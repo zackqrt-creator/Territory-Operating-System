@@ -25,3 +25,32 @@ export function daysUntil(iso: string): number {
   now.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - now.getTime()) / 86400000);
 }
+
+/** Sunday of the week containing the given ISO date (or today). */
+export function weekStart(iso?: string): string {
+  const d = iso ? new Date(`${iso}T00:00:00`) : new Date();
+  d.setDate(d.getDate() - d.getDay());
+  return toISODate(d);
+}
+
+export function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return toISODate(d);
+}
+
+/** The 7 ISO dates (Sun..Sat) for the week starting at weekStartISO. */
+export function weekDays(weekStartISO: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => addDays(weekStartISO, i));
+}
+
+export function formatWeekRange(weekStartISO: string): string {
+  const start = new Date(`${weekStartISO}T00:00:00`);
+  const end = new Date(`${addDays(weekStartISO, 6)}T00:00:00`);
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}`;
+}
+
+export function isToday(iso: string): boolean {
+  return iso === toISODate(new Date());
+}

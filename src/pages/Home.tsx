@@ -58,7 +58,7 @@ export default function Home() {
             <p className="mt-1 text-3xl font-semibold text-white">{nextSevenDays.length}</p>
             <p className="text-sm text-slate-400">scheduled cases</p>
             <Link to="/cases" className="mt-2 inline-block text-sm text-sky-400">
-              View all cases &rarr;
+              Open calendar &rarr;
             </Link>
           </div>
 

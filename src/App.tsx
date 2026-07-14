@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
-import Cases from "./pages/Cases";
+import Calendar from "./pages/Calendar";
 import AddCase from "./pages/AddCase";
 import Inventory from "./pages/Inventory";
 import Scan from "./pages/Scan";
@@ -33,7 +33,7 @@ function App() {
     <>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/cases" element={<Cases />} />
+        <Route path="/cases" element={<Calendar />} />
         <Route path="/cases/new" element={<AddCase />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/scan" element={<Scan />} />

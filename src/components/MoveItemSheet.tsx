@@ -6,16 +6,21 @@ import type { Facility, InventoryItem } from "../lib/types";
 export default function MoveItemSheet({
   item,
   facilities,
+  initialTarget,
+  relatedCaseId,
   onClose,
   onMoved,
 }: {
   item: InventoryItem;
   facilities: Facility[];
+  /** Skips the destination-picking step, e.g. a readiness-checklist quick-fix. */
+  initialTarget?: Facility;
+  relatedCaseId?: string;
   onClose: () => void;
   onMoved: () => void;
 }) {
   const { profile } = useAuth();
-  const [target, setTarget] = useState<Facility | null>(null);
+  const [target, setTarget] = useState<Facility | null>(initialTarget ?? null);
   const [saving, setSaving] = useState(false);
 
   const currentFacility = facilities.find((f) => f.id === item.location_id);
@@ -30,6 +35,7 @@ export default function MoveItemSheet({
         toLocation: target.id,
         movedBy: profile.id,
         territoryId: profile.territory_id,
+        relatedCaseId,
       });
       onMoved();
     } finally {

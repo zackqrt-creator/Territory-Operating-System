@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { bulkCreateCases, createCase, listFacilities, updateLastFacility } from "../lib/api";
-import type { Facility, Side, SurgeryType } from "../lib/types";
+import type { CaseVariant, Facility, Side, SurgeryType } from "../lib/types";
 import { nextWednesday } from "../utils/dates";
 import { dedupeByCaseId, parsePasteText, type ParsedCase } from "../utils/parsePaste";
 
@@ -75,6 +75,7 @@ function QuickAddForm({
 }) {
   const [date, setDate] = useState(nextWednesday());
   const [type, setType] = useState<SurgeryType>("KNEE");
+  const [variant, setVariant] = useState<CaseVariant>("total");
   const [side, setSide] = useState<Side | null>("LEFT");
   const [facilityId, setFacilityId] = useState(lastFacilityId ?? "");
   const [surgeon, setSurgeon] = useState("");
@@ -93,7 +94,8 @@ function QuickAddForm({
     try {
       await createCase({
         surgery_type: type,
-        side: type === "KNEE" || type === "INSTRUMENT" ? side : null,
+        side,
+        variant: type === "INSTRUMENT" ? null : variant,
         surgery_date: date,
         facility_id: facilityId,
         surgeon: surgeon.trim() || null,
@@ -123,20 +125,39 @@ function QuickAddForm({
 
       <div>
         <label className="mb-1 block text-sm text-slate-400">Type</label>
-        <div className="flex gap-2">
-          {(["KNEE", "INSTRUMENT"] as SurgeryType[]).map((t) => (
+        <div className="grid grid-cols-3 gap-2">
+          {(["KNEE", "HIP", "INSTRUMENT"] as SurgeryType[]).map((t) => (
             <button
               key={t}
               onClick={() => setType(t)}
-              className={`flex-1 rounded-lg py-3 font-medium ${
+              className={`rounded-lg py-3 font-medium ${
                 type === t ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-400"
               }`}
             >
-              {t === "KNEE" ? "Knee" : "Instrument"}
+              {t === "KNEE" ? "Knee" : t === "HIP" ? "Hip" : "Instrument"}
             </button>
           ))}
         </div>
       </div>
+
+      {type !== "INSTRUMENT" && (
+        <div>
+          <label className="mb-1 block text-sm text-slate-400">Total or partial</label>
+          <div className="flex gap-2">
+            {(["total", "partial"] as CaseVariant[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setVariant(v)}
+                className={`flex-1 rounded-lg py-3 font-medium capitalize ${
+                  variant === v ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-400"
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="mb-1 block text-sm text-slate-400">Side</label>

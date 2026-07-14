@@ -16,9 +16,10 @@ export interface Profile {
   last_facility_id: string | null;
 }
 
-export type SurgeryType = "KNEE" | "INSTRUMENT";
+export type SurgeryType = "KNEE" | "HIP" | "INSTRUMENT";
 export type Side = "LEFT" | "RIGHT";
 export type CaseStatus = "scheduled" | "completed" | "cancelled";
+export type CaseVariant = "total" | "partial";
 
 export interface CaseRow {
   id: string;
@@ -33,6 +34,7 @@ export interface CaseRow {
   surgeon: string | null;
   status: CaseStatus;
   notes: string | null;
+  variant: CaseVariant | null;
   template_id: string | null;
   created_by: string | null;
   created_at: string;
@@ -72,5 +74,17 @@ export interface CaseTemplate {
   territory_id: string;
   name: string;
   surgery_type: "KNEE" | "HIP";
-  variant: "total" | "partial";
+  variant: CaseVariant;
+}
+
+export interface CaseTemplateItem {
+  id: string;
+  template_id: string;
+  category: ItemCategory;
+  name: string;
+  quantity: number;
+}
+
+export interface CaseTemplateWithItems extends CaseTemplate {
+  case_template_items: CaseTemplateItem[];
 }

@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { CaseRow, Facility, InventoryItem, Movement } from "./types";
+import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem, Movement } from "./types";
 
 export async function listFacilities(): Promise<Facility[]> {
   const { data, error } = await supabase.from("facilities").select("*").order("name");
@@ -17,13 +17,32 @@ export async function listUpcomingCases(): Promise<CaseRow[]> {
   return data as CaseRow[];
 }
 
+export async function listCasesInRange(startISO: string, endISO: string): Promise<CaseRow[]> {
+  const { data, error } = await supabase
+    .from("cases")
+    .select("*")
+    .gte("surgery_date", startISO)
+    .lte("surgery_date", endISO)
+    .order("surgery_date", { ascending: true })
+    .order("surgery_time", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return data as CaseRow[];
+}
+
+export async function listCaseTemplatesWithItems(): Promise<CaseTemplateWithItems[]> {
+  const { data, error } = await supabase.from("case_templates").select("*, case_template_items(*)");
+  if (error) throw error;
+  return data as CaseTemplateWithItems[];
+}
+
 export interface NewCaseInput {
   case_id?: string | null;
-  surgery_type: "KNEE" | "INSTRUMENT";
+  surgery_type: "KNEE" | "HIP" | "INSTRUMENT";
   side?: "LEFT" | "RIGHT" | null;
   surgery_date: string;
   surgery_time?: string | null;
   time_tba?: boolean;
+  variant?: "total" | "partial" | null;
   facility_id: string;
   surgeon?: string | null;
   notes?: string | null;
