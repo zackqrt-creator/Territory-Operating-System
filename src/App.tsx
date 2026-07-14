@@ -1,0 +1,47 @@
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "./hooks/useAuth";
+import Login from "./pages/Login";
+import Home from "./pages/Home";
+import Cases from "./pages/Cases";
+import AddCase from "./pages/AddCase";
+import Inventory from "./pages/Inventory";
+import Scan from "./pages/Scan";
+import BottomNav from "./components/BottomNav";
+
+function App() {
+  const { session, profile, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-slate-400">Loading...</div>
+    );
+  }
+
+  if (!session) {
+    return <Login />;
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-6 text-center text-slate-400">
+        Setting up your account... if this doesn't finish in a few seconds, refresh the page.
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/cases" element={<Cases />} />
+        <Route path="/cases/new" element={<AddCase />} />
+        <Route path="/inventory" element={<Inventory />} />
+        <Route path="/scan" element={<Scan />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <BottomNav />
+    </>
+  );
+}
+
+export default App;

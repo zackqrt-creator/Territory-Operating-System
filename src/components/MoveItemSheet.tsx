@@ -1,0 +1,92 @@
+import { useState } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { moveItem } from "../lib/api";
+import type { Facility, InventoryItem } from "../lib/types";
+
+export default function MoveItemSheet({
+  item,
+  facilities,
+  onClose,
+  onMoved,
+}: {
+  item: InventoryItem;
+  facilities: Facility[];
+  onClose: () => void;
+  onMoved: () => void;
+}) {
+  const { profile } = useAuth();
+  const [target, setTarget] = useState<Facility | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const currentFacility = facilities.find((f) => f.id === item.location_id);
+  const destinations = facilities.filter((f) => f.id !== item.location_id);
+
+  async function confirmMove() {
+    if (!target || !profile) return;
+    setSaving(true);
+    try {
+      await moveItem({
+        item,
+        toLocation: target.id,
+        movedBy: profile.id,
+        territoryId: profile.territory_id,
+      });
+      onMoved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end bg-black/60" onClick={onClose}>
+      <div
+        className="w-full rounded-t-2xl bg-slate-900 p-5 pb-8"
+        style={{ paddingBottom: "calc(2rem + var(--safe-bottom))" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
+        <h2 className="text-lg font-semibold text-white">{item.name}</h2>
+        <p className="text-sm text-slate-400">Currently at {currentFacility?.name ?? "unknown"}</p>
+
+        {!target ? (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {destinations.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setTarget(f)}
+                className="rounded-lg bg-slate-800 py-4 font-medium text-white active:bg-slate-700"
+              >
+                {f.name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <p className="text-slate-200">
+              Move to <span className="font-semibold text-white">{target.name}</span>?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setTarget(null)}
+                className="flex-1 rounded-lg bg-slate-800 py-3 font-medium text-white"
+              >
+                Back
+              </button>
+              <button
+                onClick={confirmMove}
+                disabled={saving}
+                className="flex-1 rounded-lg bg-sky-600 py-3 font-medium text-white disabled:opacity-50"
+              >
+                {saving ? "Moving..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <button onClick={onClose} className="mt-4 w-full text-sm text-slate-500 underline">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
