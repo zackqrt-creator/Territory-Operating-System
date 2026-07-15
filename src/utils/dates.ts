@@ -54,3 +54,15 @@ export function formatWeekRange(weekStartISO: string): string {
 export function isToday(iso: string): boolean {
   return iso === toISODate(new Date());
 }
+
+export function tomorrow(): string {
+  return addDays(toISODate(new Date()), 1);
+}
+
+/** Formats a "HH:MM" or "HH:MM:SS" time string as e.g. "7:30 AM". */
+export function formatTime(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}

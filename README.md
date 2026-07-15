@@ -16,9 +16,14 @@ trunk. Built with React + Vite + Supabase.
   Gaps show red, right down to which other facility has the item — tapping a case opens the full
   checklist, and a gap has a one-tap "Move to [facility]" action wired straight into the
   inventory move flow.
+- **Staging report** (`/staging`, the killer feature) — pick a day (defaults to tomorrow) and it
+  rolls up every case that day into one run sheet: a haul list grouped by "from facility → to
+  facility" with a one-tap move per item, a count of what's already staged, anything required
+  that isn't in inventory anywhere, and every loaner kit due back at corporate within the week
+  (with a one-tap "Ship" action). Home shows a live summary card whenever tomorrow has cases.
 
-**Not built yet** (next up — see "What's next" below): the Tuesday staging report, loaner
-return countdown view, post-case quick log / replenishment, and the team activity feed.
+**Not built yet** (next up — see "What's next" below): the loaner return countdown as its own
+dedicated view, post-case quick log / replenishment, and the team activity feed.
 
 ---
 
@@ -123,15 +128,13 @@ for trays that don't have one and tape them on.
 
 Ranked in the order the original brief lays them out — tell me which to build next:
 
-1. **Tuesday staging report** — the killer feature: what to haul where before Wednesday, and
-   what loaners ship back to corporate.
-2. **Loaner return countdown** view, sorted most-urgent-first (the red state at 2 days out is
-   already computed in `daysUntil()` / used on Home and Inventory, just needs its own dedicated
-   list).
-3. **Post-case quick log** → auto-generates replenishment list, decrements inventory.
-4. **Team activity feed** ("Zack moved GMK tray from A to Vehicle, 7:42 AM") — the `movements`
+1. **Loaner return countdown** view, sorted most-urgent-first (the staging report already
+   surfaces the urgent ones; this would be a dedicated, always-current list beyond just the next
+   7 days).
+2. **Post-case quick log** → auto-generates replenishment list, decrements inventory.
+3. **Team activity feed** ("Zack moved GMK tray from A to Vehicle, 7:42 AM") — the `movements`
    table already has everything needed; this is a UI-only addition.
-5. **Offline queueing** for scans made without signal.
+4. **Offline queueing** for scans made without signal.
 
 ## Project structure
 
@@ -141,13 +144,25 @@ src/lib/supabase.ts       # Supabase client
 src/lib/api.ts            # all database reads/writes
 src/lib/types.ts          # TypeScript types matching the schema
 src/lib/readiness.ts      # matches a case to its template, diffs required items against inventory
+src/lib/staging.ts        # rolls up a day's cases into the haul list + loaner ship list
 src/hooks/useAuth.tsx     # session + profile state
 src/pages/Calendar.tsx    # Wednesday-anchored week view (route: /cases)
+src/pages/StagingReport.tsx  # the staging report (route: /staging)
 src/pages/                # one file per screen
 src/components/           # shared bottom sheets (move item, add item, readiness checklist), nav
 src/utils/parsePaste.ts   # myOPS paste-import parser
 src/utils/dates.ts        # next-Wednesday default, week math, countdown math
 ```
+
+## A note on "every Tuesday"
+
+The brief describes this as something that generates itself every Tuesday. There's no
+background server here to run something on a schedule — it's a static site, so the report is
+computed live, on demand, whenever you open `/staging`. It defaults to **tomorrow**, so opening
+it on a Tuesday naturally shows Wednesday's run sheet (and on a Thursday, Friday's). You can
+also page backward/forward a day at a time to preview or revisit any day. If you want an actual
+Tuesday-morning nudge on your phone, that would mean adding push notifications — a bigger
+addition; say the word if you want it.
 
 ## A note on hip cases and "total vs. partial"
 

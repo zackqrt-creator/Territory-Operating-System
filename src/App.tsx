@@ -6,6 +6,7 @@ import Calendar from "./pages/Calendar";
 import AddCase from "./pages/AddCase";
 import Inventory from "./pages/Inventory";
 import Scan from "./pages/Scan";
+import StagingReport from "./pages/StagingReport";
 import BottomNav from "./components/BottomNav";
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
         <Route path="/cases/new" element={<AddCase />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/scan" element={<Scan />} />
+        <Route path="/staging" element={<StagingReport />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />
