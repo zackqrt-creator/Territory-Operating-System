@@ -138,6 +138,8 @@ export interface ToteTemplateItem {
   tote_template_id: string;
   catalog_item_id: string;
   quantity_per_tote: number;
+  /** Physical packing order (1, 2, 3...) so the pack list can match how you actually load the tote. */
+  pack_layer: number | null;
 }
 
 export interface ToteTemplateWithItems extends ToteTemplate {

@@ -129,13 +129,33 @@ function PackGroupCard({ group }: { group: PackGroup }) {
         </div>
       ))}
 
-      {group.implantLines.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {group.implantLines.map((line, i) => (
-            <PackLineRow key={i} line={line} />
-          ))}
+      {group.implantLines.length > 0 && <LayeredLines lines={group.implantLines} />}
+    </div>
+  );
+}
+
+function LayeredLines({ lines }: { lines: PackLine[] }) {
+  const layers = new Map<number | null, PackLine[]>();
+  for (const line of lines) {
+    const list = layers.get(line.packLayer) ?? [];
+    list.push(line);
+    layers.set(line.packLayer, list);
+  }
+
+  return (
+    <div className="mt-3 space-y-4">
+      {[...layers.entries()].map(([layer, layerLines]) => (
+        <div key={layer ?? "other"}>
+          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+            {layer ? `Layer ${layer}` : "Other"}
+          </h3>
+          <div className="space-y-2">
+            {layerLines.map((line, i) => (
+              <PackLineRow key={i} line={line} />
+            ))}
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }

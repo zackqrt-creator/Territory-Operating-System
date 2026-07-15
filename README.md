@@ -46,9 +46,11 @@ trunk. Built with React + Vite + Supabase.
   the pack list groups that day's cases by surgeon + side, multiplies the whole tote by however
   many same-side cases need it that day (since an opened implant can't go back on the shelf — 3
   same-side cases means 3 complete size-runs), and checks every size against on-hand inventory
-  with lot numbers. Instrument trays get a separate, non-blocking advisory instead of a hard
-  requirement, since they're normally resterilized and reused between cases — see "A note on the
-  pack list" below for exactly how that ratio works and what's still placeholder data.
+  with lot numbers, grouped into **Layer 1/2/3** matching how you physically load a tote.
+  Instrument trays get a separate, non-blocking advisory instead of a hard requirement, since
+  they're normally resterilized and reused between cases. A tote only needs to be defined for one
+  side — the other side resolves automatically once matching catalog items exist for it. See "A
+  note on the pack list" below for what's real (from your photos) vs. still open.
 - **Reserve-facility alerts** — flag a facility (e.g. a rarely-touched backup storage location)
   as `alert_on_withdrawal`, and any time something leaves it, it shows up in red across Home and
   the Activity feed until someone taps "Mark replenished." There's no push/SMS infrastructure
@@ -85,6 +87,10 @@ way:
    - `005_seed_surgeon_bom_example.sql` — example starter data (Dr. Sidhu, KA One totes). Read
      the comment block at the top of that file before you rely on it for a real case — it lists
      exactly what's confirmed vs. placeholder.
+   - `006_pack_layers_and_real_catalog.sql` — corrects the placeholder product names to the real
+     brands (confirmed from your photos), adds Right-side catalog items, expands tibial inserts
+     to real size × thickness combinations, and adds the Layer 1/2/3 packing order. **Must run
+     after 005**, since it edits what 005 created.
    - Already ran earlier ones? Just run whichever new numbered file(s) you haven't yet — you
      don't need to redo ones you already ran.
 4. Whenever this repo gets an update with a new numbered file in `supabase/migrations/`, run
@@ -166,23 +172,26 @@ for trays that don't have one and tape them on.
 
 ## What's next
 
-**Before the pack list is trustworthy for a real case**, I need from you:
+**Before the pack list is trustworthy for a real case**, I still need from you:
 
-1. Which facility is Lodi (or if it's not one of the 4 seeded ones yet, its real name) — for now,
+1. Which facility is Lodi (or its real name if it's not one of the 4 seeded ones yet) — for now,
    flip `alert_on_withdrawal` to `true` on that row in Supabase's **Table Editor** →
    `facilities`. I can build an in-app toggle for this later if you want one.
-2. Right-side KA One catalog items — I only seeded Left (matching your walkthrough example).
-   Once Right items exist with the same product_line/category/size_label, the pack list picks
-   them up automatically; no template changes needed.
-3. Clarification on the two "Partial Small Tote" descriptions and both Revision totes — the
-   phrasing in chat had some ambiguity I didn't want to silently guess on (see the comment block
-   at the top of `005_seed_surgeon_bom_example.sql`).
-4. Whether the "Inserts sizes 1-6" in the tote maps to the same GMK Sphere Vit-E product line as
-   the specific loaner items you gave me (SPKAEFFL, GSLVEMIC01, etc.) — their size codes don't
-   obviously line up, so I kept them separate rather than guess.
-5. Real catalog/item numbers for the sized femur/tibia/insert/Motopat items, whenever you have
-   them handy — not required for the pack list to work (it matches by name/size), but useful for
-   your own reference.
+2. Whether the KA One instrument set is really **one combined unit** (all its trays always
+   travel/sterilize together) or should be tracked as **separate trays** — from your photos it
+   looks like at least 2-3 distinct trays. Right now it's modeled as one; tell me if a tray can
+   go missing independently of the others and I'll split it out.
+3. Clarification on the two "Partial Small Tote" descriptions and both Revision totes from your
+   very first message — still not seeded, the phrasing had ambiguity I didn't want to guess on
+   (see the comment block at the top of `005_seed_surgeon_bom_example.sql`).
+4. Whether the "Inserts" in the tote are really the same GMK Sphere Primary E-Cross line as the
+   specific loaner items from your live example (SPKAEFFL, GSLVEMIC01, etc.) — their size codes
+   ("Micro S1", "17-20") still don't obviously map onto the size/thickness catalog now seeded, so
+   I've kept them separate rather than guess.
+5. Real item numbers for inserts and Moto PFJ patella components, whenever convenient — femur and
+   tibial tray REFs are now populated (derived from the clean pattern on your labels), but I
+   didn't trust myself to derive insert/patella codes the same way. Not required for the pack
+   list to work either way (matching is by name/size).
 
 **Once that's settled**, the natural next steps for the pack-batching workflow you described:
 
@@ -297,10 +306,20 @@ for single-use instruments (like the Spherika Efficiency plastic sets) — those
 per-case requirement as implants instead of the soft advisory.
 
 **Sizing without a separate "Right tote"**: tote templates only need to be built once. Each line
-item is a specific catalog item (e.g. "KA One Femoral Component, Left, size 2+"); when a case's
-side doesn't match, the engine looks for the same product line/category/size on the other side
-and uses that instead. So once Right-side catalog items exist, Right-side cases just work — you
-don't define a second template.
+item is a specific catalog item (e.g. "GMK Spherika Femoral Component, Left, size 2+"); when a
+case's side doesn't match, the engine looks for the same product line/category/size on the other
+side and uses that instead. Right-side catalog items now exist (from your photos), so Right-side
+cases already resolve correctly — verified end-to-end with mock data.
+
+**Layers**: each tote line item can carry a `pack_layer` (1, 2, 3...) and the pack list groups
+and orders the checklist by it, matching how you actually load a tote — Layer 1 (femurs + tibial
+trays), Layer 2 (inserts), Layer 3 (size-7 femur, Moto PFJ, fixation hardware) for the KA One
+Complete Tote, based on your photos. Items without a layer sort to the bottom under "Other."
+
+**Inserts carry real size × thickness combinations**, not just "one per size" — your photos
+showed multiple thicknesses (10-20mm) stocked per size, so the catalog now has that full grid for
+both sides (42 combinations: 6 sizes × 7 thicknesses). Combinations you don't actually stock just
+show 0 on hand, which is the correct, honest signal rather than silently excluding a real one.
 
 **On-hand quantities are territory-wide**, not filtered to the case's facility — the question the
 pack list answers is "do I have enough of this size anywhere," not "is it already at the right

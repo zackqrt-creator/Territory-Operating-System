@@ -17,6 +17,8 @@ export interface PackLine {
   onHandQty: number;
   matchedItems: InventoryItem[];
   status: PackStatus;
+  /** Physical packing order, when the tote template defines one — null sorts last. */
+  packLayer: number | null;
 }
 
 export interface InstrumentAdvice {
@@ -156,6 +158,7 @@ export function buildPackList(
             onHandQty,
             matchedItems: matched,
             status: onHandQty >= required ? "ready" : onHandQty > 0 ? "short" : "missing",
+            packLayer: toteItem.pack_layer,
           });
         }
       }
@@ -198,9 +201,16 @@ export function buildPackList(
           onHandQty: traysAvailable,
           matchedItems: resolvedTray ? matchInventory(resolvedTray, inventory) : [],
           status: traysAvailable >= required ? "ready" : traysAvailable > 0 ? "short" : "missing",
+          packLayer: trayItem.pack_layer,
         });
       }
     }
+
+    const implantLines = [...implantLineMap.values()].sort((a, b) => {
+      const layerDiff = (a.packLayer ?? 99) - (b.packLayer ?? 99);
+      if (layerDiff !== 0) return layerDiff;
+      return a.catalogItem.name.localeCompare(b.catalogItem.name) || (a.catalogItem.size_label ?? "").localeCompare(b.catalogItem.size_label ?? "");
+    });
 
     return {
       key,
@@ -208,7 +218,7 @@ export function buildPackList(
       surgeryType: sample.surgery_type,
       side,
       cases: groupCases,
-      implantLines: [...implantLineMap.values()],
+      implantLines,
       instrumentAdvice,
       unresolvedNote: null,
     };
