@@ -21,9 +21,15 @@ trunk. Built with React + Vite + Supabase.
   facility" with a one-tap move per item, a count of what's already staged, anything required
   that isn't in inventory anywhere, and every loaner kit due back at corporate within the week
   (with a one-tap "Ship" action). Home shows a live summary card whenever tomorrow has cases.
+- **Post-case quick log** — a "Log case" button on the case checklist. Tap what was actually
+  used (implants and consumables only — loaner kits/trays aren't consumed, they get moved back
+  via the existing flow), adjust quantities with +/− if a case ran long on cement or needed an
+  extra unit, and submitting decrements inventory, marks the case complete, and shows you a
+  replenishment list of exactly what to restock. Decrementing consumes the earliest-expiring lot
+  first (FIFO) when a facility is holding more than one lot of the same implant.
 
 **Not built yet** (next up — see "What's next" below): the loaner return countdown as its own
-dedicated view, post-case quick log / replenishment, and the team activity feed.
+dedicated view, and the team activity feed.
 
 ---
 
@@ -131,17 +137,16 @@ Ranked in the order the original brief lays them out — tell me which to build 
 1. **Loaner return countdown** view, sorted most-urgent-first (the staging report already
    surfaces the urgent ones; this would be a dedicated, always-current list beyond just the next
    7 days).
-2. **Post-case quick log** → auto-generates replenishment list, decrements inventory.
-3. **Team activity feed** ("Zack moved GMK tray from A to Vehicle, 7:42 AM") — the `movements`
+2. **Team activity feed** ("Zack moved GMK tray from A to Vehicle, 7:42 AM") — the `movements`
    table already has everything needed; this is a UI-only addition.
-4. **Offline queueing** for scans made without signal.
+3. **Offline queueing** for scans made without signal.
 
 ## Project structure
 
 ```
 supabase/migrations/      # run these in order in the Supabase SQL editor
 src/lib/supabase.ts       # Supabase client
-src/lib/api.ts            # all database reads/writes
+src/lib/api.ts            # all database reads/writes, incl. logCaseUsage (post-case decrement)
 src/lib/types.ts          # TypeScript types matching the schema
 src/lib/readiness.ts      # matches a case to its template, diffs required items against inventory
 src/lib/staging.ts        # rolls up a day's cases into the haul list + loaner ship list
@@ -149,7 +154,7 @@ src/hooks/useAuth.tsx     # session + profile state
 src/pages/Calendar.tsx    # Wednesday-anchored week view (route: /cases)
 src/pages/StagingReport.tsx  # the staging report (route: /staging)
 src/pages/                # one file per screen
-src/components/           # shared bottom sheets (move item, add item, readiness checklist), nav
+src/components/           # shared bottom sheets (move/add item, readiness checklist, quick log), nav
 src/utils/parsePaste.ts   # myOPS paste-import parser
 src/utils/dates.ts        # next-Wednesday default, week math, countdown math
 ```
@@ -173,3 +178,13 @@ since you do THA and partial cases too; this is what the readiness checklist use
 right template. Paste-imported cases default to total, since myOPS's export doesn't distinguish
 partial in what you pulled — edit a case in Supabase's **Table Editor** → `cases` → `variant`
 column if one of the pasted-in cases was actually a partial.
+
+## A note on post-case logging
+
+There's no separate "reorder" table — the replenishment list is just a plain-language summary
+of exactly what you tapped as used, shown once, right after logging. If you need to see it
+again later, the used quantities are in the `movements` table (search by case or item) since
+each decrement writes an audit row there too — note that its `from_location`/`to_location` are
+both set to the case's facility for these, since nothing physically moved; only the quantity did.
+Quick-logging a case doesn't move the loaner kit or instrument tray anywhere — those still need
+a manual move (or the staging report will catch it) once you're done with them.

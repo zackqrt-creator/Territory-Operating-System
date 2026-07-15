@@ -1,5 +1,12 @@
 import { supabase } from "./supabase";
-import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem, Movement } from "./types";
+import type {
+  CaseRow,
+  CaseTemplateWithItems,
+  Facility,
+  InventoryItem,
+  ItemCategory,
+  Movement,
+} from "./types";
 
 export async function listFacilities(): Promise<Facility[]> {
   const { data, error } = await supabase.from("facilities").select("*").order("name");
@@ -156,4 +163,70 @@ export async function listMovementsForItem(itemId: string): Promise<Movement[]> 
 
 export async function updateLastFacility(profileId: string, facilityId: string): Promise<void> {
   await supabase.from("profiles").update({ last_facility_id: facilityId }).eq("id", profileId);
+}
+
+export interface UsedItem {
+  category: ItemCategory;
+  name: string;
+  quantity: number;
+}
+
+/**
+ * Post-case quick log: decrements inventory for whatever was used, consuming
+ * the earliest-expiring lot first (FIFO), writes an audit-log movement per
+ * decrement, and marks the case completed. `inventory` is the caller's
+ * current in-memory snapshot, used only to pick which rows to decrement —
+ * the actual writes go straight to Supabase.
+ */
+export async function logCaseUsage(params: {
+  caseRow: CaseRow;
+  usedItems: UsedItem[];
+  inventory: InventoryItem[];
+  movedBy: string;
+  territoryId: string;
+}): Promise<void> {
+  const { caseRow, usedItems, inventory, movedBy, territoryId } = params;
+  const facilityId = caseRow.facility_id;
+  if (!facilityId) throw new Error("Case has no facility set");
+
+  for (const use of usedItems) {
+    if (use.quantity <= 0) continue;
+
+    const rows = inventory
+      .filter(
+        (i) => i.category === use.category && i.name === use.name && i.location_id === facilityId,
+      )
+      .sort((a, b) => (a.expiration_date ?? "9999-12-31").localeCompare(b.expiration_date ?? "9999-12-31"));
+
+    let remaining = use.quantity;
+    for (const row of rows) {
+      if (remaining <= 0) break;
+      const consumed = Math.min(remaining, row.quantity);
+      if (consumed <= 0) continue;
+      remaining -= consumed;
+
+      const { error: updateError } = await supabase
+        .from("inventory_items")
+        .update({ quantity: row.quantity - consumed })
+        .eq("id", row.id);
+      if (updateError) throw updateError;
+
+      const { error: moveError } = await supabase.from("movements").insert({
+        territory_id: territoryId,
+        item_id: row.id,
+        from_location: facilityId,
+        to_location: facilityId,
+        moved_by: movedBy,
+        related_case_id: caseRow.id,
+        note: `Used ${consumed} in case`,
+      });
+      if (moveError) throw moveError;
+    }
+  }
+
+  const { error: caseError } = await supabase
+    .from("cases")
+    .update({ status: "completed" })
+    .eq("id", caseRow.id);
+  if (caseError) throw caseError;
 }

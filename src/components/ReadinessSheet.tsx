@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem } from "../lib/types";
 import { computeReadiness, gapMessage } from "../lib/readiness";
 import MoveItemSheet from "./MoveItemSheet";
+import QuickLogSheet from "./QuickLogSheet";
 import { formatDateShort } from "../utils/dates";
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -33,6 +34,7 @@ export default function ReadinessSheet({
   onRefresh: () => void;
 }) {
   const [moving, setMoving] = useState<{ item: InventoryItem; target: Facility } | null>(null);
+  const [logging, setLogging] = useState(false);
 
   const caseFacility = facilities.find((f) => f.id === caseRow.facility_id);
   const readiness = computeReadiness(caseRow, templates, inventory, facilities);
@@ -56,6 +58,19 @@ export default function ReadinessSheet({
         </p>
         {caseRow.surgeon && <p className="text-sm text-slate-500">{caseRow.surgeon}</p>}
         {caseRow.case_id && <p className="text-xs text-slate-600">Case #{caseRow.case_id}</p>}
+
+        {caseRow.status === "completed" ? (
+          <span className="mt-3 inline-block rounded bg-emerald-900 px-2 py-1 text-xs font-medium text-emerald-300">
+            ✓ Logged complete
+          </span>
+        ) : (
+          <button
+            onClick={() => setLogging(true)}
+            className="mt-3 w-full rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white active:bg-emerald-800"
+          >
+            Log case
+          </button>
+        )}
 
         <div className="mt-5">
           {!readiness.applicable ? (
@@ -126,6 +141,21 @@ export default function ReadinessSheet({
           onMoved={() => {
             setMoving(null);
             onRefresh();
+          }}
+        />
+      )}
+
+      {logging && (
+        <QuickLogSheet
+          caseRow={caseRow}
+          templates={templates}
+          inventory={inventory}
+          facilities={facilities}
+          onClose={() => setLogging(false)}
+          onLogged={() => {
+            setLogging(false);
+            onRefresh();
+            onClose();
           }}
         />
       )}
