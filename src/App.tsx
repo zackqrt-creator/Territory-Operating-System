@@ -11,6 +11,7 @@ import LoanerReturns from "./pages/LoanerReturns";
 import ActivityFeed from "./pages/ActivityFeed";
 import PackList from "./pages/PackList";
 import Surgeons from "./pages/Surgeons";
+import Readiness from "./pages/Readiness";
 import BottomNav from "./components/BottomNav";
 
 function App() {
@@ -47,6 +48,7 @@ function App() {
         <Route path="/activity" element={<ActivityFeed />} />
         <Route path="/pack-list" element={<PackList />} />
         <Route path="/surgeons" element={<Surgeons />} />
+        <Route path="/readiness" element={<Readiness />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

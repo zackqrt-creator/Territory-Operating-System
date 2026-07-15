@@ -17,7 +17,11 @@ import type {
 } from "./types";
 
 export async function listFacilities(): Promise<Facility[]> {
-  const { data, error } = await supabase.from("facilities").select("*").order("name");
+  const { data, error } = await supabase
+    .from("facilities")
+    .select("*")
+    .order("sourcing_priority")
+    .order("name");
   if (error) throw error;
   return data as Facility[];
 }
@@ -126,12 +130,94 @@ export interface NewItemInput {
   territory_id: string;
   catalog_item_id?: string | null;
   photo_url?: string | null;
+  acquisition_type?: "consignment" | "loaner";
+  loaner_tote_id?: string | null;
+  loaner_code?: string | null;
+  contents_label?: string | null;
+  cement_type?: "cemented" | "cementless" | null;
 }
 
 export async function createInventoryItem(input: NewItemInput): Promise<InventoryItem> {
   const { data, error } = await supabase.from("inventory_items").insert(input).select().single();
   if (error) throw error;
   return data as InventoryItem;
+}
+
+/** One line of a loaner tote's contents: a catalog item and how many of it are inside. */
+export interface LoanerContentLine {
+  catalog_item_id: string;
+  name: string;
+  category: ItemCategory;
+  quantity: number;
+  lot_number?: string | null;
+}
+
+/**
+ * Creates a loaner tote (the container row, carrying the outer code + inner
+ * label) and its contents in one go. Each content line becomes its own
+ * inventory row linked to a catalog item and back to the tote, with
+ * acquisition_type 'loaner', so it rolls into per-size/side availability
+ * totals right alongside consignment stock.
+ */
+export async function createLoanerTote(params: {
+  loanerCode: string;
+  contentsLabel: string | null;
+  locationId: string;
+  territoryId: string;
+  returnDeadline?: string | null;
+  contents: LoanerContentLine[];
+}): Promise<InventoryItem> {
+  const { loanerCode, contentsLabel, locationId, territoryId, returnDeadline, contents } = params;
+
+  const { data: tote, error: toteError } = await supabase
+    .from("inventory_items")
+    .insert({
+      name: contentsLabel || loanerCode,
+      category: "loaner_kit",
+      location_id: locationId,
+      territory_id: territoryId,
+      acquisition_type: "loaner",
+      loaner_code: loanerCode,
+      contents_label: contentsLabel,
+      loaner_return_deadline: returnDeadline ?? null,
+      quantity: 1,
+    })
+    .select()
+    .single();
+  if (toteError) throw toteError;
+  const toteRow = tote as InventoryItem;
+
+  const rows = contents
+    .filter((c) => c.quantity > 0)
+    .map((c) => ({
+      name: c.name,
+      category: c.category,
+      catalog_item_id: c.catalog_item_id,
+      lot_number: c.lot_number ?? null,
+      location_id: locationId,
+      territory_id: territoryId,
+      acquisition_type: "loaner" as const,
+      loaner_tote_id: toteRow.id,
+      quantity: c.quantity,
+    }));
+
+  if (rows.length > 0) {
+    const { error: contentError } = await supabase.from("inventory_items").insert(rows);
+    if (contentError) throw contentError;
+  }
+
+  return toteRow;
+}
+
+/** The individual content rows of a loaner tote. */
+export async function listLoanerContents(toteId: string): Promise<InventoryItem[]> {
+  const { data, error } = await supabase
+    .from("inventory_items")
+    .select("*")
+    .eq("loaner_tote_id", toteId)
+    .order("name");
+  if (error) throw error;
+  return data as InventoryItem[];
 }
 
 /** Moves an item to a new location and writes the immutable movement record. */

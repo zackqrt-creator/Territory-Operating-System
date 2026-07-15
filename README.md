@@ -75,6 +75,21 @@ trunk. Built with React + Vite + Supabase.
   of the physical device when you scan it in; it uploads to Supabase Storage and shows as a
   thumbnail. Useful for the team to visually confirm a match without asking you, especially
   while the hip catalog is still filling in.
+- **"Am I ready?" inventory readiness** (`/readiness`, headline feature) — pick a day and it
+  answers the three questions that matter: **total inventory, where it is, and do I have enough
+  for the day.** It counts every size you'd bring (a knee case needs one of every size on its
+  side, since the surgeon sizes intraop), combines **consignment + loaner** stock into one total
+  per size, and grades each size: ✅ ready, ⚠️ covered only if you dip into **Lodi reserve**
+  (flagged to replenish), or ❌ short. Shortfalls come with the smartest way to cover them —
+  haul from Elk Grove/Adventist first, order a loaner, and Lodi as the true last resort. A total
+  inventory summary (by location, reserve flagged) sits at the bottom and shows even on days with
+  no cases. Surfaced big on Home.
+- **Consignment vs. loaner tracking** — inventory now distinguishes owned **consignment** stock
+  (tracked by name/size/side, with a Cemented/Cementless toggle on femurs) from borrowed
+  **loaner totes**. A loaner tote is logged by its outer code (e.g. `SPKAEFFR08`) plus a plain
+  inner name (e.g. "Ins-Spherika Efficiency Right"); its contents are itemized so they roll into
+  the same per-size/side totals as consignment. A one-tap "quick fill a full set" adds one of
+  every size the way a loaner tote actually arrives, so a 25-piece insert tote is a couple taps.
 - **myOPS CSV import** — on Add Case, upload the CSV exported from the myOPS case table
   (File > Export on your MacBook) and it imports everything in one shot: date, time (respecting
   TBA), knee/hip/instrument, side, status ("done" cases come in as completed; canceled ones are
@@ -141,6 +156,12 @@ way:
      devices can be organized separately from knee ones, adds `photo_url` to `inventory_items`,
      and creates the `item-photos` Storage bucket. No hip products are seeded — see "A note on
      the Hips catalog" below.
+   - `009_inventory_acquisition_and_readiness.sql` — the consignment-vs-loaner tracking model
+     (`acquisition_type`, loaner-tote container columns, per-unit `cement_type`), replaces the
+     demo facilities with your real ones (Elk Grove, Adventist Memorial Hospital, Lodi Reserve,
+     Vehicle, Corporate) with a `sourcing_priority`, and backfills the real tibial-insert item
+     numbers from the confirmed REF pattern. See "A note on inventory & readiness" below. **Run
+     after 006/008.**
    - Already ran earlier ones? Just run whichever new numbered file(s) you haven't yet — you
      don't need to redo ones you already ran.
 4. Whenever this repo gets an update with a new numbered file in `supabase/migrations/`, run
@@ -403,6 +424,40 @@ That's real-time only in the sense that it's visible the next time the app is op
 an actual push/SMS alert the moment it happens, that's a separate, bigger addition (web push
 needs a service worker subscription + a Supabase function to trigger it; SMS would mean adding
 Twilio or similar). Say the word if the in-app version isn't enough.
+
+## A note on inventory & readiness
+
+**The demand model** matches how you actually pack: for a knee case you bring a full run of every
+size on that side, because the surgeon doesn't commit to a size until they're in there. So N
+same-side cases need N units of **every** size on that side — 4 right cases → 4 of every right
+size, 2 left → 2 of every left size. One complete size-run = one case. (One loaner tote of
+inserts = one of every size = one case's worth, which is why the "quick fill a full set" button
+exists.)
+
+**Availability combines consignment and loaner.** Loaner tote contents are real inventory rows
+linked to the same catalog item, so "how many size-3 right femurs do I have" counts owned and
+borrowed together. The tote's outer wrapper row isn't double-counted.
+
+**Lodi is counted but held apart.** The readiness grade is: covered without touching reserve
+(✅), covered only by dipping into Lodi (⚠️, flagged to replenish after), or short even with Lodi
+(❌ → order a loaner). This is the "don't get caught having quietly drained Lodi" logic — a
+size that's only covered by reserve shows amber, not green, and tells you to replenish.
+
+**Sourcing order** when short: Elk Grove → Adventist Memorial Hospital → order a loaner → Lodi
+reserve dead last. That's set by each facility's `sourcing_priority` (and `alert_on_withdrawal`
+marks the reserve); change the order any time in Supabase's Table Editor → `facilities`. If any
+of the real facility names/roles are wrong, fix them there too — renaming is safe, it keeps the
+IDs your inventory points at.
+
+**Cross-day depletion** works through live inventory: once a case is logged (or a Lodi pull is
+moved/consumed), the counts drop, so a case two days out sees the real, reduced availability. The
+app doesn't pre-reserve a specific unit for a future case (you don't know which size they'll use
+until surgery) — it reflects what's actually on hand, which is the honest signal.
+
+**Insert item numbers** are now filled in for the full sizes 1–6 × {10,11,12,13,14,17,20}mm × L/R
+grid, derived from the confirmed label pattern `02.12.E0{size}{height}F{side}` (your size 3 / 14mm
+/ Left label = `02.12.E0314FL`). Spot-check a couple against real boxes, but the pattern held
+across every example on your labels and the loaner packing sheet.
 
 ## A note on the Hips catalog
 

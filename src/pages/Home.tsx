@@ -121,6 +121,17 @@ export default function Home() {
             + Add case
           </Link>
 
+          <Link
+            to="/readiness"
+            className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-4 active:bg-slate-800"
+          >
+            <div>
+              <h2 className="font-semibold text-white">Am I ready?</h2>
+              <p className="text-sm text-slate-400">Every size, every case — checked against your stock</p>
+            </div>
+            <span className="text-2xl">🩺</span>
+          </Link>
+
           {staging.cases.length > 0 && (
             <Link
               to="/staging"

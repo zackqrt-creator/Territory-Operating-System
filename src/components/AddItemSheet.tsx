@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { createCatalogItem, createInventoryItem, listCatalogItems, uploadItemPhoto } from "../lib/api";
-import type { CatalogItem, CatalogJoint, CatalogSide, CementType, Facility, ItemCategory } from "../lib/types";
+import type {
+  AcquisitionType,
+  CatalogItem,
+  CatalogJoint,
+  CatalogSide,
+  CementType,
+  Facility,
+  ItemCategory,
+} from "../lib/types";
+import LoanerIntake from "./LoanerIntake";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "loaner_kit", label: "Loaner kit" },
@@ -89,6 +98,7 @@ export default function AddItemSheet({
   onCreated: () => void;
 }) {
   const { profile } = useAuth();
+  const [acquisition, setAcquisition] = useState<AcquisitionType>("consignment");
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [joint, setJoint] = useState<CatalogJoint>("KNEE");
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -99,6 +109,7 @@ export default function AddItemSheet({
   const [barcode, setBarcode] = useState(prefillBarcode ?? "");
   const [locationId, setLocationId] = useState(profile?.last_facility_id ?? facilities[0]?.id ?? "");
   const [returnDeadline, setReturnDeadline] = useState("");
+  const [cementType, setCementType] = useState<"cemented" | "cementless" | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -194,6 +205,8 @@ export default function AddItemSheet({
         territory_id: profile.territory_id,
         catalog_item_id: catalogItemId,
         photo_url: photoUrl,
+        acquisition_type: "consignment",
+        cement_type: category === "implant" ? cementType : null,
       });
       onCreated();
     } finally {
@@ -209,8 +222,32 @@ export default function AddItemSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
-        <h2 className="text-lg font-semibold text-white">Add inventory item</h2>
+        <h2 className="text-lg font-semibold text-white">Add inventory</h2>
 
+        <div className="mt-4 flex rounded-lg border border-slate-700 bg-slate-800/50 p-1">
+          {(["consignment", "loaner"] as AcquisitionType[]).map((a) => (
+            <button
+              key={a}
+              onClick={() => setAcquisition(a)}
+              className={`flex-1 rounded-md py-2 text-sm font-medium capitalize ${
+                acquisition === a ? "bg-sky-600 text-white" : "text-slate-400"
+              }`}
+            >
+              {a === "consignment" ? "Consignment" : "Loaner tote"}
+            </button>
+          ))}
+        </div>
+
+        {acquisition === "loaner" ? (
+          <LoanerIntake
+            facilities={facilities}
+            catalog={catalog}
+            territoryId={profile?.territory_id ?? ""}
+            defaultLocationId={locationId}
+            onCreated={onCreated}
+            onCancel={onClose}
+          />
+        ) : (
         <div className="mt-4 space-y-4">
           <div>
             <label className="mb-1 block text-sm text-slate-400">Joint</label>
@@ -433,6 +470,31 @@ export default function AddItemSheet({
             </div>
           </div>
 
+          {category === "implant" && (
+            <div>
+              <label className="mb-1 block text-sm text-slate-400">Cement (femurs)</label>
+              <div className="flex gap-2">
+                {(
+                  [
+                    { v: null, l: "N/A" },
+                    { v: "cemented", l: "Cemented" },
+                    { v: "cementless", l: "Cementless" },
+                  ] as { v: "cemented" | "cementless" | null; l: string }[]
+                ).map((opt) => (
+                  <button
+                    key={opt.l}
+                    onClick={() => setCementType(opt.v)}
+                    className={`flex-1 rounded-lg py-3 font-medium ${
+                      cementType === opt.v ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-400"
+                    }`}
+                  >
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm text-slate-400">Location</label>
             <select
@@ -481,7 +543,7 @@ export default function AddItemSheet({
           <button
             onClick={onSubmit}
             disabled={saving || !name.trim() || !locationId}
-            className="w-full rounded-lg bg-sky-600 px-4 py-4 text-lg font-medium text-white disabled:opacity-50"
+            className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-lg font-semibold text-white shadow-lg shadow-sky-950/60 disabled:opacity-50"
           >
             {saving ? "Saving..." : "Add item"}
           </button>
@@ -489,6 +551,7 @@ export default function AddItemSheet({
             Cancel
           </button>
         </div>
+        )}
       </div>
     </div>
   );

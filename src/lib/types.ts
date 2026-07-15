@@ -8,6 +8,8 @@ export interface Facility {
   address: string | null;
   /** Rarely-touch reserve storage (e.g. Lodi) — withdrawals get flagged red across the app. */
   alert_on_withdrawal: boolean;
+  /** Lower = pull from here first when sourcing a shortfall. Reserve sits high (~90). */
+  sourcing_priority: number;
 }
 
 export interface Profile {
@@ -44,6 +46,7 @@ export interface CaseRow {
 }
 
 export type ItemCategory = "loaner_kit" | "instrument_tray" | "implant" | "consumable";
+export type AcquisitionType = "consignment" | "loaner";
 
 export interface InventoryItem {
   id: string;
@@ -61,6 +64,16 @@ export interface InventoryItem {
   assigned_case_id: string | null;
   catalog_item_id: string | null;
   photo_url: string | null;
+  /** How this unit is held: owned consignment stock vs a borrowed loaner. */
+  acquisition_type: AcquisitionType;
+  /** For loaner tote contents: the inventory id of the tote they came in. */
+  loaner_tote_id: string | null;
+  /** On a loaner tote row: the outer code printed on the tote (e.g. SPKAEFFR08). */
+  loaner_code: string | null;
+  /** On a loaner tote row: what's inside, in plain terms (e.g. "Ins-Spherika Efficiency Right"). */
+  contents_label: string | null;
+  /** Femur cement variant, when it applies. */
+  cement_type: "cemented" | "cementless" | null;
   created_at: string;
 }
 
