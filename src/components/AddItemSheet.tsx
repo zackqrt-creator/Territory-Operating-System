@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { createInventoryItem } from "../lib/api";
-import type { Facility, ItemCategory } from "../lib/types";
+import { createInventoryItem, listCatalogItems } from "../lib/api";
+import type { CatalogItem, Facility, ItemCategory } from "../lib/types";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "loaner_kit", label: "Loaner kit" },
@@ -9,6 +9,13 @@ const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "implant", label: "Implant" },
   { value: "consumable", label: "Consumable" },
 ];
+
+function catalogLabel(c: CatalogItem): string {
+  const parts = [c.name];
+  if (c.side && c.side !== "NA") parts.push(c.side === "LEFT" ? "Left" : "Right");
+  if (c.size_label) parts.push(`Size ${c.size_label}`);
+  return parts.join(" · ");
+}
 
 export default function AddItemSheet({
   facilities,
@@ -22,6 +29,9 @@ export default function AddItemSheet({
   onCreated: () => void;
 }) {
   const { profile } = useAuth();
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogItemId, setCatalogItemId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<ItemCategory>("loaner_kit");
   const [lot, setLot] = useState("");
@@ -29,6 +39,22 @@ export default function AddItemSheet({
   const [locationId, setLocationId] = useState(profile?.last_facility_id ?? facilities[0]?.id ?? "");
   const [returnDeadline, setReturnDeadline] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    listCatalogItems().then(setCatalog);
+  }, []);
+
+  function onCatalogSearchChange(value: string) {
+    setCatalogSearch(value);
+    const match = catalog.find((c) => catalogLabel(c) === value);
+    if (match) {
+      setCatalogItemId(match.id);
+      setName(match.name);
+      setCategory(match.category);
+    } else {
+      setCatalogItemId(null);
+    }
+  }
 
   async function onSubmit() {
     if (!name.trim() || !locationId || !profile) return;
@@ -42,6 +68,7 @@ export default function AddItemSheet({
         location_id: locationId,
         loaner_return_deadline: returnDeadline || null,
         territory_id: profile.territory_id,
+        catalog_item_id: catalogItemId,
       });
       onCreated();
     } finally {
@@ -61,11 +88,35 @@ export default function AddItemSheet({
 
         <div className="mt-4 space-y-4">
           <div>
+            <label className="mb-1 block text-sm text-slate-400">Match catalog item (optional)</label>
+            <input
+              list="catalog-options"
+              value={catalogSearch}
+              onChange={(e) => onCatalogSearchChange(e.target.value)}
+              placeholder="Search by name, side, or size..."
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+            />
+            <datalist id="catalog-options">
+              {catalog.map((c) => (
+                <option key={c.id} value={catalogLabel(c)} />
+              ))}
+            </datalist>
+            <p className="mt-1 text-xs text-slate-500">
+              {catalogItemId
+                ? "Linked — this item's size will be used for the pack list."
+                : "Matching an existing catalog item pre-fills the name and links the size for the pack list."}
+            </p>
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm text-slate-400">Name</label>
             <input
               autoFocus
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setCatalogItemId(null);
+              }}
               placeholder="GMK Total Knee Loaner Kit"
               className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
             />

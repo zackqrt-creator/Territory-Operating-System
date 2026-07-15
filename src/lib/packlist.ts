@@ -21,11 +21,19 @@ export interface PackLine {
   packLayer: number | null;
 }
 
+export interface TrayStatus {
+  name: string;
+  available: number;
+}
+
 export interface InstrumentAdvice {
   toteTemplate: ToteTemplateWithItems;
-  traysAvailable: number;
-  recommendedTrays: number;
-  text: string;
+  /** Each distinct tray in the set, tracked individually — one can be short while others aren't. */
+  trays: TrayStatus[];
+  /** Complete sets on hand = the scarcest tray, since a set needs all of them together. */
+  completeSets: number;
+  recommendedSets: number;
+  caseCount: number;
 }
 
 export interface PackGroup {
@@ -173,36 +181,38 @@ export function buildPackList(
       ? toteTemplates.find((t) => t.id === pref.instrument_tote_id)
       : null;
     if (instrumentTote) {
-      // All instrument-tray line items in this tote share the same tray count.
-      const trayItem = instrumentTote.tote_template_items[0];
-      const resolvedTray = trayItem ? resolveForSide(trayItem.catalog_item, side, catalogItems) : null;
-      const traysAvailable = resolvedTray
-        ? matchInventory(resolvedTray, inventory).reduce((sum, i) => sum + i.quantity, 0)
-        : 0;
-
       if (instrumentTote.reusable) {
+        // Each tray in the set is tracked individually — a loaner for just
+        // one tray can come in and go back separately from the rest of the
+        // set, so one tray being short doesn't mean they all are.
+        const trays: TrayStatus[] = instrumentTote.tote_template_items.map((trayItem) => {
+          const resolved = resolveForSide(trayItem.catalog_item, side, catalogItems);
+          const available = resolved
+            ? matchInventory(resolved, inventory).reduce((sum, i) => sum + i.quantity, 0)
+            : 0;
+          return { name: resolved?.name ?? trayItem.catalog_item.name, available };
+        });
+        const completeSets = trays.length > 0 ? Math.min(...trays.map((t) => t.available)) : 0;
         const ratio = instrumentTote.advisory_cases_per_unit ?? 2;
-        const recommendedTrays = Math.max(1, Math.ceil(caseCount / ratio));
-        instrumentAdvice.push({
-          toteTemplate: instrumentTote,
-          traysAvailable,
-          recommendedTrays,
-          text:
-            traysAvailable >= recommendedTrays
-              ? `${traysAvailable} tray${traysAvailable === 1 ? "" : "s"} on hand for ${caseCount} case${caseCount === 1 ? "" : "s"} — should be fine with a normal turnaround between cases.`
-              : `${traysAvailable} tray${traysAvailable === 1 ? "" : "s"} on hand for ${caseCount} case${caseCount === 1 ? "" : "s"} — recommend ${recommendedTrays} if cases run back-to-back without time to resterilize.`,
-        });
-      } else if (trayItem) {
-        // Single-use instruments (e.g. plastic disposable sets) — hard per-case requirement.
-        const required = caseCount;
-        implantLineMap.set(`instrument:${instrumentTote.id}`, {
-          catalogItem: resolvedTray ?? trayItem.catalog_item,
-          requiredQty: required,
-          onHandQty: traysAvailable,
-          matchedItems: resolvedTray ? matchInventory(resolvedTray, inventory) : [],
-          status: traysAvailable >= required ? "ready" : traysAvailable > 0 ? "short" : "missing",
-          packLayer: trayItem.pack_layer,
-        });
+        const recommendedSets = Math.max(1, Math.ceil(caseCount / ratio));
+        instrumentAdvice.push({ toteTemplate: instrumentTote, trays, completeSets, recommendedSets, caseCount });
+      } else {
+        // Single-use instruments (e.g. plastic disposable sets) — hard per-case requirement, per tray.
+        for (const trayItem of instrumentTote.tote_template_items) {
+          const resolved = resolveForSide(trayItem.catalog_item, side, catalogItems);
+          const available = resolved
+            ? matchInventory(resolved, inventory).reduce((sum, i) => sum + i.quantity, 0)
+            : 0;
+          const required = caseCount;
+          implantLineMap.set(`instrument:${trayItem.id}`, {
+            catalogItem: resolved ?? trayItem.catalog_item,
+            requiredQty: required,
+            onHandQty: available,
+            matchedItems: resolved ? matchInventory(resolved, inventory) : [],
+            status: available >= required ? "ready" : available > 0 ? "short" : "missing",
+            packLayer: trayItem.pack_layer,
+          });
+        }
       }
     }
 

@@ -120,6 +120,7 @@ export interface NewItemInput {
   expiration_date?: string | null;
   loaner_return_deadline?: string | null;
   territory_id: string;
+  catalog_item_id?: string | null;
 }
 
 export async function createInventoryItem(input: NewItemInput): Promise<InventoryItem> {
@@ -378,6 +379,11 @@ export async function createSurgeon(name: string, territoryId: string): Promise<
     .single();
   if (error) throw error;
   return data as Surgeon;
+}
+
+export async function updateSurgeonNotes(surgeonId: string, notes: string): Promise<void> {
+  const { error } = await supabase.from("surgeons").update({ notes }).eq("id", surgeonId);
+  if (error) throw error;
 }
 
 export async function listSurgeonPreferences(): Promise<SurgeonPreference[]> {

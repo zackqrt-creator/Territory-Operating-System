@@ -55,6 +55,20 @@ trunk. Built with React + Vite + Supabase.
   as `alert_on_withdrawal`, and any time something leaves it, it shows up in red across Home and
   the Activity feed until someone taps "Mark replenished." There's no push/SMS infrastructure
   yet, so this is in-app visibility, not a phone notification — see the note below.
+- **Individually tracked instrument trays** — the KA One instrument set is now modeled as its
+  3 component trays (Cutting & Alignment, Sizing & Spacer Block, Drill & Cut Block) instead of
+  one combined unit, since loaners for a single tray sometimes come and go on their own. The pack
+  list shows on-hand count and a ✅/⚠️/❌ status per tray, plus a "complete sets" number
+  (the minimum across all three) so you can see at a glance if the set is actually whole.
+- **Surgeons page** (`/surgeons`) — add a surgeon, and write free-text notes on what they like,
+  what to expect, anything worth knowing before a case (separate from the structured tote
+  preferences that drive the pack list — this is just for the team). Dr. Sidhu and Dr. Neophil
+  (Lodi Memorial) are seeded; their notes are empty/placeholder until you fill them in.
+- **Catalog-linked inventory** — adding an inventory item (via the Inventory page's "+ Add" or
+  the Scan screen's "not found" fallback) now has an optional "Match catalog item" search field.
+  Matching an existing catalog entry pre-fills the name/category and links the item's exact size,
+  which is what lets the pack list match it correctly. Leaving it unmatched still works for
+  generic items — it just won't be size-aware on the pack list.
 
 Every feature from the original brief is now built, plus surgeon preference profiles and the
 pack list. See "What's next" for what's still open.
@@ -91,6 +105,11 @@ way:
      brands (confirmed from your photos), adds Right-side catalog items, expands tibial inserts
      to real size × thickness combinations, and adds the Layer 1/2/3 packing order. **Must run
      after 005**, since it edits what 005 created.
+   - `007_individual_trays_and_neophil.sql` — splits the single "KA One Instrument Tray" line
+     into its 3 component trays (tracked individually), and adds Dr. Neophil (Lodi Memorial) as a
+     surgeon. **Must run after 005/006.** The 3 tray names are my best inference from your
+     photos, not official names — rename them in Supabase's Table Editor → `catalog_items`
+     whenever convenient, nothing else depends on the exact wording.
    - Already ran earlier ones? Just run whichever new numbered file(s) you haven't yet — you
      don't need to redo ones you already ran.
 4. Whenever this repo gets an update with a new numbered file in `supabase/migrations/`, run
@@ -177,10 +196,9 @@ for trays that don't have one and tape them on.
 1. Which facility is Lodi (or its real name if it's not one of the 4 seeded ones yet) — for now,
    flip `alert_on_withdrawal` to `true` on that row in Supabase's **Table Editor** →
    `facilities`. I can build an in-app toggle for this later if you want one.
-2. Whether the KA One instrument set is really **one combined unit** (all its trays always
-   travel/sterilize together) or should be tracked as **separate trays** — from your photos it
-   looks like at least 2-3 distinct trays. Right now it's modeled as one; tell me if a tray can
-   go missing independently of the others and I'll split it out.
+2. ~~Whether the KA One instrument set is one combined unit or separate trays~~ — done: it's now
+   modeled as 3 individually tracked trays (see above). The 3 tray names are my inference from
+   your photos though — correct them whenever convenient (see migration 007's note).
 3. Clarification on the two "Partial Small Tote" descriptions and both Revision totes from your
    very first message — still not seeded, the phrasing had ambiguity I didn't want to guess on
    (see the comment block at the top of `005_seed_surgeon_bom_example.sql`).
@@ -192,27 +210,32 @@ for trays that don't have one and tape them on.
    tibial tray REFs are now populated (derived from the clean pattern on your labels), but I
    didn't trust myself to derive insert/patella codes the same way. Not required for the pack
    list to work either way (matching is by name/size).
+6. Dr. Sidhu and Dr. Neophil's actual preference context — the **Surgeons page** (`/surgeons`)
+   is built and ready for it, both are seeded with empty/placeholder notes. Add hip-implant
+   photos and the facility-audit data whenever you get to it too.
 
 **Once that's settled**, the natural next steps for the pack-batching workflow you described:
 
-6. **GS1 barcode parsing** — decode lot/expiration/GTIN straight from a scan instead of typing
+7. **GS1 barcode parsing** — decode lot/expiration/GTIN straight from a scan instead of typing
    them, once you're ready. Buildable now, independent of the harder scanning question below.
-7. **Rapid sequential scanning** for pack verification — keep the camera open and scan through a
+8. **Rapid sequential scanning** for pack verification — keep the camera open and scan through a
    tote item-by-item, checking each one off the pack list as you go. This is the realistic v1 of
    "batch scan a tote"; see the note below on why true multi-item-per-frame video scanning is a
    bigger, likely-paid undertaking I'd want to scope separately.
-8. A small in-app screen for adding/editing surgeon preferences and tote templates yourself,
-   instead of asking me to write a migration each time.
+9. A small in-app screen for adding/editing surgeon preferences and tote templates yourself,
+   instead of asking me to write a migration each time (the Surgeons page now covers notes, but
+   not the structured tote/preference wiring — that's still migration-only).
 
 **Smaller items still open:**
 
-9. **Offline queueing** for scans made without signal (explicitly called a "nice to have,
-   don't block v1" in the original brief).
-10. The loaner extend/swap suggestion doesn't check whether a "spare" unit is itself needed for
+10. **Offline queueing** for scans made without signal (explicitly called a "nice to have,
+    don't block v1" in the original brief).
+11. The loaner extend/swap suggestion doesn't check whether a "spare" unit is itself needed for
     something else soon — fine at your current scale, worth tightening once you have multiple
     reps moving kits independently.
-11. Give Staging, Loaners, Activity, and Pack their own bottom-nav visibility tuning if 6 tabs
-    ever feels cramped on your phone — tell me if it does.
+12. Give Staging, Loaners, Activity, Pack, and Surgeons their own bottom-nav visibility tuning if
+    the current 6 tabs (plus a Surgeons link off the Pack page) ever feels cramped on your phone —
+    tell me if it does.
 
 ## Project structure
 
@@ -232,6 +255,7 @@ src/pages/StagingReport.tsx  # the staging report (route: /staging)
 src/pages/LoanerReturns.tsx  # the loaner return countdown (route: /loaners)
 src/pages/ActivityFeed.tsx   # the team activity feed (route: /activity)
 src/pages/PackList.tsx    # the pack list (route: /pack-list)
+src/pages/Surgeons.tsx    # surgeon list + free-text preference notes (route: /surgeons)
 src/pages/                # one file per screen
 src/components/           # shared bottom sheets (move/add item, readiness checklist, quick log, extend), nav
 src/utils/parsePaste.ts   # myOPS paste-import parser
@@ -324,6 +348,18 @@ show 0 on hand, which is the correct, honest signal rather than silently excludi
 **On-hand quantities are territory-wide**, not filtered to the case's facility — the question the
 pack list answers is "do I have enough of this size anywhere," not "is it already at the right
 building" (that's what the Staging Report's haul list is for, separately).
+
+**Instrument trays are tracked individually, not as one combined unit** — the KA One instrument
+set shows a status line per tray (❌ 0 on hand / ⚠️ short of the recommended count / ✅ enough),
+plus a "complete sets" number computed as the minimum on-hand count across all 3 trays. That
+matters because a set isn't really usable if even one tray in it is out on loan — showing the
+per-tray breakdown instead of a single combined count is what surfaces that.
+
+**New inventory items only show up correctly sized on the pack list if they're linked to a
+catalog item.** The Add Item form (Inventory page and Scan's "not found" fallback) now has an
+optional "Match catalog item" field for this — matching pre-fills the name and links the exact
+size/side. An item added without a match still shows up in plain inventory, it just won't be
+matched by the pack list's size-aware logic. Worth keeping in mind as you scan in real inventory.
 
 ## A note on reserve-facility alerts
 

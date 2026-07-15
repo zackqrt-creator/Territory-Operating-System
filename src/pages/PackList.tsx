@@ -18,6 +18,7 @@ import type {
 import { buildPackList, type PackGroup, type PackLine, type PackStatus } from "../lib/packlist";
 import { caseLabel } from "../lib/staging";
 import { addDays, formatDateShort, tomorrow } from "../utils/dates";
+import { Link } from "react-router-dom";
 
 const STATUS_STYLE: Record<PackStatus, string> = {
   ready: "border-slate-700 bg-slate-800/50",
@@ -66,7 +67,12 @@ export default function PackList() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-xl font-semibold text-white">Pack list</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-white">Pack list</h1>
+        <Link to="/surgeons" className="text-sm text-sky-400">
+          Surgeons &rarr;
+        </Link>
+      </div>
       <p className="mt-1 text-sm text-slate-400">
         Every size you need to bring, by surgeon and side, checked against what's on hand.
       </p>
@@ -125,7 +131,21 @@ function PackGroupCard({ group }: { group: PackGroup }) {
       {group.instrumentAdvice.map((advice, i) => (
         <div key={i} className="mt-3 rounded-lg border border-sky-800 bg-sky-950/20 p-3">
           <p className="text-sm font-medium text-sky-200">{advice.toteTemplate.name}</p>
-          <p className="text-sm text-sky-300">{advice.text}</p>
+          <p className="text-sm text-sky-300">
+            {advice.completeSets} complete set{advice.completeSets === 1 ? "" : "s"} on hand for{" "}
+            {advice.caseCount} case{advice.caseCount === 1 ? "" : "s"}
+            {advice.completeSets >= advice.recommendedSets
+              ? " — should be fine with a normal turnaround between cases."
+              : ` — recommend ${advice.recommendedSets} if cases run back-to-back without time to resterilize.`}
+          </p>
+          <div className="mt-2 space-y-1">
+            {advice.trays.map((tray, j) => (
+              <p key={j} className="text-xs text-sky-300/80">
+                {tray.available === 0 ? "❌" : tray.available < advice.recommendedSets ? "⚠️" : "✅"} {tray.name}:{" "}
+                {tray.available} on hand
+              </p>
+            ))}
+          </div>
         </div>
       ))}
 
