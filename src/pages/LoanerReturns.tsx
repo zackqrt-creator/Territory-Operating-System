@@ -73,7 +73,7 @@ export default function LoanerReturns() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-xl font-semibold text-white">Loaner returns</h1>
+      <h1 className="text-2xl font-bold text-white">Loaner returns</h1>
       <p className="mt-1 text-sm text-slate-400">
         48 hours back to corporate after the case it was used on, unless extended for something
         coming up. Since loaners go out overnight, shipping it on the ship-by date is what

@@ -43,7 +43,7 @@ export default function ActivityFeed() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-xl font-semibold text-white">Activity</h1>
+      <h1 className="text-2xl font-bold text-white">Activity</h1>
       <p className="mt-1 text-sm text-slate-400">Everything the team has done to inventory, newest first.</p>
 
       {loading ? (

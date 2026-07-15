@@ -45,7 +45,7 @@ export default function ExtendSheet({
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-black/60" onClick={onClose}>
       <div
-        className="w-full rounded-t-2xl bg-slate-900 p-5"
+        className="w-full rounded-t-3xl border-t border-slate-700/60 bg-slate-900 shadow-2xl p-5"
         style={{ paddingBottom: "calc(2rem + var(--safe-bottom))" }}
         onClick={(e) => e.stopPropagation()}
       >

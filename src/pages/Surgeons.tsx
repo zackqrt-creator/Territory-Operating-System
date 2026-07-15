@@ -45,7 +45,7 @@ export default function Surgeons() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-xl font-semibold text-white">Surgeons</h1>
+      <h1 className="text-2xl font-bold text-white">Surgeons</h1>
       <p className="mt-1 text-sm text-slate-400">
         Preferences drive the pack list. Notes are just for the team — what they like, what to
         expect, anything worth knowing before a case.

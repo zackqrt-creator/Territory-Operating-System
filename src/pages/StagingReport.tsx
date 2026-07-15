@@ -64,7 +64,7 @@ export default function StagingReport() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-xl font-semibold text-white">Staging report</h1>
+      <h1 className="text-2xl font-bold text-white">Staging report</h1>
       <p className="mt-1 text-sm text-slate-400">
         Everything to haul so tomorrow's cases are ready, and what needs to ship back before the
         week gets away from you.

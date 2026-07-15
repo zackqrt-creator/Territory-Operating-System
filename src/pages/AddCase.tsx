@@ -27,7 +27,7 @@ export default function AddCase() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-xl font-semibold text-white">Add case</h1>
+      <h1 className="text-2xl font-bold text-white">Add case</h1>
 
       <div className="mt-4 flex rounded-lg border border-slate-700 bg-slate-800/50 p-1">
         <button

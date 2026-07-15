@@ -68,7 +68,7 @@ export default function PackList() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">Pack list</h1>
+        <h1 className="text-2xl font-bold text-white">Pack list</h1>
         <Link to="/surgeons" className="text-sm text-sky-400">
           Surgeons &rarr;
         </Link>

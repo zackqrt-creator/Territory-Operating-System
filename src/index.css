@@ -1,4 +1,41 @@
+@import "@fontsource-variable/inter";
 @import "tailwindcss";
+
+/*
+ * CaseTrack design tokens.
+ *
+ * The whole app is written against Tailwind's slate/sky scales, so the
+ * palette is retuned here in one place instead of restyling every page:
+ * slate gets a richer navy tint with noticeably brighter mid-tones
+ * (the old defaults read muddy/"blurry" on the dark background), and
+ * sky-600 -- the primary action color everywhere -- gets a more vivid,
+ * confident blue. Any component using these utilities picks the new
+ * values up automatically.
+ */
+@theme {
+  --font-sans: "Inter Variable", system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --color-slate-950: #05080f;
+  --color-slate-900: #0d1526;
+  --color-slate-800: #172138;
+  --color-slate-700: #2b3a58;
+  --color-slate-600: #44557d;
+  --color-slate-500: #8b9ab8;
+  --color-slate-400: #a9b6d0;
+  --color-slate-300: #c6d0e4;
+  --color-slate-200: #dee5f2;
+  --color-slate-100: #eef2f9;
+
+  --color-sky-950: #0a1a30;
+  --color-sky-900: #0d2c55;
+  --color-sky-800: #11498f;
+  --color-sky-700: #0f62c8;
+  --color-sky-600: #1273e6;
+  --color-sky-500: #2f8cf4;
+  --color-sky-400: #5cabff;
+  --color-sky-300: #8ec7ff;
+  --color-sky-200: #c0deff;
+}
 
 :root {
   color-scheme: dark;
@@ -14,11 +51,39 @@ body,
 
 body {
   margin: 0;
-  background: #0b1220;
-  color: #e5e7eb;
-  font: 16px/1.4 system-ui, "Segoe UI", Roboto, sans-serif;
+  background: #070c18;
+  color: #dee5f2;
+  font: 16px/1.45 "Inter Variable", system-ui, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
   overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Soft brand glow at the top of every screen; fixed pseudo-element so it
+ * doesn't scroll away or repaint (iOS-safe, unlike background-attachment). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 45% at 50% -12%, rgba(29, 106, 226, 0.16), transparent 70%),
+    #070c18;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+::selection {
+  background: rgba(47, 140, 244, 0.35);
 }
 
 /* Bigger tap targets everywhere by default; this is a one-handed field app. */
@@ -38,4 +103,44 @@ textarea {
 button {
   min-height: 44px;
   cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.06s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+/* One consistent, visible focus treatment app-wide; keyboard/scanner users
+ * get the ring, plain taps don't. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: #2f8cf4;
+  box-shadow: 0 0 0 3px rgba(47, 140, 244, 0.22);
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #2f8cf4;
+  outline-offset: 2px;
+}
+
+/* Slim, unobtrusive scrollbars on desktop; invisible on mobile anyway. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2b3a58;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }

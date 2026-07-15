@@ -75,6 +75,11 @@ trunk. Built with React + Vite + Supabase.
   of the physical device when you scan it in; it uploads to Supabase Storage and shows as a
   thumbnail. Useful for the team to visually confirm a match without asking you, especially
   while the hip catalog is still filling in.
+- **Professional visual refresh** — the whole app now uses the Inter typeface (bundled, so it
+  works offline), a retuned navy/blue palette with noticeably crisper text contrast, a subtle
+  brand glow behind every screen, an active-tab pill on the bottom nav, gradient primary buttons,
+  and consistent focus rings and press feedback. No layout or flow changed — everything is where
+  it was, it just reads sharper.
 - **Catalog-linked inventory** — adding an inventory item (via the Inventory page's "+ Add" or
   the Scan screen's "not found" fallback) now has an optional "Match catalog item" search field.
   Matching an existing catalog entry pre-fills the name/category and links the item's exact size,

@@ -75,13 +75,18 @@ export default function Home() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-white">CaseTrack</h1>
-          <p className="text-sm text-slate-400">
-            {profile ? `Hi, ${profile.display_name}` : "Loading..."}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 text-lg font-bold text-white shadow-lg shadow-sky-900/50">
+            CT
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">CaseTrack</h1>
+            <p className="text-sm text-slate-400">
+              {profile ? `Hi, ${profile.display_name}` : "Loading..."}
+            </p>
+          </div>
         </div>
-        <button onClick={signOut} className="text-sm text-slate-500 underline">
+        <button onClick={signOut} className="text-sm text-slate-500 underline underline-offset-2">
           Sign out
         </button>
       </div>
@@ -111,7 +116,7 @@ export default function Home() {
 
           <Link
             to="/cases/new"
-            className="block rounded-xl bg-sky-600 px-4 py-4 text-center text-lg font-medium text-white active:bg-sky-700"
+            className="block rounded-xl bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-center text-lg font-semibold text-white shadow-lg shadow-sky-950/60 active:from-sky-600 active:to-sky-700"
           >
             + Add case
           </Link>

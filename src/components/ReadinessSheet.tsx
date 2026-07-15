@@ -42,7 +42,7 @@ export default function ReadinessSheet({
   return (
     <div className="fixed inset-0 z-30 flex items-end bg-black/60" onClick={onClose}>
       <div
-        className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-slate-900 p-5"
+        className="max-h-[85vh] w-full overflow-y-auto rounded-t-3xl border-t border-slate-700/60 bg-slate-900 shadow-2xl p-5"
         style={{ paddingBottom: "calc(2rem + var(--safe-bottom))" }}
         onClick={(e) => e.stopPropagation()}
       >

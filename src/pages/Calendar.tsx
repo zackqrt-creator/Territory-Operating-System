@@ -85,7 +85,7 @@ export default function Calendar() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">Calendar</h1>
+        <h1 className="text-2xl font-bold text-white">Calendar</h1>
         <Link to="/cases/new" className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white">
           + Add
         </Link>

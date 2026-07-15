@@ -52,7 +52,7 @@ export default function Inventory() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">Inventory</h1>
+        <h1 className="text-2xl font-bold text-white">Inventory</h1>
         <button
           onClick={() => setAdding(true)}
           className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white"
