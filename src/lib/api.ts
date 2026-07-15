@@ -3,6 +3,9 @@ import type {
   CaseRow,
   CaseTemplateWithItems,
   CatalogItem,
+  CatalogJoint,
+  CatalogSide,
+  CementType,
   Facility,
   InventoryItem,
   ItemCategory,
@@ -121,6 +124,7 @@ export interface NewItemInput {
   loaner_return_deadline?: string | null;
   territory_id: string;
   catalog_item_id?: string | null;
+  photo_url?: string | null;
 }
 
 export async function createInventoryItem(input: NewItemInput): Promise<InventoryItem> {
@@ -363,6 +367,35 @@ export async function listCatalogItems(): Promise<CatalogItem[]> {
     .order("size_label");
   if (error) throw error;
   return data as CatalogItem[];
+}
+
+export interface NewCatalogItemInput {
+  name: string;
+  category: ItemCategory;
+  joint: CatalogJoint;
+  device_type?: string | null;
+  product_line?: string | null;
+  side?: CatalogSide | null;
+  size_label?: string | null;
+  cement_type?: CementType | null;
+  territory_id: string;
+}
+
+/** Creates a brand-new catalog entry on the fly, e.g. scanning in a device that has no existing catalog match. */
+export async function createCatalogItem(input: NewCatalogItemInput): Promise<CatalogItem> {
+  const { data, error } = await supabase.from("catalog_items").insert(input).select().single();
+  if (error) throw error;
+  return data as CatalogItem;
+}
+
+/** Uploads a reference photo to the public `item-photos` bucket and returns its public URL. */
+export async function uploadItemPhoto(file: File, territoryId: string): Promise<string> {
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `${territoryId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from("item-photos").upload(path, file);
+  if (error) throw error;
+  const { data } = supabase.storage.from("item-photos").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export async function listSurgeons(): Promise<Surgeon[]> {

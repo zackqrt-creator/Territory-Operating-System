@@ -64,6 +64,17 @@ trunk. Built with React + Vite + Supabase.
   what to expect, anything worth knowing before a case (separate from the structured tote
   preferences that drive the pack list — this is just for the team). Dr. Sidhu and Dr. Neophil
   (Lodi Memorial) are seeded; their notes are empty/placeholder until you fill them in.
+- **Hip catalog support + on-the-fly device creation** — the catalog now has a `joint`
+  (Knee/Hip/Other) and `device_type` (Femoral Stem, Acetabular Cup, Bone Cement, etc.) so hip
+  devices organize separately from knee ones. Add Item has a Knee/Hip/Other toggle that filters
+  the catalog search to match, and if a device isn't in the catalog yet, "Add as a new catalog
+  item" creates it inline (name, device type, product line, side, size, cement type) right from
+  the add-item flow — no migration needed. See "A note on the Hips catalog" below for exactly
+  what's seeded vs. what you're adding tomorrow.
+- **Photo on inventory items** — Add Item now has an optional camera/photo field. Attach a photo
+  of the physical device when you scan it in; it uploads to Supabase Storage and shows as a
+  thumbnail. Useful for the team to visually confirm a match without asking you, especially
+  while the hip catalog is still filling in.
 - **Catalog-linked inventory** — adding an inventory item (via the Inventory page's "+ Add" or
   the Scan screen's "not found" fallback) now has an optional "Match catalog item" search field.
   Matching an existing catalog entry pre-fills the name/category and links the item's exact size,
@@ -110,6 +121,10 @@ way:
      surgeon. **Must run after 005/006.** The 3 tray names are my best inference from your
      photos, not official names — rename them in Supabase's Table Editor → `catalog_items`
      whenever convenient, nothing else depends on the exact wording.
+   - `008_hip_catalog_and_photos.sql` — adds `joint` and `device_type` to `catalog_items` so hip
+     devices can be organized separately from knee ones, adds `photo_url` to `inventory_items`,
+     and creates the `item-photos` Storage bucket. No hip products are seeded — see "A note on
+     the Hips catalog" below.
    - Already ran earlier ones? Just run whichever new numbered file(s) you haven't yet — you
      don't need to redo ones you already ran.
 4. Whenever this repo gets an update with a new numbered file in `supabase/migrations/`, run
@@ -372,6 +387,39 @@ That's real-time only in the sense that it's visible the next time the app is op
 an actual push/SMS alert the moment it happens, that's a separate, bigger addition (web push
 needs a service worker subscription + a Supabase function to trigger it; SMS would mean adding
 Twilio or similar). Say the word if the in-app version isn't enough.
+
+## A note on the Hips catalog
+
+You sent Medacta product pages for GMK Revision, Global Hip, Bipolar Head, HighCross, MectaCem-X,
+and the Revision Hip Replacement overview. Two things worth knowing before tomorrow:
+
+**GMK Revision is a knee product, not hip** — it's Medacta's revision TKA system (3D metal cones
++ revision stems), so it belongs next to GMK Sphere Primary in the knee catalog, not under
+"Hips." Flagging this now so it doesn't get filed under the wrong joint tomorrow.
+
+**Nothing hip-related is seeded in the catalog yet.** The pages describe Medacta's general
+lineup, not necessarily what's in your bag — "Global Hip" alone covers 5+ distinct stem systems
+(AMIStem-P, Quadra-P, SMS, MasterLoc, X-ACTA), and I don't know which you actually stock, or the
+real sizes/REF numbers for any of it. Seeding guesses here would recreate exactly the
+false-readiness problem this app has avoided everywhere else (see the "never guess" thread
+running through 005/006/007's seed data). What I did instead: added `joint` and `device_type`
+columns to the catalog (migration 008) so hip devices organize under their own heading, distinct
+from knee, broken down by device (Femoral Stem, Acetabular Cup, Liner, Femoral Head, Bone Cement,
+etc.) the same way the knee catalog already breaks down by product line.
+
+**How tomorrow's scan-in actually works**: Add Item now has a Knee/Hip/Other toggle. Pick Hip,
+and the catalog search only shows hip devices. First time you scan a given device (say, a
+specific Bipolar Head size), it won't be in the catalog — tap "Add as a new catalog item," fill
+in device type/product line/side/size/cement type from what's on the label or box, and it's
+created and linked in one step. Every subsequent unit of that exact device just matches against
+what you already created — no more migrations needed for new hip devices, you build the catalog
+as you scan. A photo field on the same screen lets you attach a picture of the physical item too,
+which is the fast, reliable version of "populate the correct spot" — you're always the one
+confirming which device it is; nothing tries to guess from the photo. I looked into true
+photo-based auto-recognition and intentionally didn't build it: it would need a separate backend
+call to a vision model, cost money per photo, and can misidentify similar-looking implants —
+too risky for a surgical inventory to run unconfirmed. If a suggest-and-confirm version of that
+ever seems worth the cost, say the word.
 
 ## A note on FedEx tracking
 

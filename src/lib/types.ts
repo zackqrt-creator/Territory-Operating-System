@@ -60,6 +60,7 @@ export interface InventoryItem {
   return_extension_reason: string | null;
   assigned_case_id: string | null;
   catalog_item_id: string | null;
+  photo_url: string | null;
   created_at: string;
 }
 
@@ -100,6 +101,7 @@ export interface CaseTemplateWithItems extends CaseTemplate {
 
 export type CatalogSide = "LEFT" | "RIGHT" | "NA";
 export type CementType = "cemented" | "cementless" | "NA";
+export type CatalogJoint = "KNEE" | "HIP" | "NA";
 
 export interface CatalogItem {
   id: string;
@@ -111,6 +113,9 @@ export interface CatalogItem {
   side: CatalogSide | null;
   size_label: string | null;
   cement_type: CementType | null;
+  joint: CatalogJoint;
+  /** Free-text device grouping, e.g. "Femoral Stem", "Acetabular Cup", "Bone Cement". */
+  device_type: string | null;
   created_at: string;
 }
 

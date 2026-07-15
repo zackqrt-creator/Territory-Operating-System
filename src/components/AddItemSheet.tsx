@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { createInventoryItem, listCatalogItems } from "../lib/api";
-import type { CatalogItem, Facility, ItemCategory } from "../lib/types";
+import { createCatalogItem, createInventoryItem, listCatalogItems, uploadItemPhoto } from "../lib/api";
+import type { CatalogItem, CatalogJoint, CatalogSide, CementType, Facility, ItemCategory } from "../lib/types";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "loaner_kit", label: "Loaner kit" },
@@ -10,11 +10,29 @@ const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "consumable", label: "Consumable" },
 ];
 
+const JOINTS: { value: CatalogJoint; label: string }[] = [
+  { value: "KNEE", label: "Knee" },
+  { value: "HIP", label: "Hip" },
+  { value: "NA", label: "Other" },
+];
+
+const SIDES: { value: CatalogSide; label: string }[] = [
+  { value: "NA", label: "N/A" },
+  { value: "LEFT", label: "Left" },
+  { value: "RIGHT", label: "Right" },
+];
+
+const CEMENT_TYPES: { value: CementType; label: string }[] = [
+  { value: "NA", label: "N/A" },
+  { value: "cemented", label: "Cemented" },
+  { value: "cementless", label: "Cementless" },
+];
+
 function catalogLabel(c: CatalogItem): string {
-  const parts = [c.name];
-  if (c.side && c.side !== "NA") parts.push(c.side === "LEFT" ? "Left" : "Right");
-  if (c.size_label) parts.push(`Size ${c.size_label}`);
-  return parts.join(" · ");
+  const label = [c.name];
+  if (c.side && c.side !== "NA") label.push(c.side === "LEFT" ? "Left" : "Right");
+  if (c.size_label) label.push(`Size ${c.size_label}`);
+  return label.join(" · ");
 }
 
 export default function AddItemSheet({
@@ -30,6 +48,7 @@ export default function AddItemSheet({
 }) {
   const { profile } = useAuth();
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [joint, setJoint] = useState<CatalogJoint>("KNEE");
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogItemId, setCatalogItemId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -40,19 +59,73 @@ export default function AddItemSheet({
   const [returnDeadline, setReturnDeadline] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [showNewCatalogForm, setShowNewCatalogForm] = useState(false);
+  const [newDeviceType, setNewDeviceType] = useState("");
+  const [newProductLine, setNewProductLine] = useState("");
+  const [newSide, setNewSide] = useState<CatalogSide>("NA");
+  const [newSizeLabel, setNewSizeLabel] = useState("");
+  const [newCementType, setNewCementType] = useState<CementType>("NA");
+  const [creatingCatalogItem, setCreatingCatalogItem] = useState(false);
+
   useEffect(() => {
     listCatalogItems().then(setCatalog);
   }, []);
 
+  const filteredCatalog = catalog.filter((c) => c.joint === joint);
+
+  function onJointChange(value: CatalogJoint) {
+    setJoint(value);
+    setCatalogSearch("");
+    setCatalogItemId(null);
+    setShowNewCatalogForm(false);
+  }
+
   function onCatalogSearchChange(value: string) {
     setCatalogSearch(value);
-    const match = catalog.find((c) => catalogLabel(c) === value);
+    const match = filteredCatalog.find((c) => catalogLabel(c) === value);
     if (match) {
       setCatalogItemId(match.id);
       setName(match.name);
       setCategory(match.category);
+      setShowNewCatalogForm(false);
     } else {
       setCatalogItemId(null);
+    }
+  }
+
+  function onPhotoSelected(file: File | null) {
+    setPhotoFile(file);
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  }
+
+  async function onCreateCatalogItem() {
+    if (!catalogSearch.trim() || !profile) return;
+    setCreatingCatalogItem(true);
+    try {
+      const created = await createCatalogItem({
+        name: catalogSearch.trim(),
+        category,
+        joint,
+        device_type: newDeviceType.trim() || null,
+        product_line: newProductLine.trim() || null,
+        side: newSide,
+        size_label: newSizeLabel.trim() || null,
+        cement_type: newCementType,
+        territory_id: profile.territory_id,
+      });
+      setCatalog((prev) => [...prev, created]);
+      setCatalogItemId(created.id);
+      setName(created.name);
+      setShowNewCatalogForm(false);
+    } finally {
+      setCreatingCatalogItem(false);
     }
   }
 
@@ -60,6 +133,7 @@ export default function AddItemSheet({
     if (!name.trim() || !locationId || !profile) return;
     setSaving(true);
     try {
+      const photoUrl = photoFile ? await uploadItemPhoto(photoFile, profile.territory_id) : null;
       await createInventoryItem({
         name: name.trim(),
         category,
@@ -69,6 +143,7 @@ export default function AddItemSheet({
         loaner_return_deadline: returnDeadline || null,
         territory_id: profile.territory_id,
         catalog_item_id: catalogItemId,
+        photo_url: photoUrl,
       });
       onCreated();
     } finally {
@@ -88,6 +163,56 @@ export default function AddItemSheet({
 
         <div className="mt-4 space-y-4">
           <div>
+            <label className="mb-1 block text-sm text-slate-400">Joint</label>
+            <div className="grid grid-cols-3 gap-2">
+              {JOINTS.map((j) => (
+                <button
+                  key={j.value}
+                  onClick={() => onJointChange(j.value)}
+                  className={`rounded-lg py-2.5 font-medium ${
+                    joint === j.value ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  {j.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm text-slate-400">Photo (optional)</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => onPhotoSelected(e.target.files?.[0] ?? null)}
+            />
+            {photoPreview ? (
+              <div className="flex items-center gap-3">
+                <img src={photoPreview} alt="Item preview" className="h-20 w-20 rounded-lg object-cover" />
+                <button
+                  onClick={() => {
+                    onPhotoSelected(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="text-sm text-slate-500 underline"
+                >
+                  Remove photo
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full rounded-lg border border-dashed border-slate-700 bg-slate-800/50 px-4 py-3 text-slate-400"
+              >
+                📷 Take or choose a photo
+              </button>
+            )}
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm text-slate-400">Match catalog item (optional)</label>
             <input
               list="catalog-options"
@@ -97,16 +222,99 @@ export default function AddItemSheet({
               className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
             />
             <datalist id="catalog-options">
-              {catalog.map((c) => (
+              {filteredCatalog.map((c) => (
                 <option key={c.id} value={catalogLabel(c)} />
               ))}
             </datalist>
-            <p className="mt-1 text-xs text-slate-500">
-              {catalogItemId
-                ? "Linked — this item's size will be used for the pack list."
-                : "Matching an existing catalog item pre-fills the name and links the size for the pack list."}
-            </p>
+            {catalogItemId ? (
+              <p className="mt-1 text-xs text-slate-500">
+                Linked — this item's size will be used for the pack list.
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-slate-500">
+                Matching an existing catalog item pre-fills the name and links the size for the pack
+                list. Don't see it?{" "}
+                <button
+                  onClick={() => setShowNewCatalogForm((v) => !v)}
+                  disabled={!catalogSearch.trim()}
+                  className="text-sky-400 underline disabled:opacity-40"
+                >
+                  Add "{catalogSearch.trim() || "..."}" as a new catalog item
+                </button>
+              </p>
+            )}
           </div>
+
+          {showNewCatalogForm && !catalogItemId && (
+            <div className="space-y-3 rounded-lg border border-sky-800 bg-sky-950/20 p-3">
+              <p className="text-xs text-sky-300">
+                Creates a reusable catalog entry under {joint === "HIP" ? "Hips" : joint === "KNEE" ? "Knee" : "Other"}{" "}
+                so future scans of this exact device match automatically.
+              </p>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">Device type (e.g. Femoral Stem, Acetabular Cup, Bone Cement)</label>
+                <input
+                  value={newDeviceType}
+                  onChange={(e) => setNewDeviceType(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">Product line (e.g. Global Hip, Mpact)</label>
+                <input
+                  value={newProductLine}
+                  onChange={(e) => setNewProductLine(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-slate-400">Side</label>
+                  <select
+                    value={newSide}
+                    onChange={(e) => setNewSide(e.target.value as CatalogSide)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                  >
+                    {SIDES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-slate-400">Size label</label>
+                  <input
+                    value={newSizeLabel}
+                    onChange={(e) => setNewSizeLabel(e.target.value)}
+                    placeholder="e.g. 50mm"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">Cement type</label>
+                <select
+                  value={newCementType}
+                  onChange={(e) => setNewCementType(e.target.value as CementType)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                >
+                  {CEMENT_TYPES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={onCreateCatalogItem}
+                disabled={creatingCatalogItem || !catalogSearch.trim()}
+                className="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {creatingCatalogItem ? "Creating..." : "Create catalog item"}
+              </button>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm text-slate-400">Name</label>
