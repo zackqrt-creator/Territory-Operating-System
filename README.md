@@ -413,7 +413,18 @@ specific Bipolar Head size), it won't be in the catalog — tap "Add as a new ca
 in device type/product line/side/size/cement type from what's on the label or box, and it's
 created and linked in one step. Every subsequent unit of that exact device just matches against
 what you already created — no more migrations needed for new hip devices, you build the catalog
-as you scan. A photo field on the same screen lets you attach a picture of the physical item too,
+as you scan.
+
+**Knee and hip use the exact same entry format, on purpose.** Device type and product line are
+both dropdowns, not free text — Femoral Component/Tibial Tray/Tibial Insert/Patella/Instrument
+Tray for knee, Femoral Stem/Acetabular Cup/Liner/Femoral Head/Revision Femoral/Revision
+Acetabular/Bone Cement for hip, each with an "Other" fallback if the real device isn't listed.
+The knee catalog was seeded via migration with consistent values; without the dropdowns, hip
+entries typed by hand tomorrow could easily drift into inconsistent wording ("Stem" vs "Femoral
+Stem" vs "stem"). The dropdown is the same interaction for both joints — only the option list
+changes, since a knee and a hip genuinely have different device types.
+
+A photo field on the same screen lets you attach a picture of the physical item too,
 which is the fast, reliable version of "populate the correct spot" — you're always the one
 confirming which device it is; nothing tries to guess from the photo. I looked into true
 photo-based auto-recognition and intentionally didn't build it: it would need a separate backend

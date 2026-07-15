@@ -28,6 +28,48 @@ const CEMENT_TYPES: { value: CementType; label: string }[] = [
   { value: "cementless", label: "Cementless" },
 ];
 
+const OTHER = "__other__";
+
+// Same controlled-vocabulary pattern for every joint, so knee and hip
+// catalog entries come out formatted identically instead of one being
+// curated (knee, seeded via migration) and the other free-typed (hip,
+// entered live tomorrow). "Other" always falls back to free text.
+const DEVICE_TYPES: Record<CatalogJoint, string[]> = {
+  KNEE: ["Femoral Component", "Tibial Tray", "Tibial Insert", "Patella", "Instrument Tray", "Hardware"],
+  HIP: [
+    "Femoral Stem",
+    "Acetabular Cup",
+    "Liner",
+    "Femoral Head",
+    "Revision Femoral",
+    "Revision Acetabular",
+    "Bone Cement",
+  ],
+  NA: ["Consumable", "Hardware"],
+};
+
+const PRODUCT_LINES: Record<CatalogJoint, string[]> = {
+  KNEE: ["GMK Spherika", "GMK Primary", "GMK Sphere Primary E-Cross", "Moto PFJ", "KA One", "GMK Revision"],
+  HIP: [
+    "Global Hip",
+    "AMIStem-P",
+    "Quadra-P",
+    "SMS",
+    "MasterLoc",
+    "X-ACTA",
+    "Versafitcup",
+    "Mpact",
+    "HighCross",
+    "Bipolar Head",
+    "M-Vizion Femoral Revision System",
+    "AMIS-K Long",
+    "QUADRA-R",
+    "3D Metal B-Cage",
+    "MectaCem-X",
+  ],
+  NA: [],
+};
+
 function catalogLabel(c: CatalogItem): string {
   const label = [c.name];
   if (c.side && c.side !== "NA") label.push(c.side === "LEFT" ? "Left" : "Right");
@@ -64,8 +106,10 @@ export default function AddItemSheet({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showNewCatalogForm, setShowNewCatalogForm] = useState(false);
-  const [newDeviceType, setNewDeviceType] = useState("");
-  const [newProductLine, setNewProductLine] = useState("");
+  const [newDeviceTypeChoice, setNewDeviceTypeChoice] = useState("");
+  const [newDeviceTypeOther, setNewDeviceTypeOther] = useState("");
+  const [newProductLineChoice, setNewProductLineChoice] = useState("");
+  const [newProductLineOther, setNewProductLineOther] = useState("");
   const [newSide, setNewSide] = useState<CatalogSide>("NA");
   const [newSizeLabel, setNewSizeLabel] = useState("");
   const [newCementType, setNewCementType] = useState<CementType>("NA");
@@ -82,6 +126,10 @@ export default function AddItemSheet({
     setCatalogSearch("");
     setCatalogItemId(null);
     setShowNewCatalogForm(false);
+    setNewDeviceTypeChoice("");
+    setNewDeviceTypeOther("");
+    setNewProductLineChoice("");
+    setNewProductLineOther("");
   }
 
   function onCatalogSearchChange(value: string) {
@@ -107,14 +155,16 @@ export default function AddItemSheet({
 
   async function onCreateCatalogItem() {
     if (!catalogSearch.trim() || !profile) return;
+    const deviceType = newDeviceTypeChoice === OTHER ? newDeviceTypeOther.trim() : newDeviceTypeChoice;
+    const productLine = newProductLineChoice === OTHER ? newProductLineOther.trim() : newProductLineChoice;
     setCreatingCatalogItem(true);
     try {
       const created = await createCatalogItem({
         name: catalogSearch.trim(),
         category,
         joint,
-        device_type: newDeviceType.trim() || null,
-        product_line: newProductLine.trim() || null,
+        device_type: deviceType || null,
+        product_line: productLine || null,
         side: newSide,
         size_label: newSizeLabel.trim() || null,
         cement_type: newCementType,
@@ -252,20 +302,56 @@ export default function AddItemSheet({
                 so future scans of this exact device match automatically.
               </p>
               <div>
-                <label className="mb-1 block text-xs text-slate-400">Device type (e.g. Femoral Stem, Acetabular Cup, Bone Cement)</label>
-                <input
-                  value={newDeviceType}
-                  onChange={(e) => setNewDeviceType(e.target.value)}
+                <label className="mb-1 block text-xs text-slate-400">Device type</label>
+                <select
+                  value={newDeviceTypeChoice}
+                  onChange={(e) => setNewDeviceTypeChoice(e.target.value)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
-                />
+                >
+                  <option value="" disabled>
+                    Select a device type...
+                  </option>
+                  {DEVICE_TYPES[joint].map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                  <option value={OTHER}>Other (type below)</option>
+                </select>
+                {newDeviceTypeChoice === OTHER && (
+                  <input
+                    value={newDeviceTypeOther}
+                    onChange={(e) => setNewDeviceTypeOther(e.target.value)}
+                    placeholder="Custom device type"
+                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                  />
+                )}
               </div>
               <div>
-                <label className="mb-1 block text-xs text-slate-400">Product line (e.g. Global Hip, Mpact)</label>
-                <input
-                  value={newProductLine}
-                  onChange={(e) => setNewProductLine(e.target.value)}
+                <label className="mb-1 block text-xs text-slate-400">Product line</label>
+                <select
+                  value={newProductLineChoice}
+                  onChange={(e) => setNewProductLineChoice(e.target.value)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
-                />
+                >
+                  <option value="" disabled>
+                    Select a product line...
+                  </option>
+                  {PRODUCT_LINES[joint].map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                  <option value={OTHER}>Other (type below)</option>
+                </select>
+                {newProductLineChoice === OTHER && (
+                  <input
+                    value={newProductLineOther}
+                    onChange={(e) => setNewProductLineOther(e.target.value)}
+                    placeholder="Custom product line"
+                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                  />
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
