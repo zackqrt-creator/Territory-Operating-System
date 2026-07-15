@@ -75,6 +75,17 @@ trunk. Built with React + Vite + Supabase.
   of the physical device when you scan it in; it uploads to Supabase Storage and shows as a
   thumbnail. Useful for the team to visually confirm a match without asking you, especially
   while the hip catalog is still filling in.
+- **myOPS CSV import** — on Add Case, upload the CSV exported from the myOPS case table
+  (File > Export on your MacBook) and it imports everything in one shot: date, time (respecting
+  TBA), knee/hip/instrument, side, status ("done" cases come in as completed; canceled ones are
+  skipped and counted), plus a notes line per case carrying the alignment (e.g. KINEMATIC), the
+  loaner ship/return window from the smart-ordering columns, the myOPS classification codes
+  (MKGS/MKGR/ABMS), and any patient comment (implant-size context for revisions). **Patient
+  names and identifiers in the file are deliberately never imported** — case logistics don't
+  need PHI in this database. Surgeons come through myOPS as numeric IDs, not names, so imported
+  cases aren't linked to a surgeon automatically; set that per case or rely on quick-add. The
+  same preview/dedupe screen as paste-import runs before anything is saved, and re-importing an
+  overlapping export is safe (existing case IDs are skipped).
 - **Professional visual refresh** — the whole app now uses the Inter typeface (bundled, so it
   works offline), a retuned navy/blue palette with noticeably crisper text contrast, a subtle
   brand glow behind every screen, an active-tab pill on the bottom nav, gradient primary buttons,

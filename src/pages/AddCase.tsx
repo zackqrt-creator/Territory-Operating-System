@@ -11,7 +11,8 @@ import {
 } from "../lib/api";
 import type { CaseVariant, Facility, Side, Surgeon, SurgeryType } from "../lib/types";
 import { nextWednesday } from "../utils/dates";
-import { dedupeByCaseId, parsePasteText, type ParsedCase } from "../utils/parsePaste";
+import { dedupeByCaseId, parsePasteText } from "../utils/parsePaste";
+import { dedupeMyopsRows, parseMyopsCsv } from "../utils/parseMyopsCsv";
 
 export default function AddCase() {
   const { profile } = useAuth();
@@ -44,7 +45,7 @@ export default function AddCase() {
             mode === "paste" ? "bg-sky-600 text-white" : "text-slate-400"
           }`}
         >
-          Paste import
+          CSV / paste import
         </button>
       </div>
 
@@ -255,6 +256,17 @@ function QuickAddForm({
   );
 }
 
+interface ImportRow {
+  case_id: string | null;
+  surgery_type: SurgeryType;
+  side: Side | null;
+  surgery_date: string;
+  surgery_time: string | null;
+  time_tba?: boolean;
+  status?: "scheduled" | "completed";
+  notes?: string | null;
+}
+
 function PasteImport({
   facilities,
   territoryId,
@@ -269,9 +281,10 @@ function PasteImport({
   onDone: () => void;
 }) {
   const [text, setText] = useState("");
-  const [parsed, setParsed] = useState<ParsedCase[]>([]);
+  const [parsed, setParsed] = useState<ImportRow[]>([]);
   const [included, setIncluded] = useState<boolean[]>([]);
   const [duplicates, setDuplicates] = useState(0);
+  const [csvNote, setCsvNote] = useState<string | null>(null);
   const [facilityId, setFacilityId] = useState(lastFacilityId ?? "");
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
@@ -288,6 +301,31 @@ function PasteImport({
     setParsed(rows);
     setIncluded(rows.map(() => true));
     setDuplicates(duplicates);
+    setCsvNote(null);
+    setResult(null);
+  }
+
+  async function onCsvFile(file: File) {
+    const content = await file.text();
+    const res = parseMyopsCsv(content);
+    if (res.error) {
+      setCsvNote(res.error);
+      setParsed([]);
+      setIncluded([]);
+      return;
+    }
+    const { rows, duplicates } = dedupeMyopsRows(res.rows);
+    setParsed(rows);
+    setIncluded(rows.map(() => true));
+    setDuplicates(duplicates);
+    const skipped: string[] = [];
+    if (res.canceled > 0) skipped.push(`${res.canceled} canceled`);
+    if (res.unrecognized > 0) skipped.push(`${res.unrecognized} unrecognized`);
+    setCsvNote(
+      `${rows.length} case${rows.length === 1 ? "" : "s"} found` +
+        (skipped.length > 0 ? ` (skipped: ${skipped.join(", ")})` : "") +
+        ". Patient names in the file are never imported.",
+    );
     setResult(null);
   }
 
@@ -304,6 +342,9 @@ function PasteImport({
           side: r.side,
           surgery_date: r.surgery_date,
           surgery_time: r.surgery_time,
+          time_tba: r.time_tba ?? false,
+          status: r.status,
+          notes: r.notes ?? null,
           facility_id: facilityId,
           territory_id: territoryId,
           created_by: profileId,
@@ -313,6 +354,7 @@ function PasteImport({
       setResult(res);
       setParsed([]);
       setText("");
+      setCsvNote(null);
     } finally {
       setImporting(false);
     }
@@ -320,9 +362,34 @@ function PasteImport({
 
   return (
     <div className="mt-6 space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-300">
+          Upload the myOPS CSV export
+        </label>
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onCsvFile(f);
+          }}
+          className="w-full rounded-lg border border-dashed border-slate-700 bg-slate-800/50 px-4 py-3 text-sm text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-1.5 file:font-medium file:text-white"
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Reads date, time, type, side, status, alignment, and the loaner ship/return window.
+          Canceled cases and patient names are skipped automatically.
+        </p>
+      </div>
+
+      {csvNote && (
+        <p className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-sm text-slate-300">
+          {csvNote}
+        </p>
+      )}
+
       <p className="text-sm text-slate-400">
-        Select case rows in myOPS, copy, and paste them below. We'll pull out the date, type, and
-        side automatically — review before importing.
+        ...or select case rows in myOPS, copy, and paste them below. We'll pull out the date, type,
+        and side automatically — review before importing.
       </p>
 
       <textarea
@@ -374,6 +441,7 @@ function PasteImport({
                   <th className="p-2">Type</th>
                   <th className="p-2">Side</th>
                   <th className="p-2">Case #</th>
+                  <th className="p-2">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -396,6 +464,9 @@ function PasteImport({
                     <td className="p-2 text-slate-300">{row.surgery_type}</td>
                     <td className="p-2 text-slate-300">{row.side ?? "—"}</td>
                     <td className="p-2 text-slate-500">{row.case_id ?? "—"}</td>
+                    <td className="p-2 text-slate-500">
+                      {row.status === "completed" ? "done" : "scheduled"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

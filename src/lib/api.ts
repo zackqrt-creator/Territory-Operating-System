@@ -62,6 +62,7 @@ export interface NewCaseInput {
   surgeon?: string | null;
   surgeon_id?: string | null;
   notes?: string | null;
+  status?: "scheduled" | "completed";
   territory_id: string;
   created_by: string;
 }
