@@ -9,7 +9,8 @@ import {
 } from "../lib/api";
 import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem } from "../lib/types";
 import { buildStagingReport } from "../lib/staging";
-import { daysUntil, formatDateShort, tomorrow } from "../utils/dates";
+import { buildLoanerReport } from "../lib/loaners";
+import { daysUntil, formatDateShort, toISODate, tomorrow } from "../utils/dates";
 
 export default function Home() {
   const { profile, signOut } = useAuth();
@@ -33,10 +34,8 @@ export default function Home() {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = cases.filter((c) => c.surgery_date >= today && c.status === "scheduled");
   const nextSevenDays = upcoming.filter((c) => daysUntil(c.surgery_date) <= 7);
-  const urgentLoaners = items
-    .filter((i) => i.loaner_return_deadline)
-    .sort((a, b) => (a.loaner_return_deadline! < b.loaner_return_deadline! ? -1 : 1))
-    .filter((i) => daysUntil(i.loaner_return_deadline!) <= 2);
+  const loanerReport = buildLoanerReport(items, cases, templates, facilities, daysUntil, toISODate(new Date()));
+  const urgentLoaners = loanerReport.filter((s) => s.urgency === "overdue" || s.urgency === "urgent");
 
   const staging = useMemo(
     () => buildStagingReport(tomorrow(), cases, templates, items, facilities, daysUntil),
@@ -102,19 +101,19 @@ export default function Home() {
           </div>
 
           {urgentLoaners.length > 0 && (
-            <div className="rounded-xl border border-red-800 bg-red-950/40 p-4">
+            <Link to="/loaners" className="block rounded-xl border border-red-800 bg-red-950/40 p-4">
               <h2 className="text-sm font-medium text-red-300">Loaners due back soon</h2>
               <ul className="mt-2 space-y-1">
-                {urgentLoaners.map((i) => (
-                  <li key={i.id} className="text-sm text-red-200">
-                    {i.name} &mdash; due {formatDateShort(i.loaner_return_deadline!)}
+                {urgentLoaners.map((s) => (
+                  <li key={s.item.id} className="text-sm text-red-200">
+                    {s.item.name} &mdash; due {formatDateShort(s.effectiveDeadline)}
                   </li>
                 ))}
               </ul>
-              <Link to="/inventory" className="mt-2 inline-block text-sm text-red-300 underline">
-                Open inventory &rarr;
-              </Link>
-            </div>
+              <span className="mt-2 inline-block text-sm text-red-300 underline">
+                Open loaner returns &rarr;
+              </span>
+            </Link>
           )}
 
           <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">

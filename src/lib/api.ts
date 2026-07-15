@@ -130,8 +130,12 @@ export async function moveItem(params: {
   territoryId: string;
   relatedCaseId?: string | null;
   note?: string | null;
+  /** True when the destination is the corporate facility: clears the loaner
+   * return clock (deadline, any extension, case assignment) since the
+   * return cycle is complete for this unit. */
+  returningToCorporate?: boolean;
 }): Promise<void> {
-  const { item, toLocation, movedBy, territoryId, relatedCaseId, note } = params;
+  const { item, toLocation, movedBy, territoryId, relatedCaseId, note, returningToCorporate } = params;
 
   const { error: moveError } = await supabase.from("movements").insert({
     territory_id: territoryId,
@@ -144,10 +148,15 @@ export async function moveItem(params: {
   });
   if (moveError) throw moveError;
 
-  const { error: updateError } = await supabase
-    .from("inventory_items")
-    .update({ location_id: toLocation })
-    .eq("id", item.id);
+  const update: Record<string, unknown> = { location_id: toLocation };
+  if (returningToCorporate) {
+    update.loaner_return_deadline = null;
+    update.return_extended_until = null;
+    update.return_extension_reason = null;
+    update.assigned_case_id = null;
+  }
+
+  const { error: updateError } = await supabase.from("inventory_items").update(update).eq("id", item.id);
   if (updateError) throw updateError;
 }
 
@@ -229,4 +238,80 @@ export async function logCaseUsage(params: {
     .update({ status: "completed" })
     .eq("id", caseRow.id);
   if (caseError) throw caseError;
+}
+
+/**
+ * Starts the 48-hour return clock on a loaner kit that was used in a case:
+ * sets the deadline to two days after the surgery date, assigns it to the
+ * case, and logs an audit movement. Clears any prior extension, since the
+ * clock has restarted for this use.
+ */
+export async function markLoanerUsed(params: {
+  item: InventoryItem;
+  caseRow: CaseRow;
+  movedBy: string;
+  territoryId: string;
+}): Promise<void> {
+  const { item, caseRow, movedBy, territoryId } = params;
+  const deadline = new Date(`${caseRow.surgery_date}T00:00:00`);
+  deadline.setDate(deadline.getDate() + 2);
+  const deadlineISO = deadline.toISOString().slice(0, 10);
+
+  const { error: updateError } = await supabase
+    .from("inventory_items")
+    .update({
+      assigned_case_id: caseRow.id,
+      loaner_return_deadline: deadlineISO,
+      return_extended_until: null,
+      return_extension_reason: null,
+    })
+    .eq("id", item.id);
+  if (updateError) throw updateError;
+
+  const { error: moveError } = await supabase.from("movements").insert({
+    territory_id: territoryId,
+    item_id: item.id,
+    from_location: item.location_id,
+    to_location: item.location_id,
+    moved_by: movedBy,
+    related_case_id: caseRow.id,
+    note: `Used in case, return due ${deadlineISO}`,
+  });
+  if (moveError) throw moveError;
+}
+
+/** Records an approved extension: keep this loaner past its default deadline. */
+export async function extendLoanerReturn(params: {
+  itemId: string;
+  until: string;
+  reason: string;
+  movedBy: string;
+  territoryId: string;
+  relatedCaseId?: string | null;
+}): Promise<void> {
+  const { itemId, until, reason, movedBy, territoryId, relatedCaseId } = params;
+
+  const { data: item, error: fetchError } = await supabase
+    .from("inventory_items")
+    .select("location_id")
+    .eq("id", itemId)
+    .single();
+  if (fetchError) throw fetchError;
+
+  const { error: updateError } = await supabase
+    .from("inventory_items")
+    .update({ return_extended_until: until, return_extension_reason: reason })
+    .eq("id", itemId);
+  if (updateError) throw updateError;
+
+  const { error: moveError } = await supabase.from("movements").insert({
+    territory_id: territoryId,
+    item_id: itemId,
+    from_location: item.location_id,
+    to_location: item.location_id,
+    moved_by: movedBy,
+    related_case_id: relatedCaseId ?? null,
+    note: `Extended return to ${until}: ${reason}`,
+  });
+  if (moveError) throw moveError;
 }

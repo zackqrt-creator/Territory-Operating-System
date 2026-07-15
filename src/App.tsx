@@ -7,6 +7,7 @@ import AddCase from "./pages/AddCase";
 import Inventory from "./pages/Inventory";
 import Scan from "./pages/Scan";
 import StagingReport from "./pages/StagingReport";
+import LoanerReturns from "./pages/LoanerReturns";
 import BottomNav from "./components/BottomNav";
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/scan" element={<Scan />} />
         <Route path="/staging" element={<StagingReport />} />
+        <Route path="/loaners" element={<LoanerReturns />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

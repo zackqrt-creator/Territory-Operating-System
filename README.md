@@ -22,14 +22,21 @@ trunk. Built with React + Vite + Supabase.
   that isn't in inventory anywhere, and every loaner kit due back at corporate within the week
   (with a one-tap "Ship" action). Home shows a live summary card whenever tomorrow has cases.
 - **Post-case quick log** — a "Log case" button on the case checklist. Tap what was actually
-  used (implants and consumables only — loaner kits/trays aren't consumed, they get moved back
-  via the existing flow), adjust quantities with +/− if a case ran long on cement or needed an
-  extra unit, and submitting decrements inventory, marks the case complete, and shows you a
-  replenishment list of exactly what to restock. Decrementing consumes the earliest-expiring lot
-  first (FIFO) when a facility is holding more than one lot of the same implant.
+  used (implants and consumables decrement inventory; loaner kits get a "used, start the return
+  clock" toggle instead — see below), adjust quantities with +/− if a case ran long on cement or
+  needed an extra unit, and submitting marks the case complete and shows a replenishment list of
+  exactly what to restock. Decrementing consumes the earliest-expiring lot first (FIFO) when a
+  facility is holding more than one lot of the same implant.
+- **Loaner return countdown** (`/loaners`) — your 48-hour-after-the-case rule, tracked
+  automatically: logging a case starts the clock on its loaner kit (deadline = surgery date + 2
+  days), and this view lists every loaner currently on the clock, most-urgent-first. When a
+  loaner nearing its deadline is needed again by a case in the next 3 days, it gets a logistics
+  suggestion — extend this one, and if a spare unit of the same kit exists elsewhere and isn't
+  itself needed soon, ship that one back instead so you stay compliant without leaving the
+  upcoming case short. One-tap **Extend** (date + reason, pre-filled from the suggestion) or
+  **Ship to corporate**, which automatically clears the return clock once it's actually back.
 
-**Not built yet** (next up — see "What's next" below): the loaner return countdown as its own
-dedicated view, and the team activity feed.
+**Not built yet** (next up — see "What's next" below): the team activity feed.
 
 ---
 
@@ -51,8 +58,11 @@ way:
      own data, and seeds one territory ("Sacramento") with your 4 facilities (Storage Facility
      A/B, Vehicle, Corporate) and the 4 case templates (TKA, THA, Partial Knee, Partial Hip).
 3. Repeat for `supabase/migrations/002_calendar_readiness.sql` (adds hip cases and the
-   total/partial distinction the readiness checklist uses to pick the right template).
-   - Already ran `001` before? Just run the new `002` file — you don't need to redo `001`.
+   total/partial distinction the readiness checklist uses to pick the right template) and
+   `supabase/migrations/003_loaner_extensions.sql` (adds the extension date/reason columns the
+   loaner return countdown uses).
+   - Already ran earlier ones? Just run whichever new numbered file(s) you haven't yet — you
+     don't need to redo ones you already ran.
 4. Whenever this repo gets an update with a new numbered file in `supabase/migrations/`, run
    just that new file the same way. All migrations are safe to re-run if you're ever unsure
    whether one went through.
@@ -132,29 +142,33 @@ for trays that don't have one and tape them on.
 
 ## What's next
 
-Ranked in the order the original brief lays them out — tell me which to build next:
+Only one item left from the original brief:
 
-1. **Loaner return countdown** view, sorted most-urgent-first (the staging report already
-   surfaces the urgent ones; this would be a dedicated, always-current list beyond just the next
-   7 days).
-2. **Team activity feed** ("Zack moved GMK tray from A to Vehicle, 7:42 AM") — the `movements`
+1. **Team activity feed** ("Zack moved GMK tray from A to Vehicle, 7:42 AM") — the `movements`
    table already has everything needed; this is a UI-only addition.
-3. **Offline queueing** for scans made without signal.
+2. **Offline queueing** for scans made without signal.
+
+Otherwise, tell me what you want refined or extended — e.g. the extension-suggestion logic
+could get smarter (right now the "spare unit" check doesn't see whether that spare is itself
+needed for something else soon), or the loaner countdown could get its own nav tab instead of
+living under Home/Inventory links.
 
 ## Project structure
 
 ```
 supabase/migrations/      # run these in order in the Supabase SQL editor
 src/lib/supabase.ts       # Supabase client
-src/lib/api.ts            # all database reads/writes, incl. logCaseUsage (post-case decrement)
+src/lib/api.ts            # all database reads/writes: logCaseUsage, markLoanerUsed, extendLoanerReturn, etc.
 src/lib/types.ts          # TypeScript types matching the schema
 src/lib/readiness.ts      # matches a case to its template, diffs required items against inventory
 src/lib/staging.ts        # rolls up a day's cases into the haul list + loaner ship list
+src/lib/loaners.ts        # loaner return countdown + extend/swap suggestion engine
 src/hooks/useAuth.tsx     # session + profile state
 src/pages/Calendar.tsx    # Wednesday-anchored week view (route: /cases)
 src/pages/StagingReport.tsx  # the staging report (route: /staging)
+src/pages/LoanerReturns.tsx  # the loaner return countdown (route: /loaners)
 src/pages/                # one file per screen
-src/components/           # shared bottom sheets (move/add item, readiness checklist, quick log), nav
+src/components/           # shared bottom sheets (move/add item, readiness checklist, quick log, extend), nav
 src/utils/parsePaste.ts   # myOPS paste-import parser
 src/utils/dates.ts        # next-Wednesday default, week math, countdown math
 ```
@@ -186,5 +200,22 @@ of exactly what you tapped as used, shown once, right after logging. If you need
 again later, the used quantities are in the `movements` table (search by case or item) since
 each decrement writes an audit row there too — note that its `from_location`/`to_location` are
 both set to the case's facility for these, since nothing physically moved; only the quantity did.
-Quick-logging a case doesn't move the loaner kit or instrument tray anywhere — those still need
-a manual move (or the staging report will catch it) once you're done with them.
+Quick-logging a case doesn't physically move the loaner kit or instrument tray anywhere — it
+just starts the loaner's return clock (see below). Getting it back to a storage facility or
+shipping it to corporate is still a manual move (or the staging report/loaner countdown will
+prompt you).
+
+## A note on the 48-hour loaner rule
+
+The return clock starts the moment you quick-log a case: deadline = surgery date + 2 days. This
+is **day-level**, not hour-level — a 7:30am Tuesday case and a 4pm Tuesday case both show a
+deadline of Thursday, not two different times on Thursday. That matches how the rest of the app
+already tracks dates (Calendar, Staging Report), and keeps the UI to "due in 2 days" instead of
+needing exact clock times everywhere. If you need hour-level precision later, this is a one-file
+change in `src/lib/api.ts` (`markLoanerUsed`).
+
+The extend/swap suggestion only looks 3 days ahead and only checks whether *some other unit* of
+the same kit name exists in the field — it doesn't check whether that other unit is itself
+needed for a different upcoming case. With a small territory-scale inventory this is unlikely to
+bite, but sanity-check the suggestion before shipping the "spare" back, especially once you have
+multiple reps moving kits around independently.

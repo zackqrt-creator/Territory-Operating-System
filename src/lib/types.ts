@@ -53,6 +53,8 @@ export interface InventoryItem {
   quantity: number;
   expiration_date: string | null;
   loaner_return_deadline: string | null;
+  return_extended_until: string | null;
+  return_extension_reason: string | null;
   assigned_case_id: string | null;
   created_at: string;
 }

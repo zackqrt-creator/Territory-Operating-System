@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { listFacilities, listInventory } from "../lib/api";
 import type { Facility, InventoryItem, ItemCategory } from "../lib/types";
 import MoveItemSheet from "../components/MoveItemSheet";
@@ -59,6 +60,10 @@ export default function Inventory() {
           + Add
         </button>
       </div>
+
+      <Link to="/loaners" className="mt-3 inline-block text-sm text-sky-400">
+        Loaner return countdown &rarr;
+      </Link>
 
       <div className="mt-4 space-y-2">
         <input

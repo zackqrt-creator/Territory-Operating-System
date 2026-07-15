@@ -121,14 +121,14 @@ export function buildStagingReport(
     .filter(
       (i) =>
         i.category === "loaner_kit" &&
-        i.loaner_return_deadline &&
+        (i.loaner_return_deadline || i.return_extended_until) &&
         (!corporate || i.location_id !== corporate.id) &&
-        daysUntilFn(i.loaner_return_deadline) <= 7,
+        daysUntilFn(i.return_extended_until ?? i.loaner_return_deadline!) <= 7,
     )
     .map((i) => ({
       item: i,
       facility: facilities.find((f) => f.id === i.location_id)!,
-      daysLeft: daysUntilFn(i.loaner_return_deadline!),
+      daysLeft: daysUntilFn(i.return_extended_until ?? i.loaner_return_deadline!),
     }))
     .filter((r) => r.facility)
     .sort((a, b) => a.daysLeft - b.daysLeft);

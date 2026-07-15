@@ -36,6 +36,7 @@ export default function MoveItemSheet({
         movedBy: profile.id,
         territoryId: profile.territory_id,
         relatedCaseId,
+        returningToCorporate: target.type === "corporate",
       });
       onMoved();
     } finally {
