@@ -39,9 +39,23 @@ trunk. Built with React + Vite + Supabase.
   sentences ("Zack moved GMK Total Knee Loaner Kit from Storage Facility A to Vehicle · 7:42 AM"),
   grouped by day, newest first. Nothing new to track — it just reads the `movements` audit log
   that every other feature already writes to. Home shows the 3 most recent as a preview card.
+- **Surgeon preference profiles + pack list** (`/pack-list`) — instead of a generic per-surgery
+  checklist, each surgeon can have a preference profile (instrument set, implant product line,
+  alignment technique) pointing at tote templates you define once (e.g. "KA One Complete Tote" —
+  every femur/tibia/insert size, one of each, plus Motopat and fixation hardware). Pick a day and
+  the pack list groups that day's cases by surgeon + side, multiplies the whole tote by however
+  many same-side cases need it that day (since an opened implant can't go back on the shelf — 3
+  same-side cases means 3 complete size-runs), and checks every size against on-hand inventory
+  with lot numbers. Instrument trays get a separate, non-blocking advisory instead of a hard
+  requirement, since they're normally resterilized and reused between cases — see "A note on the
+  pack list" below for exactly how that ratio works and what's still placeholder data.
+- **Reserve-facility alerts** — flag a facility (e.g. a rarely-touched backup storage location)
+  as `alert_on_withdrawal`, and any time something leaves it, it shows up in red across Home and
+  the Activity feed until someone taps "Mark replenished." There's no push/SMS infrastructure
+  yet, so this is in-app visibility, not a phone notification — see the note below.
 
-Every feature from the original brief is now built. See "What's next" for the couple of
-nice-to-haves still on the table.
+Every feature from the original brief is now built, plus surgeon preference profiles and the
+pack list. See "What's next" for what's still open.
 
 ---
 
@@ -62,10 +76,15 @@ way:
    - This creates all the tables, sets up row-level security so each territory only sees its
      own data, and seeds one territory ("Sacramento") with your 4 facilities (Storage Facility
      A/B, Vehicle, Corporate) and the 4 case templates (TKA, THA, Partial Knee, Partial Hip).
-3. Repeat for `supabase/migrations/002_calendar_readiness.sql` (adds hip cases and the
-   total/partial distinction the readiness checklist uses to pick the right template) and
-   `supabase/migrations/003_loaner_extensions.sql` (adds the extension date/reason columns the
-   loaner return countdown uses).
+3. Repeat for each remaining numbered file, in order:
+   - `002_calendar_readiness.sql` — hip cases + total/partial distinction.
+   - `003_loaner_extensions.sql` — extension date/reason columns.
+   - `004_surgeon_bom_and_totes.sql` — catalog items, surgeons, surgeon preferences, tote
+     templates, `cases.surgeon_id`, `movements.tracking_number`, and the reserve-facility alert
+     column on `facilities`.
+   - `005_seed_surgeon_bom_example.sql` — example starter data (Dr. Sidhu, KA One totes). Read
+     the comment block at the top of that file before you rely on it for a real case — it lists
+     exactly what's confirmed vs. placeholder.
    - Already ran earlier ones? Just run whichever new numbered file(s) you haven't yet — you
      don't need to redo ones you already ran.
 4. Whenever this repo gets an update with a new numbered file in `supabase/migrations/`, run
@@ -147,18 +166,44 @@ for trays that don't have one and tape them on.
 
 ## What's next
 
-Everything from the original brief is built. What's left is polish and nice-to-haves — tell me
-what you want to tackle:
+**Before the pack list is trustworthy for a real case**, I need from you:
 
-1. **Offline queueing** for scans made without signal (explicitly called a "nice to have,
+1. Which facility is Lodi (or if it's not one of the 4 seeded ones yet, its real name) — for now,
+   flip `alert_on_withdrawal` to `true` on that row in Supabase's **Table Editor** →
+   `facilities`. I can build an in-app toggle for this later if you want one.
+2. Right-side KA One catalog items — I only seeded Left (matching your walkthrough example).
+   Once Right items exist with the same product_line/category/size_label, the pack list picks
+   them up automatically; no template changes needed.
+3. Clarification on the two "Partial Small Tote" descriptions and both Revision totes — the
+   phrasing in chat had some ambiguity I didn't want to silently guess on (see the comment block
+   at the top of `005_seed_surgeon_bom_example.sql`).
+4. Whether the "Inserts sizes 1-6" in the tote maps to the same GMK Sphere Vit-E product line as
+   the specific loaner items you gave me (SPKAEFFL, GSLVEMIC01, etc.) — their size codes don't
+   obviously line up, so I kept them separate rather than guess.
+5. Real catalog/item numbers for the sized femur/tibia/insert/Motopat items, whenever you have
+   them handy — not required for the pack list to work (it matches by name/size), but useful for
+   your own reference.
+
+**Once that's settled**, the natural next steps for the pack-batching workflow you described:
+
+6. **GS1 barcode parsing** — decode lot/expiration/GTIN straight from a scan instead of typing
+   them, once you're ready. Buildable now, independent of the harder scanning question below.
+7. **Rapid sequential scanning** for pack verification — keep the camera open and scan through a
+   tote item-by-item, checking each one off the pack list as you go. This is the realistic v1 of
+   "batch scan a tote"; see the note below on why true multi-item-per-frame video scanning is a
+   bigger, likely-paid undertaking I'd want to scope separately.
+8. A small in-app screen for adding/editing surgeon preferences and tote templates yourself,
+   instead of asking me to write a migration each time.
+
+**Smaller items still open:**
+
+9. **Offline queueing** for scans made without signal (explicitly called a "nice to have,
    don't block v1" in the original brief).
-2. Make the extension-suggestion logic smarter — right now the "spare unit" check doesn't see
-   whether that spare is itself needed for something else soon.
-3. Give Staging, Loaners, and Activity their own bottom-nav tabs instead of living under
-   Home/Inventory links — worth it once you're using all of them daily and don't want the extra
-   tap.
-4. Any real-world friction once you and your team are actually using it day to day — that's
-   probably more valuable to fix than anything on this list.
+10. The loaner extend/swap suggestion doesn't check whether a "spare" unit is itself needed for
+    something else soon — fine at your current scale, worth tightening once you have multiple
+    reps moving kits independently.
+11. Give Staging, Loaners, Activity, and Pack their own bottom-nav visibility tuning if 6 tabs
+    ever feels cramped on your phone — tell me if it does.
 
 ## Project structure
 
@@ -171,11 +216,13 @@ src/lib/readiness.ts      # matches a case to its template, diffs required items
 src/lib/staging.ts        # rolls up a day's cases into the haul list + loaner ship list
 src/lib/loaners.ts        # loaner return countdown + extend/swap suggestion engine
 src/lib/activity.ts       # turns movements rows into plain-language feed sentences
+src/lib/packlist.ts       # surgeon-preference-driven pack list / demand aggregation engine
 src/hooks/useAuth.tsx     # session + profile state
 src/pages/Calendar.tsx    # Wednesday-anchored week view (route: /cases)
 src/pages/StagingReport.tsx  # the staging report (route: /staging)
 src/pages/LoanerReturns.tsx  # the loaner return countdown (route: /loaners)
 src/pages/ActivityFeed.tsx   # the team activity feed (route: /activity)
+src/pages/PackList.tsx    # the pack list (route: /pack-list)
 src/pages/                # one file per screen
 src/components/           # shared bottom sheets (move/add item, readiness checklist, quick log, extend), nav
 src/utils/parsePaste.ts   # myOPS paste-import parser
@@ -228,6 +275,68 @@ the same kit name exists in the field — it doesn't check whether that other un
 needed for a different upcoming case. With a small territory-scale inventory this is unlikely to
 bite, but sanity-check the suggestion before shipping the "spare" back, especially once you have
 multiple reps moving kits around independently.
+
+## A note on the pack list
+
+**How matching works**: a case links to a surgeon via `cases.surgeon_id` (the Surgeon field on
+Add Case now autocompletes against existing surgeons and creates a new one automatically if you
+type a name that doesn't match — no separate "add surgeon" step). The pack list groups a day's
+knee/hip cases by surgeon + side + surgery type, looks up that surgeon's preference for that
+surgery type, and expands their instrument + implant tote templates into required quantities.
+Cases without a surgeon on file, or a surgeon without a preference profile yet, show up as an
+"unmapped" group with a note instead of guessing — you'd fall back to the standard checklist on
+Calendar for those.
+
+**Implants vs. instruments**: this is the ratio you described — implants are a hard requirement
+(N same-side cases needs N complete size-runs, since an opened implant can't go back on the
+shelf), instrument trays are a soft, non-blocking advisory using "~1 tray covers about 2 same-day
+cases" as the starting ratio (matching your "5 cases → 3 trays, 4 cases → 2 trays" examples).
+That ratio lives on the tote template (`advisory_cases_per_unit`) so it can be tuned per
+instrument set rather than being one global number. A tote can also be marked `reusable: false`
+for single-use instruments (like the Spherika Efficiency plastic sets) — those get the same hard
+per-case requirement as implants instead of the soft advisory.
+
+**Sizing without a separate "Right tote"**: tote templates only need to be built once. Each line
+item is a specific catalog item (e.g. "KA One Femoral Component, Left, size 2+"); when a case's
+side doesn't match, the engine looks for the same product line/category/size on the other side
+and uses that instead. So once Right-side catalog items exist, Right-side cases just work — you
+don't define a second template.
+
+**On-hand quantities are territory-wide**, not filtered to the case's facility — the question the
+pack list answers is "do I have enough of this size anywhere," not "is it already at the right
+building" (that's what the Staging Report's haul list is for, separately).
+
+## A note on reserve-facility alerts
+
+`facilities.alert_on_withdrawal` is a plain boolean, not hardcoded to any facility name — flip it
+on for Lodi (or any facility you want treated as reserve-only) via Supabase's Table Editor. There
+is no push notification or SMS here yet — no phone buzzes when someone pulls from it. What
+happens instead: the movement shows up in red with a 🚨 icon at the top of Home (for anyone who
+opens the app) and in the Activity feed, and stays there until someone taps "Mark replenished."
+That's real-time only in the sense that it's visible the next time the app is open — if you want
+an actual push/SMS alert the moment it happens, that's a separate, bigger addition (web push
+needs a service worker subscription + a Supabase function to trigger it; SMS would mean adding
+Twilio or similar). Say the word if the in-app version isn't enough.
+
+## A note on FedEx tracking
+
+`movements.tracking_number` exists in the schema now but isn't wired into any screen yet — I
+didn't want to guess at the right UX (a field on the Ship action? A separate "add tracking"
+step after the fact, since the number isn't always known at ship time?). Tell me how you'd
+actually use it and I'll wire it in.
+
+## A note on GS1 scanning and true batch/video scanning
+
+Two different asks bundled into one: **parsing** a GS1-128/DataMatrix barcode into GTIN/lot/
+expiration is straightforward string parsing once a code is decoded, and I can build that
+whenever you want it — it works fine with the existing single-code-at-a-time camera scanner.
+**Detecting multiple GS1 codes simultaneously in one video frame** (scan a whole tote at once) is
+a materially harder computer-vision problem — the free scanning library this app uses now isn't
+built for that, and the SDKs that do it reliably (Dynamsoft, Scandit) are commercial. My
+recommendation, in the README's "What's next" above: build rapid sequential scanning first (scan
+item 1, beep, item 2, beep, checking each off the pack list) as the realistic v1, and revisit
+true multi-item detection only if that's not fast enough in practice — I don't want to promise
+something flaky.
 
 ## A note on the activity feed
 

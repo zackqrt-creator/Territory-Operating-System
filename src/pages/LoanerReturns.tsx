@@ -64,11 +64,11 @@ export default function LoanerReturns() {
   );
 
   function dueLabel(status: LoanerStatus): string {
-    if (status.extended) return `Extended to ${formatDateShort(status.effectiveDeadline)}`;
-    if (status.daysLeft < 0) return `Overdue by ${-status.daysLeft}d`;
-    if (status.daysLeft === 0) return "Due today";
-    if (status.daysLeft === 1) return "Due tomorrow";
-    return `Due in ${status.daysLeft}d`;
+    if (status.extended) return `Extended, ship by ${formatDateShort(status.effectiveDeadline)}`;
+    if (status.daysLeft < 0) return `Overdue — should've shipped ${-status.daysLeft}d ago`;
+    if (status.daysLeft === 0) return "Ship today";
+    if (status.daysLeft === 1) return "Ship by tomorrow";
+    return `Ship within ${status.daysLeft}d`;
   }
 
   return (
@@ -76,7 +76,8 @@ export default function LoanerReturns() {
       <h1 className="text-xl font-semibold text-white">Loaner returns</h1>
       <p className="mt-1 text-sm text-slate-400">
         48 hours back to corporate after the case it was used on, unless extended for something
-        coming up.
+        coming up. Since loaners go out overnight, shipping it on the ship-by date is what
+        counts — it doesn't need to have arrived yet.
       </p>
 
       {loading ? (

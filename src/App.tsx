@@ -9,6 +9,7 @@ import Scan from "./pages/Scan";
 import StagingReport from "./pages/StagingReport";
 import LoanerReturns from "./pages/LoanerReturns";
 import ActivityFeed from "./pages/ActivityFeed";
+import PackList from "./pages/PackList";
 import BottomNav from "./components/BottomNav";
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
         <Route path="/staging" element={<StagingReport />} />
         <Route path="/loaners" element={<LoanerReturns />} />
         <Route path="/activity" element={<ActivityFeed />} />
+        <Route path="/pack-list" element={<PackList />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

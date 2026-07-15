@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { bulkCreateCases, createCase, listFacilities, updateLastFacility } from "../lib/api";
-import type { CaseVariant, Facility, Side, SurgeryType } from "../lib/types";
+import {
+  bulkCreateCases,
+  createCase,
+  createSurgeon,
+  listFacilities,
+  listSurgeons,
+  updateLastFacility,
+} from "../lib/api";
+import type { CaseVariant, Facility, Side, Surgeon, SurgeryType } from "../lib/types";
 import { nextWednesday } from "../utils/dates";
 import { dedupeByCaseId, parsePasteText, type ParsedCase } from "../utils/parsePaste";
 
@@ -11,9 +18,11 @@ export default function AddCase() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"quick" | "paste">("quick");
   const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [surgeons, setSurgeons] = useState<Surgeon[]>([]);
 
   useEffect(() => {
     listFacilities().then(setFacilities);
+    listSurgeons().then(setSurgeons);
   }, []);
 
   return (
@@ -42,6 +51,8 @@ export default function AddCase() {
       {mode === "quick" ? (
         <QuickAddForm
           facilities={facilities}
+          surgeons={surgeons}
+          onSurgeonCreated={(s) => setSurgeons((prev) => [...prev, s])}
           territoryId={profile?.territory_id ?? ""}
           profileId={profile?.id ?? ""}
           lastFacilityId={profile?.last_facility_id ?? null}
@@ -62,12 +73,16 @@ export default function AddCase() {
 
 function QuickAddForm({
   facilities,
+  surgeons,
+  onSurgeonCreated,
   territoryId,
   profileId,
   lastFacilityId,
   onDone,
 }: {
   facilities: Facility[];
+  surgeons: Surgeon[];
+  onSurgeonCreated: (s: Surgeon) => void;
   territoryId: string;
   profileId: string;
   lastFacilityId: string | null;
@@ -88,23 +103,37 @@ function QuickAddForm({
     }
   }, [facilities, lastFacilityId, facilityId]);
 
+  /** Resolves the typed surgeon name to an existing profile (case-insensitive),
+   * creating a new one if it doesn't match — so pack-list preferences can
+   * find this case later without you having to pick from a separate list. */
+  async function resolveSurgeon(): Promise<{ name: string | null; id: string | null }> {
+    const name = surgeon.trim();
+    if (!name) return { name: null, id: null };
+    const existing = surgeons.find((s) => s.name.toLowerCase() === name.toLowerCase());
+    if (existing) return { name: existing.name, id: existing.id };
+    const created = await createSurgeon(name, territoryId);
+    onSurgeonCreated(created);
+    return { name: created.name, id: created.id };
+  }
+
   async function onSubmit() {
     if (!facilityId || !territoryId || !profileId) return;
     setSaving(true);
     try {
+      const resolved = await resolveSurgeon();
       await createCase({
         surgery_type: type,
         side,
         variant: type === "INSTRUMENT" ? null : variant,
         surgery_date: date,
         facility_id: facilityId,
-        surgeon: surgeon.trim() || null,
+        surgeon: resolved.name,
+        surgeon_id: resolved.id,
         territory_id: territoryId,
         created_by: profileId,
       });
       await updateLastFacility(profileId, facilityId);
       setJustAdded(true);
-      setSurgeon("");
       setTimeout(() => setJustAdded(false), 1500);
     } finally {
       setSaving(false);
@@ -195,10 +224,21 @@ function QuickAddForm({
         <label className="mb-1 block text-sm text-slate-400">Surgeon (optional)</label>
         <input
           type="text"
+          list="surgeon-options"
           value={surgeon}
           onChange={(e) => setSurgeon(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+          placeholder="Start typing a name..."
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
         />
+        <datalist id="surgeon-options">
+          {surgeons.map((s) => (
+            <option key={s.id} value={s.name} />
+          ))}
+        </datalist>
+        <p className="mt-1 text-xs text-slate-500">
+          Matching an existing surgeon lets the pack list use their preference profile. A new
+          name gets added automatically.
+        </p>
       </div>
 
       <button

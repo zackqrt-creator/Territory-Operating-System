@@ -9,6 +9,7 @@ import {
   listRecentMovements,
   listProfiles,
   listCasesByIds,
+  acknowledgeMovement,
 } from "../lib/api";
 import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem, Movement, Profile } from "../lib/types";
 import { buildStagingReport } from "../lib/staging";
@@ -27,26 +28,28 @@ export default function Home() {
   const [activityCases, setActivityCases] = useState<CaseRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([
+  function refresh() {
+    return Promise.all([
       listUpcomingCases(),
       listInventory(),
       listFacilities(),
       listCaseTemplatesWithItems(),
-      listRecentMovements(5),
+      listRecentMovements(50),
       listProfiles(),
-    ])
-      .then(async ([c, i, f, t, m, p]) => {
-        setCases(c);
-        setItems(i);
-        setFacilities(f);
-        setTemplates(t);
-        setMovements(m);
-        setProfiles(p);
-        const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
-        setActivityCases(await listCasesByIds(caseIds));
-      })
-      .finally(() => setLoading(false));
+    ]).then(async ([c, i, f, t, m, p]) => {
+      setCases(c);
+      setItems(i);
+      setFacilities(f);
+      setTemplates(t);
+      setMovements(m);
+      setProfiles(p);
+      const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
+      setActivityCases(await listCasesByIds(caseIds));
+    });
+  }
+
+  useEffect(() => {
+    refresh().finally(() => setLoading(false));
   }, []);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -61,6 +64,13 @@ export default function Home() {
   );
   const haulCount = staging.routes.reduce((sum, r) => sum + r.items.length, 0);
   const activity = buildActivityFeed(movements, items, facilities, profiles, activityCases);
+  const reserveAlerts = activity.filter((entry) => entry.reserveAlert && !entry.movement.acknowledged_at);
+
+  async function onAcknowledge(movementId: string) {
+    if (!profile) return;
+    await acknowledgeMovement(movementId, profile.id);
+    await refresh();
+  }
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
@@ -80,6 +90,25 @@ export default function Home() {
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : (
         <div className="mt-6 space-y-4">
+          {reserveAlerts.length > 0 && (
+            <div className="rounded-xl border border-red-700 bg-red-950/50 p-4">
+              <h2 className="text-sm font-medium text-red-200">🚨 Reserve storage was used</h2>
+              <div className="mt-2 space-y-2">
+                {reserveAlerts.map((entry) => (
+                  <div key={entry.id} className="rounded-lg bg-red-950/40 p-2">
+                    <p className="text-sm text-red-100">{entry.text}</p>
+                    <button
+                      onClick={() => onAcknowledge(entry.movement.id)}
+                      className="mt-1 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-medium text-white active:bg-red-700"
+                    >
+                      Mark replenished
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Link
             to="/cases/new"
             className="block rounded-xl bg-sky-600 px-4 py-4 text-center text-lg font-medium text-white active:bg-sky-700"
@@ -121,11 +150,11 @@ export default function Home() {
 
           {urgentLoaners.length > 0 && (
             <Link to="/loaners" className="block rounded-xl border border-red-800 bg-red-950/40 p-4">
-              <h2 className="text-sm font-medium text-red-300">Loaners due back soon</h2>
+              <h2 className="text-sm font-medium text-red-300">Loaners to ship soon</h2>
               <ul className="mt-2 space-y-1">
                 {urgentLoaners.map((s) => (
                   <li key={s.item.id} className="text-sm text-red-200">
-                    {s.item.name} &mdash; due {formatDateShort(s.effectiveDeadline)}
+                    {s.item.name} &mdash; ship by {formatDateShort(s.effectiveDeadline)}
                   </li>
                 ))}
               </ul>

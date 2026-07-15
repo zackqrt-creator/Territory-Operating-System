@@ -214,8 +214,8 @@ function LoanerReturnRow({ r, onMove }: { r: LoanerReturn; onMove: () => void })
           {r.daysLeft < 0
             ? `${-r.daysLeft}d overdue`
             : r.daysLeft === 0
-              ? "due today"
-              : `due in ${r.daysLeft}d`}
+              ? "ship today"
+              : `ship within ${r.daysLeft}d`}
         </p>
       </div>
       <button

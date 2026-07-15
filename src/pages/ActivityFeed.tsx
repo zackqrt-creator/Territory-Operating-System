@@ -59,11 +59,17 @@ export default function ActivityFeed() {
                 {entries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-start gap-2 rounded-lg border border-slate-700 bg-slate-800/50 p-3"
+                    className={`flex items-start gap-2 rounded-lg border p-3 ${
+                      entry.reserveAlert
+                        ? "border-red-700 bg-red-950/40"
+                        : "border-slate-700 bg-slate-800/50"
+                    }`}
                   >
                     <span className="text-lg leading-none">{entry.icon}</span>
                     <div className="flex-1">
-                      <p className="text-sm text-slate-200">{entry.text}</p>
+                      <p className={`text-sm ${entry.reserveAlert ? "text-red-200" : "text-slate-200"}`}>
+                        {entry.text}
+                      </p>
                       <p className="mt-0.5 text-xs text-slate-500">{formatTimeOfDay(entry.createdAt)}</p>
                     </div>
                   </div>

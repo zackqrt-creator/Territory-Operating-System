@@ -7,6 +7,9 @@ export interface ActivityEntry {
   icon: string;
   text: string;
   createdAt: string;
+  /** True for a withdrawal from a reserve facility (e.g. Lodi) — render in red. */
+  reserveAlert: boolean;
+  movement: Movement;
 }
 
 /**
@@ -35,8 +38,10 @@ export function buildActivityFeed(
 
     let icon = "📦";
     let text: string;
+    const reserveAlert = m.from_location !== m.to_location && Boolean(fromFacility?.alert_on_withdrawal);
 
     if (m.from_location !== m.to_location) {
+      icon = reserveAlert ? "🚨" : "📦";
       text = `${moverName} moved ${itemName} from ${fromFacility?.name ?? "somewhere"} to ${toFacility?.name ?? "somewhere"}`;
     } else if (m.note?.startsWith("Extended")) {
       icon = "🕐";
@@ -58,6 +63,6 @@ export function buildActivityFeed(
       text = `${moverName} updated ${itemName}`;
     }
 
-    return { id: m.id, icon, text, createdAt: m.created_at };
+    return { id: m.id, icon, text, createdAt: m.created_at, reserveAlert, movement: m };
   });
 }

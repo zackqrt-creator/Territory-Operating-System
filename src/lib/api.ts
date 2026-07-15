@@ -2,11 +2,15 @@ import { supabase } from "./supabase";
 import type {
   CaseRow,
   CaseTemplateWithItems,
+  CatalogItem,
   Facility,
   InventoryItem,
   ItemCategory,
   Movement,
   Profile,
+  Surgeon,
+  SurgeonPreference,
+  ToteTemplateWithItems,
 } from "./types";
 
 export async function listFacilities(): Promise<Facility[]> {
@@ -53,6 +57,7 @@ export interface NewCaseInput {
   variant?: "total" | "partial" | null;
   facility_id: string;
   surgeon?: string | null;
+  surgeon_id?: string | null;
   notes?: string | null;
   territory_id: string;
   created_by: string;
@@ -338,4 +343,53 @@ export async function extendLoanerReturn(params: {
     note: `Extended return to ${until}: ${reason}`,
   });
   if (moveError) throw moveError;
+}
+
+export async function acknowledgeMovement(movementId: string, profileId: string): Promise<void> {
+  const { error } = await supabase
+    .from("movements")
+    .update({ acknowledged_at: new Date().toISOString(), acknowledged_by: profileId })
+    .eq("id", movementId);
+  if (error) throw error;
+}
+
+export async function listCatalogItems(): Promise<CatalogItem[]> {
+  const { data, error } = await supabase
+    .from("catalog_items")
+    .select("*")
+    .order("category")
+    .order("product_line")
+    .order("size_label");
+  if (error) throw error;
+  return data as CatalogItem[];
+}
+
+export async function listSurgeons(): Promise<Surgeon[]> {
+  const { data, error } = await supabase.from("surgeons").select("*").order("name");
+  if (error) throw error;
+  return data as Surgeon[];
+}
+
+export async function createSurgeon(name: string, territoryId: string): Promise<Surgeon> {
+  const { data, error } = await supabase
+    .from("surgeons")
+    .insert({ name, territory_id: territoryId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Surgeon;
+}
+
+export async function listSurgeonPreferences(): Promise<SurgeonPreference[]> {
+  const { data, error } = await supabase.from("surgeon_preferences").select("*");
+  if (error) throw error;
+  return data as SurgeonPreference[];
+}
+
+export async function listToteTemplatesWithItems(): Promise<ToteTemplateWithItems[]> {
+  const { data, error } = await supabase
+    .from("tote_templates")
+    .select("*, tote_template_items(*, catalog_item:catalog_items(*))");
+  if (error) throw error;
+  return data as ToteTemplateWithItems[];
 }
