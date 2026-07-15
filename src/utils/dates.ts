@@ -66,3 +66,17 @@ export function formatTime(time: string): string {
   d.setHours(h, m, 0, 0);
   return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
+
+/** Formats a full timestamptz (e.g. movements.created_at) as local "7:42 AM". */
+export function formatTimeOfDay(isoTimestamp: string): string {
+  return new Date(isoTimestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** "Today" / "Yesterday" / "Tue, Jul 14" for a full timestamptz. */
+export function formatRelativeDay(isoTimestamp: string): string {
+  const day = toISODate(new Date(isoTimestamp));
+  const today = toISODate(new Date());
+  if (day === today) return "Today";
+  if (day === addDays(today, -1)) return "Yesterday";
+  return formatDateShort(day);
+}

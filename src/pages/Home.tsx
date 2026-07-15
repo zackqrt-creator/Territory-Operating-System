@@ -6,11 +6,15 @@ import {
   listInventory,
   listFacilities,
   listCaseTemplatesWithItems,
+  listRecentMovements,
+  listProfiles,
+  listCasesByIds,
 } from "../lib/api";
-import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem } from "../lib/types";
+import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem, Movement, Profile } from "../lib/types";
 import { buildStagingReport } from "../lib/staging";
 import { buildLoanerReport } from "../lib/loaners";
-import { daysUntil, formatDateShort, toISODate, tomorrow } from "../utils/dates";
+import { buildActivityFeed } from "../lib/activity";
+import { daysUntil, formatDateShort, formatTimeOfDay, toISODate, tomorrow } from "../utils/dates";
 
 export default function Home() {
   const { profile, signOut } = useAuth();
@@ -18,15 +22,29 @@ export default function Home() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [templates, setTemplates] = useState<CaseTemplateWithItems[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [activityCases, setActivityCases] = useState<CaseRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([listUpcomingCases(), listInventory(), listFacilities(), listCaseTemplatesWithItems()])
-      .then(([c, i, f, t]) => {
+    Promise.all([
+      listUpcomingCases(),
+      listInventory(),
+      listFacilities(),
+      listCaseTemplatesWithItems(),
+      listRecentMovements(5),
+      listProfiles(),
+    ])
+      .then(async ([c, i, f, t, m, p]) => {
         setCases(c);
         setItems(i);
         setFacilities(f);
         setTemplates(t);
+        setMovements(m);
+        setProfiles(p);
+        const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
+        setActivityCases(await listCasesByIds(caseIds));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -42,6 +60,7 @@ export default function Home() {
     [cases, templates, items, facilities],
   );
   const haulCount = staging.routes.reduce((sum, r) => sum + r.items.length, 0);
+  const activity = buildActivityFeed(movements, items, facilities, profiles, activityCases);
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
@@ -124,6 +143,23 @@ export default function Home() {
               Open inventory &rarr;
             </Link>
           </div>
+
+          {activity.length > 0 && (
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+              <h2 className="text-sm font-medium text-slate-300">Recent activity</h2>
+              <ul className="mt-2 space-y-1.5">
+                {activity.slice(0, 3).map((entry) => (
+                  <li key={entry.id} className="text-sm text-slate-300">
+                    {entry.icon} {entry.text}
+                    <span className="text-slate-500"> · {formatTimeOfDay(entry.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link to="/activity" className="mt-2 inline-block text-sm text-sky-400">
+                View all activity &rarr;
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>

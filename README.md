@@ -35,8 +35,13 @@ trunk. Built with React + Vite + Supabase.
   itself needed soon, ship that one back instead so you stay compliant without leaving the
   upcoming case short. One-tap **Extend** (date + reason, pre-filled from the suggestion) or
   **Ship to corporate**, which automatically clears the return clock once it's actually back.
+- **Activity feed** (`/activity`) — every move, case log, and extension across the team as plain
+  sentences ("Zack moved GMK Total Knee Loaner Kit from Storage Facility A to Vehicle · 7:42 AM"),
+  grouped by day, newest first. Nothing new to track — it just reads the `movements` audit log
+  that every other feature already writes to. Home shows the 3 most recent as a preview card.
 
-**Not built yet** (next up — see "What's next" below): the team activity feed.
+Every feature from the original brief is now built. See "What's next" for the couple of
+nice-to-haves still on the table.
 
 ---
 
@@ -142,16 +147,18 @@ for trays that don't have one and tape them on.
 
 ## What's next
 
-Only one item left from the original brief:
+Everything from the original brief is built. What's left is polish and nice-to-haves — tell me
+what you want to tackle:
 
-1. **Team activity feed** ("Zack moved GMK tray from A to Vehicle, 7:42 AM") — the `movements`
-   table already has everything needed; this is a UI-only addition.
-2. **Offline queueing** for scans made without signal.
-
-Otherwise, tell me what you want refined or extended — e.g. the extension-suggestion logic
-could get smarter (right now the "spare unit" check doesn't see whether that spare is itself
-needed for something else soon), or the loaner countdown could get its own nav tab instead of
-living under Home/Inventory links.
+1. **Offline queueing** for scans made without signal (explicitly called a "nice to have,
+   don't block v1" in the original brief).
+2. Make the extension-suggestion logic smarter — right now the "spare unit" check doesn't see
+   whether that spare is itself needed for something else soon.
+3. Give Staging, Loaners, and Activity their own bottom-nav tabs instead of living under
+   Home/Inventory links — worth it once you're using all of them daily and don't want the extra
+   tap.
+4. Any real-world friction once you and your team are actually using it day to day — that's
+   probably more valuable to fix than anything on this list.
 
 ## Project structure
 
@@ -163,10 +170,12 @@ src/lib/types.ts          # TypeScript types matching the schema
 src/lib/readiness.ts      # matches a case to its template, diffs required items against inventory
 src/lib/staging.ts        # rolls up a day's cases into the haul list + loaner ship list
 src/lib/loaners.ts        # loaner return countdown + extend/swap suggestion engine
+src/lib/activity.ts       # turns movements rows into plain-language feed sentences
 src/hooks/useAuth.tsx     # session + profile state
 src/pages/Calendar.tsx    # Wednesday-anchored week view (route: /cases)
 src/pages/StagingReport.tsx  # the staging report (route: /staging)
 src/pages/LoanerReturns.tsx  # the loaner return countdown (route: /loaners)
+src/pages/ActivityFeed.tsx   # the team activity feed (route: /activity)
 src/pages/                # one file per screen
 src/components/           # shared bottom sheets (move/add item, readiness checklist, quick log, extend), nav
 src/utils/parsePaste.ts   # myOPS paste-import parser
@@ -219,3 +228,14 @@ the same kit name exists in the field — it doesn't check whether that other un
 needed for a different upcoming case. With a small territory-scale inventory this is unlikely to
 bite, but sanity-check the suggestion before shipping the "spare" back, especially once you have
 multiple reps moving kits around independently.
+
+## A note on the activity feed
+
+There's no dedicated "event type" column on `movements` — the feed figures out what happened
+from the shape of the row: different `from`/`to` facility means a move; same facility plus a
+note starting with "Used" or "Extended" means a case-usage or extension event (those are the
+only two same-facility notes the app itself ever writes). Everything else in the sentence — item
+name, facility names, who did it, the reason — comes from live lookups against the current
+inventory/profile/case records, not from parsing the note text, so it stays accurate even if,
+say, an item gets renamed later. The one exception is the "2x" quantity shown for consumable
+usage, which is pulled from the note since that's the only place it's recorded.

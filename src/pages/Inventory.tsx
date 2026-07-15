@@ -61,9 +61,14 @@ export default function Inventory() {
         </button>
       </div>
 
-      <Link to="/loaners" className="mt-3 inline-block text-sm text-sky-400">
-        Loaner return countdown &rarr;
-      </Link>
+      <div className="mt-3 flex gap-4">
+        <Link to="/loaners" className="inline-block text-sm text-sky-400">
+          Loaner return countdown &rarr;
+        </Link>
+        <Link to="/activity" className="inline-block text-sm text-sky-400">
+          Activity feed &rarr;
+        </Link>
+      </div>
 
       <div className="mt-4 space-y-2">
         <input

@@ -6,6 +6,7 @@ import type {
   InventoryItem,
   ItemCategory,
   Movement,
+  Profile,
 } from "./types";
 
 export async function listFacilities(): Promise<Facility[]> {
@@ -158,6 +159,29 @@ export async function moveItem(params: {
 
   const { error: updateError } = await supabase.from("inventory_items").update(update).eq("id", item.id);
   if (updateError) throw updateError;
+}
+
+export async function listRecentMovements(limit = 100): Promise<Movement[]> {
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as Movement[];
+}
+
+export async function listProfiles(): Promise<Profile[]> {
+  const { data, error } = await supabase.from("profiles").select("*");
+  if (error) throw error;
+  return data as Profile[];
+}
+
+export async function listCasesByIds(ids: string[]): Promise<CaseRow[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase.from("cases").select("*").in("id", ids);
+  if (error) throw error;
+  return data as CaseRow[];
 }
 
 export async function listMovementsForItem(itemId: string): Promise<Movement[]> {
