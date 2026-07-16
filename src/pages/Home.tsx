@@ -83,6 +83,12 @@ export default function Home() {
   );
   const mentions = boardPosts.filter((p) => profile && p.mentioned_ids.includes(profile.id));
 
+  // Expiry safety: never implant an expired device. Loaner-tote wrappers excluded.
+  const expiryFlags = items.filter(
+    (i) => i.expiration_date && !i.loaner_code && daysUntil(i.expiration_date) <= 30,
+  );
+  const expiredCount = expiryFlags.filter((i) => daysUntil(i.expiration_date!) < 0).length;
+
   async function onAcknowledge(movementId: string) {
     if (!profile) return;
     await acknowledgeMovement(movementId, profile.id);
@@ -129,6 +135,27 @@ export default function Home() {
                 ))}
               </div>
             </div>
+          )}
+
+          {expiryFlags.length > 0 && (
+            <Link
+              to="/inventory"
+              className={`block rounded-xl border p-4 ${
+                expiredCount > 0 ? "border-red-800 bg-red-950/40" : "border-amber-800 bg-amber-950/25"
+              }`}
+            >
+              <h2 className={`text-sm font-medium ${expiredCount > 0 ? "text-red-200" : "text-amber-200"}`}>
+                {expiredCount > 0
+                  ? `⚠️ ${expiredCount} expired item${expiredCount === 1 ? "" : "s"} in stock`
+                  : `⏳ ${expiryFlags.length} item${expiryFlags.length === 1 ? "" : "s"} expiring soon`}
+              </h2>
+              <p className="mt-1 text-sm text-slate-300">
+                {expiredCount > 0
+                  ? "Pull these before a case — don't let one reach the field."
+                  : "Within 30 days. Rotate or use first."}
+              </p>
+              <span className="mt-1 inline-block text-sm text-sky-300">Review in inventory &rarr;</span>
+            </Link>
           )}
 
           <Link

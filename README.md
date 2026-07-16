@@ -89,7 +89,11 @@ trunk. Built with React + Vite + Supabase.
 - **Loaner tote click-through, acquisition badges & expiry flags** — every inventory row shows a
   Consignment/Loaner badge; tapping a **loaner tote** opens its contents (the `SPKAEFFR08` →
   "Ins-Spherika Efficiency Right" → itemized units view). Items nearing or past their expiration
-  show amber/red right in the list.
+  show amber/red right in the list, and Home shows a safety alert if anything in stock is expired
+  or expiring within 30 days (you never want an expired device reaching the field).
+- **Edit & delete inventory** — tap an item → "Edit details / delete" to fix a mistyped lot,
+  expiration, quantity, location, or cement, or remove a wrong entry (with a confirm). The
+  catalog-linked name is locked so identity stays trustworthy. The bulk-entry safety net.
 - **"Am I ready?" inventory readiness** (`/readiness`, headline feature) — pick a day and it
   answers the three questions that matter: **total inventory, where it is, and do I have enough
   for the day.** It counts every size you'd bring (a knee case needs one of every size on its
