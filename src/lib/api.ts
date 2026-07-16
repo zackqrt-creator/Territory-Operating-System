@@ -1,5 +1,8 @@
 import { supabase } from "./supabase";
 import type {
+  BoardComment,
+  BoardPost,
+  BoardPostKind,
   CaseRow,
   CaseTemplateWithItems,
   CatalogItem,
@@ -518,4 +521,85 @@ export async function listToteTemplatesWithItems(): Promise<ToteTemplateWithItem
     .select("*, tote_template_items(*, catalog_item:catalog_items(*))");
   if (error) throw error;
   return data as ToteTemplateWithItems[];
+}
+
+// ---- Team board -----------------------------------------------------------
+
+export async function listBoardPosts(): Promise<BoardPost[]> {
+  const { data, error } = await supabase
+    .from("board_posts")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as BoardPost[];
+}
+
+export async function createBoardPost(input: {
+  body: string;
+  kind: BoardPostKind;
+  assignee_id?: string | null;
+  mentioned_ids?: string[];
+  territory_id: string;
+  author_id: string;
+}): Promise<BoardPost> {
+  const { data, error } = await supabase
+    .from("board_posts")
+    .insert({
+      body: input.body,
+      kind: input.kind,
+      assignee_id: input.assignee_id ?? null,
+      mentioned_ids: input.mentioned_ids ?? [],
+      territory_id: input.territory_id,
+      author_id: input.author_id,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as BoardPost;
+}
+
+/** Check/uncheck a to-do, stamping who closed it and when. */
+export async function setTodoDone(
+  postId: string,
+  done: boolean,
+  profileId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("board_posts")
+    .update({
+      done,
+      done_at: done ? new Date().toISOString() : null,
+      done_by: done ? profileId : null,
+    })
+    .eq("id", postId);
+  if (error) throw error;
+}
+
+export async function deleteBoardPost(postId: string): Promise<void> {
+  const { error } = await supabase.from("board_posts").delete().eq("id", postId);
+  if (error) throw error;
+}
+
+export async function listBoardComments(): Promise<BoardComment[]> {
+  const { data, error } = await supabase
+    .from("board_comments")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data as BoardComment[];
+}
+
+export async function createBoardComment(input: {
+  post_id: string;
+  body: string;
+  territory_id: string;
+  author_id: string;
+}): Promise<BoardComment> {
+  const { data, error } = await supabase
+    .from("board_comments")
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as BoardComment;
 }

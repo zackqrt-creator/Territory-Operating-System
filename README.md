@@ -75,6 +75,10 @@ trunk. Built with React + Vite + Supabase.
   of the physical device when you scan it in; it uploads to Supabase Storage and shows as a
   thumbnail. Useful for the team to visually confirm a match without asking you, especially
   while the hip catalog is still filling in.
+- **Team board** (`/team`) — a shared, territory-wide space for the whole crew: post notes and
+  hand-offs, turn any post into a **to-do assigned to a teammate**, **@-tag** whoever needs to see
+  it, and reply in a thread. Filters for All / To-dos / Assigned to me / Mentions me. Home shows a
+  card with how many open to-dos are assigned to you. (In-app only — no push/SMS yet.)
 - **Scan a label to auto-fill** — adding a consignment item, tap "📷 Scan label to auto-fill,"
   snap the printed label, and it reads the REF, size, side, cement, lot, and expiration **on the
   phone** (no server, no per-scan cost, photo never leaves the device). Because the catalog now
@@ -167,6 +171,8 @@ way:
      devices can be organized separately from knee ones, adds `photo_url` to `inventory_items`,
      and creates the `item-photos` Storage bucket. No hip products are seeded — see "A note on
      the Hips catalog" below.
+   - `010_team_board.sql` — the team communication board (posts, to-dos, comments), territory-
+     scoped RLS. Independent of the others; run any time after 001.
    - `009_inventory_acquisition_and_readiness.sql` — the consignment-vs-loaner tracking model
      (`acquisition_type`, loaner-tote container columns, per-unit `cement_type`), replaces the
      demo facilities with your real ones (Elk Grove, Adventist Memorial Hospital, Lodi Reserve,

@@ -10,8 +10,17 @@ import {
   listProfiles,
   listCasesByIds,
   acknowledgeMovement,
+  listBoardPosts,
 } from "../lib/api";
-import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem, Movement, Profile } from "../lib/types";
+import type {
+  BoardPost,
+  CaseRow,
+  CaseTemplateWithItems,
+  Facility,
+  InventoryItem,
+  Movement,
+  Profile,
+} from "../lib/types";
 import { buildStagingReport } from "../lib/staging";
 import { buildLoanerReport } from "../lib/loaners";
 import { buildActivityFeed } from "../lib/activity";
@@ -26,6 +35,7 @@ export default function Home() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activityCases, setActivityCases] = useState<CaseRow[]>([]);
+  const [boardPosts, setBoardPosts] = useState<BoardPost[]>([]);
   const [loading, setLoading] = useState(true);
 
   function refresh() {
@@ -36,13 +46,15 @@ export default function Home() {
       listCaseTemplatesWithItems(),
       listRecentMovements(50),
       listProfiles(),
-    ]).then(async ([c, i, f, t, m, p]) => {
+      listBoardPosts(),
+    ]).then(async ([c, i, f, t, m, p, b]) => {
       setCases(c);
       setItems(i);
       setFacilities(f);
       setTemplates(t);
       setMovements(m);
       setProfiles(p);
+      setBoardPosts(b);
       const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
       setActivityCases(await listCasesByIds(caseIds));
     });
@@ -65,6 +77,11 @@ export default function Home() {
   const haulCount = staging.routes.reduce((sum, r) => sum + r.items.length, 0);
   const activity = buildActivityFeed(movements, items, facilities, profiles, activityCases);
   const reserveAlerts = activity.filter((entry) => entry.reserveAlert && !entry.movement.acknowledged_at);
+
+  const openTodos = boardPosts.filter(
+    (p) => p.kind === "todo" && p.assignee_id === profile?.id && !p.done,
+  );
+  const mentions = boardPosts.filter((p) => profile && p.mentioned_ids.includes(profile.id));
 
   async function onAcknowledge(movementId: string) {
     if (!profile) return;
@@ -130,6 +147,27 @@ export default function Home() {
               <p className="text-sm text-slate-400">Every size, every case — checked against your stock</p>
             </div>
             <span className="text-2xl">🩺</span>
+          </Link>
+
+          <Link
+            to="/team"
+            className={`flex items-center justify-between rounded-xl border px-4 py-4 active:bg-slate-800 ${
+              openTodos.length > 0
+                ? "border-sky-800 bg-sky-950/30"
+                : "border-slate-700 bg-slate-800/50"
+            }`}
+          >
+            <div>
+              <h2 className="font-semibold text-white">Team board</h2>
+              <p className="text-sm text-slate-400">
+                {openTodos.length > 0
+                  ? `${openTodos.length} to-do${openTodos.length === 1 ? "" : "s"} assigned to you`
+                  : mentions.length > 0
+                    ? `${mentions.length} post${mentions.length === 1 ? "" : "s"} mention you`
+                    : "Notes, hand-offs & to-dos"}
+              </p>
+            </div>
+            <span className="text-2xl">💬</span>
           </Link>
 
           {staging.cases.length > 0 && (

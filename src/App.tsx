@@ -12,6 +12,7 @@ import ActivityFeed from "./pages/ActivityFeed";
 import PackList from "./pages/PackList";
 import Surgeons from "./pages/Surgeons";
 import Readiness from "./pages/Readiness";
+import TeamBoard from "./pages/TeamBoard";
 import BottomNav from "./components/BottomNav";
 
 function App() {
@@ -49,6 +50,7 @@ function App() {
         <Route path="/pack-list" element={<PackList />} />
         <Route path="/surgeons" element={<Surgeons />} />
         <Route path="/readiness" element={<Readiness />} />
+        <Route path="/team" element={<TeamBoard />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

@@ -182,3 +182,28 @@ export interface SurgeonPreferenceWithTotes extends SurgeonPreference {
   instrument_tote: ToteTemplateWithItems | null;
   implant_tote: ToteTemplateWithItems | null;
 }
+
+export type BoardPostKind = "note" | "todo";
+
+export interface BoardPost {
+  id: string;
+  territory_id: string;
+  author_id: string | null;
+  body: string;
+  kind: BoardPostKind;
+  assignee_id: string | null;
+  done: boolean;
+  done_at: string | null;
+  done_by: string | null;
+  mentioned_ids: string[];
+  created_at: string;
+}
+
+export interface BoardComment {
+  id: string;
+  territory_id: string;
+  post_id: string;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+}
