@@ -146,6 +146,28 @@ export async function createInventoryItem(input: NewItemInput): Promise<Inventor
   return data as InventoryItem;
 }
 
+/** Fix a mistyped item (lot, expiration, quantity, name, cement, location). */
+export async function updateInventoryItem(
+  id: string,
+  patch: Partial<
+    Pick<
+      InventoryItem,
+      "name" | "lot_number" | "expiration_date" | "quantity" | "location_id" | "cement_type"
+    >
+  >,
+): Promise<void> {
+  const { error } = await supabase.from("inventory_items").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+/** Delete an inventory item. If it's a loaner tote, its contents go too. */
+export async function deleteInventoryItem(id: string): Promise<void> {
+  // Remove any loaner-tote contents that point at this row first.
+  await supabase.from("inventory_items").delete().eq("loaner_tote_id", id);
+  const { error } = await supabase.from("inventory_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
 /** One line of a loaner tote's contents: a catalog item and how many of it are inside. */
 export interface LoanerContentLine {
   catalog_item_id: string;

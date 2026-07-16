@@ -5,6 +5,7 @@ import type { Facility, InventoryItem, ItemCategory } from "../lib/types";
 import MoveItemSheet from "../components/MoveItemSheet";
 import AddItemSheet from "../components/AddItemSheet";
 import LoanerDetailSheet from "../components/LoanerDetailSheet";
+import EditItemSheet from "../components/EditItemSheet";
 import { daysUntil } from "../utils/dates";
 
 const CATEGORY_LABEL: Record<ItemCategory, string> = {
@@ -22,6 +23,7 @@ export default function Inventory() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [moving, setMoving] = useState<InventoryItem | null>(null);
+  const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [viewingTote, setViewingTote] = useState<InventoryItem | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -190,6 +192,23 @@ export default function Inventory() {
           onClose={() => setMoving(null)}
           onMoved={() => {
             setMoving(null);
+            refresh();
+          }}
+          onEdit={() => {
+            const it = moving;
+            setMoving(null);
+            setEditing(it);
+          }}
+        />
+      )}
+
+      {editing && (
+        <EditItemSheet
+          item={editing}
+          facilities={facilities}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
             refresh();
           }}
         />

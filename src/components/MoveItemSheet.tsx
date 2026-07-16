@@ -10,6 +10,7 @@ export default function MoveItemSheet({
   relatedCaseId,
   onClose,
   onMoved,
+  onEdit,
 }: {
   item: InventoryItem;
   facilities: Facility[];
@@ -18,6 +19,8 @@ export default function MoveItemSheet({
   relatedCaseId?: string;
   onClose: () => void;
   onMoved: () => void;
+  /** When provided, shows an "Edit details / delete" link (e.g. from Inventory). */
+  onEdit?: () => void;
 }) {
   const { profile } = useAuth();
   const [target, setTarget] = useState<Facility | null>(initialTarget ?? null);
@@ -90,7 +93,12 @@ export default function MoveItemSheet({
           </div>
         )}
 
-        <button onClick={onClose} className="mt-4 w-full text-sm text-slate-500 underline">
+        {onEdit && !target && (
+          <button onClick={onEdit} className="mt-4 w-full text-sm text-sky-400 underline">
+            Edit details / delete
+          </button>
+        )}
+        <button onClick={onClose} className="mt-2 w-full text-sm text-slate-500 underline">
           Cancel
         </button>
       </div>
