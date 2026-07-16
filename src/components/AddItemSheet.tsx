@@ -11,6 +11,8 @@ import type {
   ItemCategory,
 } from "../lib/types";
 import LoanerIntake from "./LoanerIntake";
+import { ocrLabel } from "../lib/ocr";
+import { parseLabelText } from "../lib/labelParse";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "loaner_kit", label: "Loaner kit" },
@@ -109,12 +111,16 @@ export default function AddItemSheet({
   const [barcode, setBarcode] = useState(prefillBarcode ?? "");
   const [locationId, setLocationId] = useState(profile?.last_facility_id ?? facilities[0]?.id ?? "");
   const [returnDeadline, setReturnDeadline] = useState("");
+  const [expiration, setExpiration] = useState("");
   const [cementType, setCementType] = useState<"cemented" | "cementless" | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
 
   const [showNewCatalogForm, setShowNewCatalogForm] = useState(false);
   const [newDeviceTypeChoice, setNewDeviceTypeChoice] = useState("");
@@ -164,6 +170,49 @@ export default function AddItemSheet({
     });
   }
 
+  /**
+   * Take/choose a photo of a label → OCR it on-device → pre-fill the form.
+   * The photo is also attached to the item. Everything filled is a suggestion
+   * the rep confirms; if OCR fails, the photo still attaches and nothing else
+   * changes.
+   */
+  async function onScanLabel(file: File) {
+    onPhotoSelected(file);
+    setScanning(true);
+    setScanNote(null);
+    try {
+      const text = await ocrLabel(file);
+      const scan = parseLabelText(text, catalog);
+      if (scan.fieldsRead.length === 0) {
+        setScanNote("Couldn't read the label clearly — fill it in by hand, the photo is attached.");
+        return;
+      }
+      if (scan.match) {
+        // Exact catalog hit: take identity from the catalog (authoritative).
+        setCatalogItemId(scan.match.id);
+        setName(scan.match.name);
+        setCategory(scan.match.category);
+        if (scan.match.joint) setJoint(scan.match.joint);
+        setCatalogSearch(catalogLabel(scan.match));
+      } else if (scan.refText) {
+        setName((prev) => prev || `REF ${scan.refText}`);
+      }
+      if (scan.cement) setCementType(scan.cement);
+      if (scan.lot) setLot(scan.lot);
+      if (scan.expiration) setExpiration(scan.expiration);
+      const matchMsg = scan.match
+        ? `Matched ${scan.match.name}${scan.match.size_label ? ` · ${scan.match.size_label}` : ""}. `
+        : scan.refText
+          ? `Read REF ${scan.refText} (no catalog match — confirm or add it). `
+          : "";
+      setScanNote(`${matchMsg}Filled: ${scan.fieldsRead.join(", ")}. Verify before saving.`);
+    } catch {
+      setScanNote("Label scan unavailable right now — photo attached, fill it in by hand.");
+    } finally {
+      setScanning(false);
+    }
+  }
+
   async function onCreateCatalogItem() {
     if (!catalogSearch.trim() || !profile) return;
     const deviceType = newDeviceTypeChoice === OTHER ? newDeviceTypeOther.trim() : newDeviceTypeChoice;
@@ -205,6 +254,7 @@ export default function AddItemSheet({
         territory_id: profile.territory_id,
         catalog_item_id: catalogItemId,
         photo_url: photoUrl,
+        expiration_date: expiration || null,
         acquisition_type: "consignment",
         cement_type: category === "implant" ? cementType : null,
       });
@@ -249,6 +299,36 @@ export default function AddItemSheet({
           />
         ) : (
         <div className="mt-4 space-y-4">
+          <div>
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void onScanLabel(f);
+              }}
+            />
+            <button
+              onClick={() => scanInputRef.current?.click()}
+              disabled={scanning}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-sky-700 bg-sky-950/40 px-4 py-3 font-medium text-sky-200 disabled:opacity-60"
+            >
+              {scanning ? "Reading label…" : "📷 Scan label to auto-fill"}
+            </button>
+            {scanNote && (
+              <p className="mt-2 rounded-lg border border-slate-700 bg-slate-800/60 p-2 text-xs text-slate-300">
+                {scanNote}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Snap the printed label — reads the REF, size, side, cement, lot &amp; expiration, and
+              links it to the catalog. Always double-check before saving.
+            </p>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm text-slate-400">Joint</label>
             <div className="grid grid-cols-3 gap-2">
@@ -510,13 +590,24 @@ export default function AddItemSheet({
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm text-slate-400">Lot number (optional)</label>
-            <input
-              value={lot}
-              onChange={(e) => setLot(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm text-slate-400">Lot number</label>
+              <input
+                value={lot}
+                onChange={(e) => setLot(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-400">Expiration</label>
+              <input
+                type="date"
+                value={expiration}
+                onChange={(e) => setExpiration(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+              />
+            </div>
           </div>
 
           <div>

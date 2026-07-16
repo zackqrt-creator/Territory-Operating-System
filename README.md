@@ -75,6 +75,17 @@ trunk. Built with React + Vite + Supabase.
   of the physical device when you scan it in; it uploads to Supabase Storage and shows as a
   thumbnail. Useful for the team to visually confirm a match without asking you, especially
   while the hip catalog is still filling in.
+- **Scan a label to auto-fill** — adding a consignment item, tap "📷 Scan label to auto-fill,"
+  snap the printed label, and it reads the REF, size, side, cement, lot, and expiration **on the
+  phone** (no server, no per-scan cost, photo never leaves the device). Because the catalog now
+  carries the real REF numbers, an exact REF match links the item and takes size/side from the
+  catalog — not from fuzzy text — so it can't silently mislabel. Everything is a pre-fill you
+  confirm; if the label won't read, the photo still attaches and you type it in. (First scan
+  fetches the recognizer from a CDN, so it needs a connection once, then caches.)
+- **Loaner tote click-through, acquisition badges & expiry flags** — every inventory row shows a
+  Consignment/Loaner badge; tapping a **loaner tote** opens its contents (the `SPKAEFFR08` →
+  "Ins-Spherika Efficiency Right" → itemized units view). Items nearing or past their expiration
+  show amber/red right in the list.
 - **"Am I ready?" inventory readiness** (`/readiness`, headline feature) — pick a day and it
   answers the three questions that matter: **total inventory, where it is, and do I have enough
   for the day.** It counts every size you'd bring (a knee case needs one of every size on its
