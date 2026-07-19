@@ -9,6 +9,8 @@ import type {
   QaAnswer,
   QaQuestion,
   RepCertification,
+  PersonalTask,
+  TaskStatus,
   CaseRow,
   CaseTemplateWithItems,
   CatalogItem,
@@ -748,4 +750,43 @@ export async function createBoardComment(input: {
     .single();
   if (error) throw error;
   return data as BoardComment;
+}
+
+// ---- Personal tasks (private by default; RLS enforces visibility) ---------
+
+export async function listMyTasks(): Promise<PersonalTask[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as PersonalTask[];
+}
+
+export async function createTask(input: {
+  title: string;
+  notes?: string | null;
+  due_date?: string | null;
+  shared_with?: string[];
+  status?: TaskStatus;
+  territory_id: string;
+  owner_id: string;
+}): Promise<PersonalTask> {
+  const { data, error } = await supabase.from("tasks").insert(input).select().single();
+  if (error) throw error;
+  return data as PersonalTask;
+}
+
+export async function updateTask(
+  id: string,
+  patch: Partial<Pick<PersonalTask, "title" | "notes" | "due_date" | "status" | "shared_with" | "done_at">>,
+): Promise<void> {
+  const { error } = await supabase.from("tasks").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  const { error } = await supabase.from("tasks").delete().eq("id", id);
+  if (error) throw error;
 }

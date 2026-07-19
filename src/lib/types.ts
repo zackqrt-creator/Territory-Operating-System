@@ -275,3 +275,19 @@ export interface FacilityCredential {
   expires_on: string;
   created_at: string;
 }
+
+export type TaskStatus = "todo" | "doing" | "done";
+
+export interface PersonalTask {
+  id: string;
+  territory_id: string;
+  owner_id: string;
+  title: string;
+  notes: string | null;
+  due_date: string | null;
+  status: TaskStatus;
+  /** Profile ids this task is shared with; empty = private to the owner. */
+  shared_with: string[];
+  done_at: string | null;
+  created_at: string;
+}

@@ -231,11 +231,12 @@ export default function Home() {
             <span className="text-2xl">💬</span>
           </Link>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {[
-              { to: "/qa", icon: "❓", label: "Q&A wall" },
+              { to: "/tasks", icon: "☑️", label: "Tasks" },
+              { to: "/qa", icon: "❓", label: "Q&A" },
               { to: "/billing", icon: "💵", label: "Billing" },
-              { to: "/compliance", icon: "🪪", label: "Compliance" },
+              { to: "/compliance", icon: "🪪", label: "Creds" },
             ].map((l) => (
               <Link
                 key={l.to}

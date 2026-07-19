@@ -100,7 +100,12 @@ trunk. Built with React + Vite + Supabase.
     away at the door.
   - **Use-these-lots-first** — Home suggests which implants expiring within 60 days fit which
     upcoming case (same joint/side, case before expiry). Advisory, never blocking.
-  - Run `011_crm_foundation.sql` (after 010) to enable all of it.
+  - **Personal task boards** (`/tasks`) — Trello-style for each teammate: To do → In progress →
+    Done, with notes and due dates. **Private by default** — a task is invisible to everyone but
+    its owner unless explicitly shared with chosen teammates, and that's enforced by row-level
+    security in the database, not just hidden in the UI. **Duplicate** any task with a new date
+    so recurring work (weekly counts, restock runs) never gets retyped. Overdue tasks flag red.
+  - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` (after 010) to enable all of it.
 - **Team board** (`/team`) — a shared, territory-wide space for the whole crew: post notes and
   hand-offs, turn any post into a **to-do assigned to a teammate**, **@-tag** whoever needs to see
   it, and reply in a thread. Filters for All / To-dos / Assigned to me / Mentions me. Home shows a

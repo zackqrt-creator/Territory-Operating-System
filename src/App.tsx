@@ -16,6 +16,7 @@ import TeamBoard from "./pages/TeamBoard";
 import QaWall from "./pages/QaWall";
 import Compliance from "./pages/Compliance";
 import Billing from "./pages/Billing";
+import Tasks from "./pages/Tasks";
 import BottomNav from "./components/BottomNav";
 
 function App() {
@@ -57,6 +58,7 @@ function App() {
         <Route path="/qa" element={<QaWall />} />
         <Route path="/compliance" element={<Compliance />} />
         <Route path="/billing" element={<Billing />} />
+        <Route path="/tasks" element={<Tasks />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />
