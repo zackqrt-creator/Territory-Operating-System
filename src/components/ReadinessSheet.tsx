@@ -142,6 +142,15 @@ export default function ReadinessSheet({
 
         <NotesSection entityType="case" entityId={caseRow.id} />
 
+        {caseRow.facility_id && (
+          <NotesSection
+            entityType="facility"
+            entityId={caseRow.facility_id}
+            title={`${caseFacility?.name ?? "Facility"} playbook`}
+            placeholder="Dock hours, parking, door codes, who to find in SPD…"
+          />
+        )}
+
         {qa.length > 0 && (
           <div className="mt-3 rounded-xl border border-sky-900 bg-sky-950/20 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-sky-300">

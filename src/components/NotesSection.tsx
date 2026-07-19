@@ -18,9 +18,13 @@ import { formatRelativeDay, formatTimeOfDay } from "../utils/dates";
 export default function NotesSection({
   entityType,
   entityId,
+  title = "Notes",
+  placeholder = "Write a note…",
 }: {
   entityType: NoteEntityType;
   entityId: string;
+  title?: string;
+  placeholder?: string;
 }) {
   const { profile } = useAuth();
   const [notes, setNotes] = useState<EntityNote[]>([]);
@@ -88,7 +92,7 @@ export default function NotesSection({
     <div className="mt-3 rounded-xl border border-slate-700 bg-slate-800/40 p-3">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          Notes{notes.length > 0 ? ` (${notes.length})` : ""}
+          {title}{notes.length > 0 ? ` (${notes.length})` : ""}
         </p>
         {!adding && (
           <button
@@ -107,7 +111,7 @@ export default function NotesSection({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={2}
-            placeholder="Write a note…"
+            placeholder={placeholder}
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
           />
           <div className="mt-1.5 flex gap-2">

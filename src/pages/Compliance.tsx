@@ -11,6 +11,7 @@ import {
 } from "../lib/api";
 import type { CaseRow, Facility, FacilityCredential, Profile, RepCertification } from "../lib/types";
 import { credentialConflicts } from "../lib/crm";
+import NotesSection from "../components/NotesSection";
 import { daysUntil, formatDateShort, toISODate } from "../utils/dates";
 
 /**
@@ -176,6 +177,25 @@ export default function Compliance() {
             >
               Add my credential
             </button>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+            <h2 className="font-semibold text-white">Facility playbooks</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              The stuff that matters at 6am: dock hours, parking, door codes, who to find. Also
+              shown on every case at that facility.
+            </p>
+            <div className="mt-2 space-y-2">
+              {facilities.map((f) => (
+                <NotesSection
+                  key={f.id}
+                  entityType="facility"
+                  entityId={f.id}
+                  title={f.name}
+                  placeholder="Dock hours, parking, door codes, who to find in SPD…"
+                />
+              ))}
+            </div>
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/40 p-4">

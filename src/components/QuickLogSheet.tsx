@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { logCaseUsage, markLoanerUsed } from "../lib/api";
+import { createEntityNote, logCaseUsage, markLoanerUsed } from "../lib/api";
 import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem, ItemCategory } from "../lib/types";
 import { computeReadiness } from "../lib/readiness";
 import { addDays } from "../utils/dates";
@@ -40,6 +40,39 @@ export default function QuickLogSheet({
 }) {
   const { profile } = useAuth();
   const readiness = computeReadiness(caseRow, templates, inventory, facilities);
+  const [debrief, setDebrief] = useState("");
+  const [savingDebrief, setSavingDebrief] = useState(false);
+
+  /** 30-second debrief: one optional line that pins to the case AND the
+   * surgeon's profile — institutional memory a competitor rep can't touch. */
+  async function finishWithDebrief() {
+    const text = debrief.trim();
+    if (text && profile) {
+      setSavingDebrief(true);
+      try {
+        const body = `Debrief — ${caseRow.surgery_date}${caseRow.surgeon ? ` (${caseRow.surgeon})` : ""}: ${text}`;
+        await createEntityNote({
+          entity_type: "case",
+          entity_id: caseRow.id,
+          body: text,
+          territory_id: profile.territory_id,
+          author_id: profile.id,
+        });
+        if (caseRow.surgeon_id) {
+          await createEntityNote({
+            entity_type: "surgeon",
+            entity_id: caseRow.surgeon_id,
+            body,
+            territory_id: profile.territory_id,
+            author_id: profile.id,
+          });
+        }
+      } finally {
+        setSavingDebrief(false);
+      }
+    }
+    onLogged();
+  }
   // Only implant/consumable items are actually consumed; loaner kits and
   // trays get returned via the move flow, not decremented here.
   const consumable = readiness.items.filter(
@@ -145,11 +178,26 @@ export default function QuickLogSheet({
                 </div>
               </>
             )}
+            <div className="mt-4 rounded-xl border border-sky-800 bg-sky-950/20 p-3">
+              <p className="text-sm font-semibold text-sky-200">30-second debrief</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Anything go sideways or worth remembering? Saves to this case and pins to{" "}
+                {caseRow.surgeon ?? "the surgeon"}'s profile.
+              </p>
+              <textarea
+                value={debrief}
+                onChange={(e) => setDebrief(e.target.value)}
+                rows={2}
+                placeholder="e.g. Went up a size on the femur late — have 4+ opened early next time"
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+              />
+            </div>
             <button
-              onClick={onLogged}
-              className="mt-5 w-full rounded-lg bg-sky-600 px-4 py-4 text-lg font-medium text-white active:bg-sky-700"
+              onClick={finishWithDebrief}
+              disabled={savingDebrief}
+              className="mt-4 w-full rounded-lg bg-sky-600 px-4 py-4 text-lg font-medium text-white active:bg-sky-700 disabled:opacity-50"
             >
-              Done
+              {savingDebrief ? "Saving…" : debrief.trim() ? "Save debrief & done" : "Done"}
             </button>
           </>
         ) : !readiness.applicable || !hasChecklist ? (
