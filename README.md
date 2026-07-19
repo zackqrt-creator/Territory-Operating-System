@@ -111,7 +111,13 @@ trunk. Built with React + Vite + Supabase.
     (marked "edited") or delete their own. One shared system (`entity_notes`), so a note
     follows its record everywhere. Personal tasks keep their own private notes field
     (this thread is team-visible by design).
-  - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` then `013_entity_notes.sql` (after 010) to enable all of it.
+  - **Regional manager locations + in-app location editing** — "Matt Inventory (RM)" and
+    "Karl Inventory (RM)" are seeded as inventory locations (migration 014), and the
+    Compliance page has a **Locations** card where anyone on the team can rename any
+    location or set its address in-app — so once you learn where an RM's stock actually
+    lives, fix it in two taps, no database access needed.
+  - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` then `013_entity_notes.sql`
+    then `014_manager_locations.sql` (after 010) to enable all of it.
 - **Team board** (`/team`) — a shared, territory-wide space for the whole crew: post notes and
   hand-offs, turn any post into a **to-do assigned to a teammate**, **@-tag** whoever needs to see
   it, and reply in a thread. Filters for All / To-dos / Assigned to me / Mentions me. Home shows a

@@ -832,3 +832,12 @@ export async function deleteEntityNote(id: string): Promise<void> {
   const { error } = await supabase.from("entity_notes").delete().eq("id", id);
   if (error) throw error;
 }
+
+/** Rename/re-address a location in-app (e.g. once you learn where an RM's stock lives). */
+export async function updateFacility(
+  id: string,
+  patch: Partial<Pick<Facility, "name" | "address">>,
+): Promise<void> {
+  const { error } = await supabase.from("facilities").update(patch).eq("id", id);
+  if (error) throw error;
+}

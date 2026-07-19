@@ -3,6 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import {
   createFacilityCredential,
   createRepCertification,
+  updateFacility,
   listFacilities,
   listFacilityCredentials,
   listProfiles,
@@ -180,6 +181,19 @@ export default function Compliance() {
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+            <h2 className="font-semibold text-white">Locations</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Anyone on the team can rename a location or set its address here — e.g. once you
+              find out where Matt's or Karl's inventory actually lives.
+            </p>
+            <div className="mt-2 space-y-2">
+              {facilities.map((f) => (
+                <FacilityEditor key={f.id} facility={f} onSaved={refresh} />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
             <h2 className="font-semibold text-white">Facility playbooks</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               The stuff that matters at 6am: dock hours, parking, door codes, who to find. Also
@@ -238,6 +252,77 @@ export default function Compliance() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function FacilityEditor({ facility, onSaved }: { facility: Facility; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(facility.name);
+  const [address, setAddress] = useState(facility.address ?? "");
+  const [busy, setBusy] = useState(false);
+
+  async function onSave() {
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      await updateFacility(facility.id, { name: name.trim(), address: address.trim() || null });
+      setEditing(false);
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm text-slate-200">
+            {facility.name}
+            {facility.alert_on_withdrawal ? " 🔒" : ""}
+          </p>
+          {facility.address && <p className="truncate text-xs text-slate-500">{facility.address}</p>}
+        </div>
+        <button
+          onClick={() => setEditing(true)}
+          className="min-h-0 shrink-0 text-xs text-sky-400 underline"
+        >
+          Edit
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg bg-slate-800/60 p-3">
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+      />
+      <input
+        value={address}
+        onChange={(e) => setAddress(e.target.value)}
+        placeholder="Address (optional)"
+        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+      />
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={() => setEditing(false)}
+          className="min-h-0 flex-1 rounded-lg bg-slate-800 py-2 text-xs text-slate-300"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onSave}
+          disabled={busy || !name.trim()}
+          className="min-h-0 flex-1 rounded-lg bg-sky-600 py-2 text-xs font-medium text-white disabled:opacity-50"
+        >
+          Save
+        </button>
+      </div>
     </div>
   );
 }
