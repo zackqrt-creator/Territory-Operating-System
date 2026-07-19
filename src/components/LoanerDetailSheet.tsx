@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { listLoanerContents } from "../lib/api";
 import type { Facility, InventoryItem } from "../lib/types";
+import NotesSection from "./NotesSection";
 
 /**
  * Tap a loaner tote to see what's inside it — the outer code (e.g. SPKAEFFR08)
@@ -71,6 +72,8 @@ export default function LoanerDetailSheet({
             </div>
           )}
         </div>
+
+        <NotesSection entityType="inventory_item" entityId={tote.id} />
 
         <button
           onClick={onMove}

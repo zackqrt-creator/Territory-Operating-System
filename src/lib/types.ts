@@ -291,3 +291,16 @@ export interface PersonalTask {
   done_at: string | null;
   created_at: string;
 }
+
+export type NoteEntityType = "case" | "inventory_item" | "surgeon" | "facility";
+
+export interface EntityNote {
+  id: string;
+  territory_id: string;
+  author_id: string | null;
+  entity_type: NoteEntityType;
+  entity_id: string;
+  body: string;
+  created_at: string;
+  updated_at: string | null;
+}

@@ -18,6 +18,7 @@ import {
 } from "../lib/api";
 import { scoreCase, type CheckStatus } from "../lib/crm";
 import MoveItemSheet from "./MoveItemSheet";
+import NotesSection from "./NotesSection";
 import QuickLogSheet from "./QuickLogSheet";
 import { formatDateShort } from "../utils/dates";
 
@@ -138,6 +139,8 @@ export default function ReadinessSheet({
             </div>
           </div>
         )}
+
+        <NotesSection entityType="case" entityId={caseRow.id} />
 
         {qa.length > 0 && (
           <div className="mt-3 rounded-xl border border-sky-900 bg-sky-950/20 p-3">

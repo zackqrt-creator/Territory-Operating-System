@@ -105,7 +105,13 @@ trunk. Built with React + Vite + Supabase.
     its owner unless explicitly shared with chosen teammates, and that's enforced by row-level
     security in the database, not just hidden in the UI. **Duplicate** any task with a new date
     so recurring work (weekly counts, restock runs) never gets retyped. Overdue tasks flag red.
-  - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` (after 010) to enable all of it.
+  - **Universal notes** — an "+ Add note" button on pretty much everything: case detail,
+    inventory item edit, loaner tote detail, and surgeon cards all carry a timestamped,
+    authored note thread. Anyone on the team can add a note any time; authors can edit
+    (marked "edited") or delete their own. One shared system (`entity_notes`), so a note
+    follows its record everywhere. Personal tasks keep their own private notes field
+    (this thread is team-visible by design).
+  - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` then `013_entity_notes.sql` (after 010) to enable all of it.
 - **Team board** (`/team`) — a shared, territory-wide space for the whole crew: post notes and
   hand-offs, turn any post into a **to-do assigned to a teammate**, **@-tag** whoever needs to see
   it, and reply in a thread. Filters for All / To-dos / Assigned to me / Mentions me. Home shows a

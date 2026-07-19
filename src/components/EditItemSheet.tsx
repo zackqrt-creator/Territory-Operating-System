@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { deleteInventoryItem, updateInventoryItem } from "../lib/api";
 import type { DeliveryStatus, Facility, InventoryItem, SterilizationStatus } from "../lib/types";
+import NotesSection from "./NotesSection";
 
 /**
  * Fix or delete an inventory item — the escape hatch for typos during bulk
@@ -222,6 +223,8 @@ export default function EditItemSheet({
               </div>
             </div>
           )}
+
+          <NotesSection entityType="inventory_item" entityId={item.id} />
 
           <button
             onClick={onSave}

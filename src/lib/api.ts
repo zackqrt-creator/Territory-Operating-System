@@ -10,6 +10,8 @@ import type {
   QaQuestion,
   RepCertification,
   PersonalTask,
+  EntityNote,
+  NoteEntityType,
   TaskStatus,
   CaseRow,
   CaseTemplateWithItems,
@@ -788,5 +790,45 @@ export async function updateTask(
 
 export async function deleteTask(id: string): Promise<void> {
   const { error } = await supabase.from("tasks").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---- Universal notes ------------------------------------------------------
+
+export async function listEntityNotes(
+  entityType: NoteEntityType,
+  entityId: string,
+): Promise<EntityNote[]> {
+  const { data, error } = await supabase
+    .from("entity_notes")
+    .select("*")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as EntityNote[];
+}
+
+export async function createEntityNote(input: {
+  entity_type: NoteEntityType;
+  entity_id: string;
+  body: string;
+  territory_id: string;
+  author_id: string;
+}): Promise<void> {
+  const { error } = await supabase.from("entity_notes").insert(input);
+  if (error) throw error;
+}
+
+export async function updateEntityNote(id: string, body: string): Promise<void> {
+  const { error } = await supabase
+    .from("entity_notes")
+    .update({ body, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteEntityNote(id: string): Promise<void> {
+  const { error } = await supabase.from("entity_notes").delete().eq("id", id);
   if (error) throw error;
 }

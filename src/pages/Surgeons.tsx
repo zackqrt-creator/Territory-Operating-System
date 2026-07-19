@@ -8,6 +8,7 @@ import {
   updateSurgeonNotes,
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
+import NotesSection from "../components/NotesSection";
 import type { CaseRow, Surgeon, SurgeonPreference, ToteTemplateWithItems } from "../lib/types";
 import { formatDateShort } from "../utils/dates";
 
@@ -175,6 +176,8 @@ function SurgeonCard({
           ))}
         </div>
       )}
+
+      <NotesSection entityType="surgeon" entityId={surgeon.id} />
 
       {preferences.length > 0 && (
         <div className="mt-2 space-y-1">
