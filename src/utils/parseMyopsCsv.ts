@@ -20,6 +20,9 @@ export interface MyopsCsvRow {
   time_tba: boolean;
   status: "scheduled" | "completed";
   notes: string | null;
+  purchase_order_no: string | null;
+  invoice_no: string | null;
+  billing_status: "none" | "po_received" | "invoiced";
 }
 
 export interface MyopsCsvResult {
@@ -147,6 +150,8 @@ export function parseMyopsCsv(text: string): MyopsCsvResult {
     const comment = get(r, "patient_comment");
     if (comment) noteParts.push(comment.replace(/\s*\n\s*/g, "; "));
 
+    const po = get(r, "purchase_order_no") || null;
+    const inv = get(r, "posted_invoice_no") || null;
     rows.push({
       case_id: get(r, "case_id") || null,
       surgery_type: type,
@@ -156,6 +161,9 @@ export function parseMyopsCsv(text: string): MyopsCsvResult {
       time_tba: timeTba,
       status: status === "done" ? "completed" : "scheduled",
       notes: noteParts.length > 0 ? noteParts.join(" · ") : null,
+      purchase_order_no: po,
+      invoice_no: inv,
+      billing_status: inv ? "invoiced" : po ? "po_received" : "none",
     });
   }
 

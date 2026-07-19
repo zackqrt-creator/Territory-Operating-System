@@ -75,6 +75,32 @@ trunk. Built with React + Vite + Supabase.
   of the physical device when you scan it in; it uploads to Supabase Storage and shows as a
   thumbnail. Useful for the team to visually confirm a match without asking you, especially
   while the hip catalog is still filling in.
+- **CRM layer** — CaseTrack is now a one-place CRM on top of the inventory engine:
+  - **Case readiness score** — every case on the Calendar carries a red/yellow/green badge
+    computed from four checks: required items (existing template diff), tray sterilization,
+    the covering rep's certifications, and inbound loaner delivery timing. The case detail
+    sheet shows the full breakdown. Honesty rule: a check with no data behind it shows
+    "not tracked" and never fakes a green or forces a false red — the score sharpens as you
+    log certs/sterilization/delivery, and works on day one from item availability alone.
+  - **Self-filling preference cards** — creating a case for a surgeon + procedure auto-suggests
+    the item list from what was *actually logged as used* in their past cases of the same type
+    (toggle between "Usual" = most frequent across history, and "Last case" = copy most recent).
+    Accept, uncheck, or add items before saving; the accepted plan shows on the case detail.
+  - **Chase-the-money pipeline** (`/billing`) — every completed case grouped by billing stage
+    (awaiting PO → PO received → invoiced → paid), tap to advance. The myOPS CSV import now
+    captures `purchase_order_no`/`posted_invoice_no` so imported cases land pre-staged.
+  - **Q&A wall** (`/qa`) — anyone asks, anyone answers, question author marks the best answer.
+    Pin a question to a product, surgeon, or procedure and it automatically surfaces on
+    matching case screens.
+  - **Surgeon profiles** — the Surgeons page now shows case volume, last-90-days trend vs the
+    prior 90, knee/hip mix, and recent case notes, derived entirely from existing case records.
+  - **Compliance + door-check** (`/compliance`) — track rep certifications and facility
+    credentials (RepTrax/Symplr expiries). The door-check cross-references credential expiry
+    against your scheduled cases at that facility and alerts on Home *before* you get turned
+    away at the door.
+  - **Use-these-lots-first** — Home suggests which implants expiring within 60 days fit which
+    upcoming case (same joint/side, case before expiry). Advisory, never blocking.
+  - Run `011_crm_foundation.sql` (after 010) to enable all of it.
 - **Team board** (`/team`) — a shared, territory-wide space for the whole crew: post notes and
   hand-offs, turn any post into a **to-do assigned to a teammate**, **@-tag** whoever needs to see
   it, and reply in a thread. Filters for All / To-dos / Assigned to me / Mentions me. Home shows a

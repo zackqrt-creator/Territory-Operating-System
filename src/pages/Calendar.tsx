@@ -5,9 +5,17 @@ import {
   listCaseTemplatesWithItems,
   listFacilities,
   listInventory,
+  listRepCertifications,
 } from "../lib/api";
-import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem } from "../lib/types";
+import type {
+  CaseRow,
+  CaseTemplateWithItems,
+  Facility,
+  InventoryItem,
+  RepCertification,
+} from "../lib/types";
 import { computeReadiness } from "../lib/readiness";
+import { scoreCase, type ScoreColor } from "../lib/crm";
 import ReadinessSheet from "../components/ReadinessSheet";
 import {
   addDays,
@@ -27,6 +35,7 @@ export default function Calendar() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [templates, setTemplates] = useState<CaseTemplateWithItems[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [certs, setCerts] = useState<RepCertification[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCase, setOpenCase] = useState<CaseRow | null>(null);
 
@@ -39,12 +48,14 @@ export default function Calendar() {
       listFacilities(),
       listCaseTemplatesWithItems(),
       listInventory(),
+      listRepCertifications(),
     ])
-      .then(([c, f, t, i]) => {
+      .then(([c, f, t, i, rc]) => {
         setCases(c);
         setFacilities(f);
         setTemplates(t);
         setInventory(i);
+        setCerts(rc);
       })
       .finally(() => setLoading(false));
   }
@@ -142,7 +153,13 @@ export default function Calendar() {
         <div className="mt-5 space-y-2">
           {selectedCases.map((c) => {
             const readiness = computeReadiness(c, templates, inventory, facilities);
-            const flagged = readiness.applicable && readiness.overallStatus !== "ready";
+            const score = scoreCase(c, readiness, inventory, certs);
+            const flagged = score.color === "red";
+            const scoreStyle: Record<ScoreColor, string> = {
+              green: "bg-emerald-500/15 text-emerald-300",
+              yellow: "bg-amber-500/15 text-amber-300",
+              red: "bg-red-500/15 text-red-300",
+            };
             return (
               <button
                 key={c.id}
@@ -157,8 +174,10 @@ export default function Calendar() {
                     {c.variant === "partial" ? " · Partial" : ""}
                     {c.side ? ` · ${c.side === "LEFT" ? "L" : "R"}` : ""}
                   </span>
-                  <span className="text-lg">
-                    {!readiness.applicable ? "" : flagged ? "⚠️" : "✅"}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${scoreStyle[score.color]}`}
+                  >
+                    {score.color === "green" ? "● Ready" : score.color === "yellow" ? "● Check" : "● At risk"}
                   </span>
                 </div>
                 <p className="text-sm text-slate-400">{facilityName(c.facility_id)}</p>

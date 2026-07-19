@@ -13,6 +13,9 @@ import PackList from "./pages/PackList";
 import Surgeons from "./pages/Surgeons";
 import Readiness from "./pages/Readiness";
 import TeamBoard from "./pages/TeamBoard";
+import QaWall from "./pages/QaWall";
+import Compliance from "./pages/Compliance";
+import Billing from "./pages/Billing";
 import BottomNav from "./components/BottomNav";
 
 function App() {
@@ -51,6 +54,9 @@ function App() {
         <Route path="/surgeons" element={<Surgeons />} />
         <Route path="/readiness" element={<Readiness />} />
         <Route path="/team" element={<TeamBoard />} />
+        <Route path="/qa" element={<QaWall />} />
+        <Route path="/compliance" element={<Compliance />} />
+        <Route path="/billing" element={<Billing />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

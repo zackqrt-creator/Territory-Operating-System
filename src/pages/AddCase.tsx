@@ -4,12 +4,26 @@ import { useAuth } from "../hooks/useAuth";
 import {
   bulkCreateCases,
   createCase,
+  createCaseItemPlans,
   createSurgeon,
   listFacilities,
+  listInventory,
+  listRecentMovements,
   listSurgeons,
+  listUpcomingCases,
   updateLastFacility,
 } from "../lib/api";
-import type { CaseVariant, Facility, Side, Surgeon, SurgeryType } from "../lib/types";
+import type {
+  CaseRow,
+  CaseVariant,
+  Facility,
+  InventoryItem,
+  Movement,
+  Side,
+  Surgeon,
+  SurgeryType,
+} from "../lib/types";
+import { buildPreferenceCard, type SuggestedItem, type SuggestionMode } from "../lib/crm";
 import { nextWednesday } from "../utils/dates";
 import { dedupeByCaseId, parsePasteText } from "../utils/parsePaste";
 import { dedupeMyopsRows, parseMyopsCsv } from "../utils/parseMyopsCsv";
@@ -98,6 +112,39 @@ function QuickAddForm({
   const [saving, setSaving] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
+  // Preference card: history for auto-suggesting this surgeon's usual items.
+  const [history, setHistory] = useState<{
+    cases: CaseRow[];
+    movements: Movement[];
+    inventory: InventoryItem[];
+  } | null>(null);
+  const [mode, setMode] = useState<SuggestionMode>("frequent");
+  const [enabled, setEnabled] = useState<Record<string, boolean>>({});
+  const [manualItems, setManualItems] = useState<SuggestedItem[]>([]);
+  const [manualName, setManualName] = useState("");
+
+  useEffect(() => {
+    Promise.all([listUpcomingCases(), listRecentMovements(500), listInventory()])
+      .then(([c, m, i]) => setHistory({ cases: c, movements: m, inventory: i }))
+      .catch(() => {});
+  }, []);
+
+  const matchedSurgeon = surgeons.find(
+    (s) => s.name.toLowerCase() === surgeon.trim().toLowerCase(),
+  );
+  const suggestions: SuggestedItem[] =
+    history && matchedSurgeon && type !== "INSTRUMENT"
+      ? buildPreferenceCard(
+          matchedSurgeon.id,
+          type,
+          variant,
+          history.cases,
+          history.movements,
+          history.inventory,
+          mode,
+        )
+      : [];
+
   useEffect(() => {
     if (!facilityId && facilities.length > 0) {
       setFacilityId(lastFacilityId ?? facilities[0].id);
@@ -122,7 +169,7 @@ function QuickAddForm({
     setSaving(true);
     try {
       const resolved = await resolveSurgeon();
-      await createCase({
+      const created = await createCase({
         surgery_type: type,
         side,
         variant: type === "INSTRUMENT" ? null : variant,
@@ -133,6 +180,26 @@ function QuickAddForm({
         territory_id: territoryId,
         created_by: profileId,
       });
+      const acceptedSuggestions = suggestions.filter(
+        (s) => enabled[`${s.category}|${s.name}`] ?? true,
+      );
+      const planRows = [
+        ...acceptedSuggestions.map((s) => ({ ...s, source: "suggested" as const })),
+        ...manualItems.map((s) => ({ ...s, source: "manual" as const })),
+      ];
+      if (planRows.length > 0) {
+        await createCaseItemPlans(
+          planRows.map((s) => ({
+            territory_id: territoryId,
+            case_id: created.id,
+            name: s.name,
+            category: s.category,
+            quantity: s.quantity,
+            source: s.source,
+          })),
+        );
+        setManualItems([]);
+      }
       await updateLastFacility(profileId, facilityId);
       setJustAdded(true);
       setTimeout(() => setJustAdded(false), 1500);
@@ -242,6 +309,85 @@ function QuickAddForm({
         </p>
       </div>
 
+      {(suggestions.length > 0 || manualItems.length > 0) && (
+        <div className="rounded-xl border border-sky-800 bg-sky-950/20 p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-sky-200">
+              {matchedSurgeon?.name}'s preference card
+            </p>
+            <div className="flex rounded-full bg-slate-800 p-0.5 text-xs">
+              {(["frequent", "recent"] as SuggestionMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`rounded-full px-2 py-1 font-medium ${
+                    mode === m ? "bg-sky-600 text-white" : "text-slate-400"
+                  }`}
+                >
+                  {m === "frequent" ? "Usual" : "Last case"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="mt-0.5 text-xs text-slate-500">
+            From items actually logged in past {type === "KNEE" ? "knee" : "hip"} cases — uncheck
+            anything that doesn't apply.
+          </p>
+          <div className="mt-2 space-y-1.5">
+            {suggestions.map((s) => {
+              const key = `${s.category}|${s.name}`;
+              const on = enabled[key] ?? true;
+              return (
+                <label key={key} className="flex items-center gap-2 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={(e) => setEnabled((prev) => ({ ...prev, [key]: e.target.checked }))}
+                  />
+                  <span className={on ? "" : "text-slate-500 line-through"}>
+                    {s.name} ×{s.quantity}
+                  </span>
+                  <span className="text-xs text-slate-500">({s.casesUsedIn} case{s.casesUsedIn === 1 ? "" : "s"})</span>
+                </label>
+              );
+            })}
+            {manualItems.map((s, i) => (
+              <p key={`m${i}`} className="flex items-center gap-2 text-sm text-slate-200">
+                + {s.name} ×{s.quantity}
+                <button
+                  onClick={() => setManualItems((prev) => prev.filter((_, j) => j !== i))}
+                  className="text-xs text-slate-500 underline"
+                >
+                  remove
+                </button>
+              </p>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={manualName}
+              onChange={(e) => setManualName(e.target.value)}
+              placeholder="Add another item..."
+              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+            />
+            <button
+              onClick={() => {
+                if (!manualName.trim()) return;
+                setManualItems((prev) => [
+                  ...prev,
+                  { name: manualName.trim(), category: "implant", quantity: 1, casesUsedIn: 0 },
+                ]);
+                setManualName("");
+              }}
+              disabled={!manualName.trim()}
+              className="min-h-0 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+
       <button
         onClick={onSubmit}
         disabled={saving || !facilityId}
@@ -265,6 +411,9 @@ interface ImportRow {
   time_tba?: boolean;
   status?: "scheduled" | "completed";
   notes?: string | null;
+  purchase_order_no?: string | null;
+  invoice_no?: string | null;
+  billing_status?: "none" | "po_received" | "invoiced";
 }
 
 function PasteImport({
@@ -345,6 +494,9 @@ function PasteImport({
           time_tba: r.time_tba ?? false,
           status: r.status,
           notes: r.notes ?? null,
+          purchase_order_no: r.purchase_order_no ?? null,
+          invoice_no: r.invoice_no ?? null,
+          billing_status: r.billing_status ?? "none",
           facility_id: facilityId,
           territory_id: territoryId,
           created_by: profileId,

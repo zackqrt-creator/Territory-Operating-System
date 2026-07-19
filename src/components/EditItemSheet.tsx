@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { deleteInventoryItem, updateInventoryItem } from "../lib/api";
-import type { Facility, InventoryItem } from "../lib/types";
+import type { DeliveryStatus, Facility, InventoryItem, SterilizationStatus } from "../lib/types";
 
 /**
  * Fix or delete an inventory item — the escape hatch for typos during bulk
@@ -24,6 +24,10 @@ export default function EditItemSheet({
   const [quantity, setQuantity] = useState(item.quantity);
   const [locationId, setLocationId] = useState(item.location_id);
   const [cement, setCement] = useState<"cemented" | "cementless" | null>(item.cement_type);
+  const [sterilization, setSterilization] = useState<SterilizationStatus>(item.sterilization_status);
+  const [sterilExpires, setSterilExpires] = useState(item.sterilization_expires_at ?? "");
+  const [delivery, setDelivery] = useState<DeliveryStatus | "">(item.delivery_status ?? "");
+  const [deliveryDate, setDeliveryDate] = useState(item.expected_delivery_date ?? "");
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -39,6 +43,12 @@ export default function EditItemSheet({
         quantity,
         location_id: locationId,
         cement_type: item.category === "implant" ? cement : null,
+        ...(item.category === "instrument_tray"
+          ? { sterilization_status: sterilization, sterilization_expires_at: sterilExpires || null }
+          : {}),
+        ...(item.acquisition_type === "loaner"
+          ? { delivery_status: delivery || null, expected_delivery_date: deliveryDate || null }
+          : {}),
       });
       onSaved();
     } finally {
@@ -155,6 +165,60 @@ export default function EditItemSheet({
                     {opt.l}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {item.category === "instrument_tray" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm text-slate-400">Sterilization</label>
+                <select
+                  value={sterilization}
+                  onChange={(e) => setSterilization(e.target.value as SterilizationStatus)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                >
+                  <option value="unknown">Not tracked</option>
+                  <option value="sterile">Sterile</option>
+                  <option value="processing">Processing</option>
+                  <option value="expired">Expired</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-slate-400">Sterile until</label>
+                <input
+                  type="date"
+                  value={sterilExpires}
+                  onChange={(e) => setSterilExpires(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                />
+              </div>
+            </div>
+          )}
+
+          {item.acquisition_type === "loaner" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm text-slate-400">Delivery</label>
+                <select
+                  value={delivery}
+                  onChange={(e) => setDelivery(e.target.value as DeliveryStatus | "")}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                >
+                  <option value="">Not tracked</option>
+                  <option value="ordered">Ordered</option>
+                  <option value="in_transit">In transit</option>
+                  <option value="delivered">Delivered</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-slate-400">Expected arrival</label>
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                />
               </div>
             </div>
           )}

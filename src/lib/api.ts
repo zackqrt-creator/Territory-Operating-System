@@ -1,8 +1,14 @@
 import { supabase } from "./supabase";
 import type {
+  BillingStatus,
   BoardComment,
   BoardPost,
   BoardPostKind,
+  CaseItemPlan,
+  FacilityCredential,
+  QaAnswer,
+  QaQuestion,
+  RepCertification,
   CaseRow,
   CaseTemplateWithItems,
   CatalogItem,
@@ -70,6 +76,9 @@ export interface NewCaseInput {
   surgeon_id?: string | null;
   notes?: string | null;
   status?: "scheduled" | "completed";
+  purchase_order_no?: string | null;
+  invoice_no?: string | null;
+  billing_status?: BillingStatus;
   territory_id: string;
   created_by: string;
 }
@@ -152,7 +161,16 @@ export async function updateInventoryItem(
   patch: Partial<
     Pick<
       InventoryItem,
-      "name" | "lot_number" | "expiration_date" | "quantity" | "location_id" | "cement_type"
+      "name"
+      | "lot_number"
+      | "expiration_date"
+      | "quantity"
+      | "location_id"
+      | "cement_type"
+      | "sterilization_status"
+      | "sterilization_expires_at"
+      | "delivery_status"
+      | "expected_delivery_date"
     >
   >,
 ): Promise<void> {
@@ -543,6 +561,112 @@ export async function listToteTemplatesWithItems(): Promise<ToteTemplateWithItem
     .select("*, tote_template_items(*, catalog_item:catalog_items(*))");
   if (error) throw error;
   return data as ToteTemplateWithItems[];
+}
+
+// ---- CRM: certifications, plans, Q&A, credentials, billing ----------------
+
+export async function listRepCertifications(): Promise<RepCertification[]> {
+  const { data, error } = await supabase.from("rep_certifications").select("*").order("expires_on");
+  if (error) throw error;
+  return data as RepCertification[];
+}
+
+export async function createRepCertification(input: {
+  profile_id: string;
+  name: string;
+  expires_on: string | null;
+  territory_id: string;
+}): Promise<void> {
+  const { error } = await supabase.from("rep_certifications").insert(input);
+  if (error) throw error;
+}
+
+export async function createCaseItemPlans(
+  rows: Omit<CaseItemPlan, "id" | "created_at">[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("case_item_plans").insert(rows);
+  if (error) throw error;
+}
+
+export async function listCaseItemPlans(caseId: string): Promise<CaseItemPlan[]> {
+  const { data, error } = await supabase
+    .from("case_item_plans")
+    .select("*")
+    .eq("case_id", caseId)
+    .order("category");
+  if (error) throw error;
+  return data as CaseItemPlan[];
+}
+
+export async function listQaQuestions(): Promise<QaQuestion[]> {
+  const { data, error } = await supabase
+    .from("qa_questions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as QaQuestion[];
+}
+
+export async function listQaAnswers(): Promise<QaAnswer[]> {
+  const { data, error } = await supabase.from("qa_answers").select("*").order("created_at");
+  if (error) throw error;
+  return data as QaAnswer[];
+}
+
+export async function createQaQuestion(input: {
+  body: string;
+  pinned_product: string | null;
+  pinned_surgeon_id: string | null;
+  pinned_surgery_type: "KNEE" | "HIP" | null;
+  territory_id: string;
+  author_id: string;
+}): Promise<void> {
+  const { error } = await supabase.from("qa_questions").insert(input);
+  if (error) throw error;
+}
+
+export async function createQaAnswer(input: {
+  question_id: string;
+  body: string;
+  territory_id: string;
+  author_id: string;
+}): Promise<void> {
+  const { error } = await supabase.from("qa_answers").insert(input);
+  if (error) throw error;
+}
+
+export async function acceptQaAnswer(answerId: string): Promise<void> {
+  const { error } = await supabase.from("qa_answers").update({ accepted: true }).eq("id", answerId);
+  if (error) throw error;
+}
+
+export async function listFacilityCredentials(): Promise<FacilityCredential[]> {
+  const { data, error } = await supabase
+    .from("facility_credentials")
+    .select("*")
+    .order("expires_on");
+  if (error) throw error;
+  return data as FacilityCredential[];
+}
+
+export async function createFacilityCredential(input: {
+  profile_id: string;
+  facility_id: string;
+  vendor: string;
+  expires_on: string;
+  territory_id: string;
+}): Promise<void> {
+  const { error } = await supabase.from("facility_credentials").insert(input);
+  if (error) throw error;
+}
+
+export async function updateCaseBilling(
+  caseId: string,
+  patch: { billing_status?: BillingStatus; purchase_order_no?: string | null; invoice_no?: string | null },
+): Promise<void> {
+  const { error } = await supabase.from("cases").update(patch).eq("id", caseId);
+  if (error) throw error;
 }
 
 // ---- Team board -----------------------------------------------------------

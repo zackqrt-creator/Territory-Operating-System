@@ -42,8 +42,15 @@ export interface CaseRow {
   variant: CaseVariant | null;
   template_id: string | null;
   created_by: string | null;
+  /** Rep covering the case (falls back to created_by for scoring). */
+  assigned_rep_id: string | null;
+  purchase_order_no: string | null;
+  invoice_no: string | null;
+  billing_status: BillingStatus;
   created_at: string;
 }
+
+export type BillingStatus = "none" | "awaiting_po" | "po_received" | "invoiced" | "paid";
 
 export type ItemCategory = "loaner_kit" | "instrument_tray" | "implant" | "consumable";
 export type AcquisitionType = "consignment" | "loaner";
@@ -74,8 +81,17 @@ export interface InventoryItem {
   contents_label: string | null;
   /** Femur cement variant, when it applies. */
   cement_type: "cemented" | "cementless" | null;
+  /** Instrument trays only. 'unknown' = not tracked, never treated as sterile. */
+  sterilization_status: SterilizationStatus;
+  sterilization_expires_at: string | null;
+  /** Inbound loaners only. */
+  delivery_status: DeliveryStatus | null;
+  expected_delivery_date: string | null;
   created_at: string;
 }
+
+export type SterilizationStatus = "sterile" | "processing" | "expired" | "unknown";
+export type DeliveryStatus = "ordered" | "in_transit" | "delivered";
 
 export interface Movement {
   id: string;
@@ -205,5 +221,57 @@ export interface BoardComment {
   post_id: string;
   author_id: string | null;
   body: string;
+  created_at: string;
+}
+
+export interface RepCertification {
+  id: string;
+  territory_id: string;
+  profile_id: string;
+  name: string;
+  issued_on: string | null;
+  expires_on: string | null;
+  created_at: string;
+}
+
+export interface CaseItemPlan {
+  id: string;
+  territory_id: string;
+  case_id: string;
+  name: string;
+  category: ItemCategory;
+  quantity: number;
+  source: "suggested" | "manual";
+  created_at: string;
+}
+
+export interface QaQuestion {
+  id: string;
+  territory_id: string;
+  author_id: string | null;
+  body: string;
+  pinned_product: string | null;
+  pinned_surgeon_id: string | null;
+  pinned_surgery_type: "KNEE" | "HIP" | null;
+  created_at: string;
+}
+
+export interface QaAnswer {
+  id: string;
+  territory_id: string;
+  question_id: string;
+  author_id: string | null;
+  body: string;
+  accepted: boolean;
+  created_at: string;
+}
+
+export interface FacilityCredential {
+  id: string;
+  territory_id: string;
+  profile_id: string;
+  facility_id: string;
+  vendor: string;
+  expires_on: string;
   created_at: string;
 }

@@ -1,9 +1,32 @@
-import { useState } from "react";
-import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem } from "../lib/types";
+import { useEffect, useState } from "react";
+import type {
+  CaseItemPlan,
+  CaseRow,
+  CaseTemplateWithItems,
+  Facility,
+  InventoryItem,
+  QaAnswer,
+  QaQuestion,
+  RepCertification,
+} from "../lib/types";
 import { computeReadiness, gapMessage } from "../lib/readiness";
+import {
+  listCaseItemPlans,
+  listQaAnswers,
+  listQaQuestions,
+  listRepCertifications,
+} from "../lib/api";
+import { scoreCase, type CheckStatus } from "../lib/crm";
 import MoveItemSheet from "./MoveItemSheet";
 import QuickLogSheet from "./QuickLogSheet";
 import { formatDateShort } from "../utils/dates";
+
+const CHECK_STYLE: Record<CheckStatus, { icon: string; text: string }> = {
+  pass: { icon: "✅", text: "text-emerald-300" },
+  warn: { icon: "⚠️", text: "text-amber-300" },
+  fail: { icon: "❌", text: "text-red-300" },
+  untracked: { icon: "◌", text: "text-slate-500" },
+};
 
 const CATEGORY_LABEL: Record<string, string> = {
   loaner_kit: "Loaner kit",
@@ -35,9 +58,28 @@ export default function ReadinessSheet({
 }) {
   const [moving, setMoving] = useState<{ item: InventoryItem; target: Facility } | null>(null);
   const [logging, setLogging] = useState(false);
+  const [certs, setCerts] = useState<RepCertification[]>([]);
+  const [plans, setPlans] = useState<CaseItemPlan[]>([]);
+  const [qa, setQa] = useState<{ q: QaQuestion; answers: QaAnswer[] }[]>([]);
+
+  useEffect(() => {
+    listRepCertifications().then(setCerts).catch(() => {});
+    listCaseItemPlans(caseRow.id).then(setPlans).catch(() => {});
+    Promise.all([listQaQuestions(), listQaAnswers()])
+      .then(([qs, ans]) => {
+        const matched = qs.filter(
+          (q) =>
+            (q.pinned_surgeon_id && q.pinned_surgeon_id === caseRow.surgeon_id) ||
+            (q.pinned_surgery_type && q.pinned_surgery_type === caseRow.surgery_type),
+        );
+        setQa(matched.map((q) => ({ q, answers: ans.filter((a) => a.question_id === q.id) })));
+      })
+      .catch(() => {});
+  }, [caseRow.id, caseRow.surgeon_id, caseRow.surgery_type]);
 
   const caseFacility = facilities.find((f) => f.id === caseRow.facility_id);
   const readiness = computeReadiness(caseRow, templates, inventory, facilities);
+  const score = scoreCase(caseRow, readiness, inventory, certs);
 
   return (
     <div className="fixed inset-0 z-30 flex items-end bg-black/60" onClick={onClose}>
@@ -58,6 +100,64 @@ export default function ReadinessSheet({
         </p>
         {caseRow.surgeon && <p className="text-sm text-slate-500">{caseRow.surgeon}</p>}
         {caseRow.case_id && <p className="text-xs text-slate-600">Case #{caseRow.case_id}</p>}
+
+        <div
+          className={`mt-3 rounded-xl border p-3 ${
+            score.color === "red"
+              ? "border-red-800 bg-red-950/25"
+              : score.color === "yellow"
+                ? "border-amber-800 bg-amber-950/20"
+                : "border-emerald-800 bg-emerald-950/20"
+          }`}
+        >
+          <p className="text-sm font-semibold text-white">
+            Readiness:{" "}
+            {score.color === "green" ? "Ready" : score.color === "yellow" ? "Needs attention" : "At risk"}
+          </p>
+          <div className="mt-2 space-y-1">
+            {score.checks.map((c) => (
+              <p key={c.key} className={`text-xs ${CHECK_STYLE[c.status].text}`}>
+                {CHECK_STYLE[c.status].icon} {c.label} — {c.detail}
+              </p>
+            ))}
+          </div>
+        </div>
+
+        {plans.length > 0 && (
+          <div className="mt-3 rounded-xl border border-slate-700 bg-slate-800/40 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Planned items (preference card)
+            </p>
+            <div className="mt-1.5 space-y-1">
+              {plans.map((p) => (
+                <p key={p.id} className="text-sm text-slate-300">
+                  {p.name} ×{p.quantity}
+                  {p.source === "manual" && <span className="text-slate-500"> · added by rep</span>}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {qa.length > 0 && (
+          <div className="mt-3 rounded-xl border border-sky-900 bg-sky-950/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-sky-300">
+              Team Q&A for this case
+            </p>
+            <div className="mt-1.5 space-y-2">
+              {qa.slice(0, 3).map(({ q, answers }) => (
+                <div key={q.id}>
+                  <p className="text-sm font-medium text-slate-200">Q: {q.body}</p>
+                  {answers.length > 0 && (
+                    <p className="text-sm text-slate-400">
+                      A: {(answers.find((a) => a.accepted) ?? answers[0]).body}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {caseRow.status === "completed" ? (
           <span className="mt-3 inline-block rounded bg-emerald-900 px-2 py-1 text-xs font-medium text-emerald-300">

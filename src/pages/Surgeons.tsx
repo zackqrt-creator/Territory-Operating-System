@@ -4,10 +4,12 @@ import {
   listSurgeonPreferences,
   listSurgeons,
   listToteTemplatesWithItems,
+  listUpcomingCases,
   updateSurgeonNotes,
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
-import type { Surgeon, SurgeonPreference, ToteTemplateWithItems } from "../lib/types";
+import type { CaseRow, Surgeon, SurgeonPreference, ToteTemplateWithItems } from "../lib/types";
+import { formatDateShort } from "../utils/dates";
 
 export default function Surgeons() {
   const { profile } = useAuth();
@@ -18,13 +20,20 @@ export default function Surgeons() {
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
 
+  const [allCases, setAllCases] = useState<CaseRow[]>([]);
+
   function refresh() {
-    return Promise.all([listSurgeons(), listSurgeonPreferences(), listToteTemplatesWithItems()])
-      .then(([s, p, t]) => {
-        setSurgeons(s);
-        setPreferences(p);
-        setTotes(t);
-      });
+    return Promise.all([
+      listSurgeons(),
+      listSurgeonPreferences(),
+      listToteTemplatesWithItems(),
+      listUpcomingCases(),
+    ]).then(([s, p, t, c]) => {
+      setSurgeons(s);
+      setPreferences(p);
+      setTotes(t);
+      setAllCases(c);
+    });
   }
 
   useEffect(() => {
@@ -77,6 +86,7 @@ export default function Surgeons() {
               surgeon={s}
               preferences={preferences.filter((p) => p.surgeon_id === s.id)}
               totes={totes}
+              cases={allCases.filter((c) => c.surgeon_id === s.id)}
               onSaved={refresh}
             />
           ))}
@@ -90,11 +100,13 @@ function SurgeonCard({
   surgeon,
   preferences,
   totes,
+  cases,
   onSaved,
 }: {
   surgeon: Surgeon;
   preferences: SurgeonPreference[];
   totes: ToteTemplateWithItems[];
+  cases: CaseRow[];
   onSaved: () => void;
 }) {
   const [notes, setNotes] = useState(surgeon.notes ?? "");
@@ -114,9 +126,55 @@ function SurgeonCard({
     }
   }
 
+  // Profile stats derived entirely from existing case records — no new entry.
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  const q0 = new Date(now.getTime() - 90 * 86400_000);
+  const q1 = new Date(now.getTime() - 180 * 86400_000);
+  const done = cases.filter((c) => c.status !== "cancelled");
+  const thisQ = done.filter((c) => c.surgery_date >= iso(q0) && c.surgery_date <= iso(now)).length;
+  const prevQ = done.filter((c) => c.surgery_date >= iso(q1) && c.surgery_date < iso(q0)).length;
+  const knees = done.filter((c) => c.surgery_type === "KNEE").length;
+  const hips = done.filter((c) => c.surgery_type === "HIP").length;
+  const recentNotes = done
+    .filter((c) => c.notes)
+    .sort((a, b) => b.surgery_date.localeCompare(a.surgery_date))
+    .slice(0, 2);
+  const trend = prevQ === 0 ? null : thisQ - prevQ;
+
   return (
     <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
       <h2 className="font-semibold text-white">{surgeon.name}</h2>
+
+      {done.length > 0 && (
+        <div className="mt-2 rounded-lg bg-slate-800/50 p-2.5">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300">
+            <span>
+              <span className="font-semibold text-white">{done.length}</span> cases on record
+            </span>
+            <span>
+              Last 90d: <span className="font-semibold text-white">{thisQ}</span>
+              {trend !== null && (
+                <span className={trend >= 0 ? "text-emerald-400" : "text-red-400"}>
+                  {" "}
+                  ({trend >= 0 ? "+" : ""}
+                  {trend} vs prior)
+                </span>
+              )}
+            </span>
+            {(knees > 0 || hips > 0) && (
+              <span>
+                Mix: {knees} knee / {hips} hip
+              </span>
+            )}
+          </div>
+          {recentNotes.map((c) => (
+            <p key={c.id} className="mt-1 truncate text-xs text-slate-500">
+              {formatDateShort(c.surgery_date)}: {c.notes}
+            </p>
+          ))}
+        </div>
+      )}
 
       {preferences.length > 0 && (
         <div className="mt-2 space-y-1">

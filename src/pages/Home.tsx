@@ -11,10 +11,14 @@ import {
   listCasesByIds,
   acknowledgeMovement,
   listBoardPosts,
+  listFacilityCredentials,
+  listCatalogItems,
 } from "../lib/api";
 import type {
   BoardPost,
   CaseRow,
+  CatalogItem,
+  FacilityCredential,
   CaseTemplateWithItems,
   Facility,
   InventoryItem,
@@ -25,6 +29,7 @@ import { buildStagingReport } from "../lib/staging";
 import { buildLoanerReport } from "../lib/loaners";
 import { buildActivityFeed } from "../lib/activity";
 import { daysUntil, formatDateShort, formatTimeOfDay, toISODate, tomorrow } from "../utils/dates";
+import { credentialConflicts, expiringLotSuggestions } from "../lib/crm";
 
 export default function Home() {
   const { profile, signOut } = useAuth();
@@ -36,6 +41,8 @@ export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activityCases, setActivityCases] = useState<CaseRow[]>([]);
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>([]);
+  const [credentials, setCredentials] = useState<FacilityCredential[]>([]);
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   function refresh() {
@@ -47,7 +54,9 @@ export default function Home() {
       listRecentMovements(50),
       listProfiles(),
       listBoardPosts(),
-    ]).then(async ([c, i, f, t, m, p, b]) => {
+      listFacilityCredentials(),
+      listCatalogItems(),
+    ]).then(async ([c, i, f, t, m, p, b, fc, cat]) => {
       setCases(c);
       setItems(i);
       setFacilities(f);
@@ -55,6 +64,8 @@ export default function Home() {
       setMovements(m);
       setProfiles(p);
       setBoardPosts(b);
+      setCredentials(fc);
+      setCatalog(cat);
       const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
       setActivityCases(await listCasesByIds(caseIds));
     });
@@ -89,6 +100,17 @@ export default function Home() {
   );
   const expiredCount = expiryFlags.filter((i) => daysUntil(i.expiration_date!) < 0).length;
 
+  const doorChecks = credentialConflicts(credentials, cases, facilities, profiles, today);
+  const lotSuggestions = expiringLotSuggestions(
+    items,
+    cases,
+    (id) => {
+      const c = catalog.find((x) => x.id === id);
+      return { joint: c?.joint ?? null, side: c?.side ?? null };
+    },
+    today,
+  ).filter((s) => s.candidateCase);
+
   async function onAcknowledge(movementId: string) {
     if (!profile) return;
     await acknowledgeMovement(movementId, profile.id);
@@ -118,6 +140,18 @@ export default function Home() {
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : (
         <div className="mt-6 space-y-4">
+          {doorChecks.length > 0 && (
+            <Link to="/compliance" className="block rounded-xl border border-red-700 bg-red-950/50 p-4">
+              <h2 className="text-sm font-medium text-red-200">🚪 Credential expires before a case</h2>
+              {doorChecks.slice(0, 2).map((d) => (
+                <p key={d.credential.id} className="mt-1 text-sm text-red-100">
+                  {d.credential.vendor} at {d.facility.name} lapses {formatDateShort(d.credential.expires_on)} — case there {formatDateShort(d.firstAffectedCase.surgery_date)}.
+                </p>
+              ))}
+              <span className="mt-1 inline-block text-sm text-red-300 underline">Open compliance →</span>
+            </Link>
+          )}
+
           {reserveAlerts.length > 0 && (
             <div className="rounded-xl border border-red-700 bg-red-950/50 p-4">
               <h2 className="text-sm font-medium text-red-200">🚨 Reserve storage was used</h2>
@@ -196,6 +230,42 @@ export default function Home() {
             </div>
             <span className="text-2xl">💬</span>
           </Link>
+
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { to: "/qa", icon: "❓", label: "Q&A wall" },
+              { to: "/billing", icon: "💵", label: "Billing" },
+              { to: "/compliance", icon: "🪪", label: "Compliance" },
+            ].map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="rounded-xl border border-slate-700 bg-slate-800/50 px-2 py-3 text-center active:bg-slate-800"
+              >
+                <span className="text-xl">{l.icon}</span>
+                <p className="mt-1 text-xs font-medium text-slate-300">{l.label}</p>
+              </Link>
+            ))}
+          </div>
+
+          {lotSuggestions.length > 0 && (
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+              <h2 className="text-sm font-medium text-slate-300">⏳ Use these lots first</h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Expiring within 60 days, matched to an upcoming case that could use them.
+              </p>
+              <div className="mt-2 space-y-1">
+                {lotSuggestions.slice(0, 4).map((sug) => (
+                  <p key={sug.item.id} className="text-sm text-slate-300">
+                    {sug.item.name}
+                    {sug.item.lot_number ? ` (lot ${sug.item.lot_number})` : ""} — {sug.daysLeft}d left ·
+                    fits the {formatDateShort(sug.candidateCase!.surgery_date)}
+                    {sug.candidateCase!.side ? ` ${sug.candidateCase!.side === "LEFT" ? "L" : "R"}` : ""} case
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
 
           {staging.cases.length > 0 && (
             <Link
