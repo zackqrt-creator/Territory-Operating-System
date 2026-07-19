@@ -687,6 +687,7 @@ export async function listBoardPosts(): Promise<BoardPost[]> {
 export async function createBoardPost(input: {
   body: string;
   kind: BoardPostKind;
+  category?: string;
   assignee_id?: string | null;
   mentioned_ids?: string[];
   territory_id: string;
@@ -697,6 +698,7 @@ export async function createBoardPost(input: {
     .insert({
       body: input.body,
       kind: input.kind,
+      category: input.category ?? "general",
       assignee_id: input.assignee_id ?? null,
       mentioned_ids: input.mentioned_ids ?? [],
       territory_id: input.territory_id,
@@ -840,4 +842,15 @@ export async function updateFacility(
 ): Promise<void> {
   const { error } = await supabase.from("facilities").update(patch).eq("id", id);
   if (error) throw error;
+}
+
+/** Every note across the territory, newest first — powers global notes search. */
+export async function listAllEntityNotes(limit = 500): Promise<EntityNote[]> {
+  const { data, error } = await supabase
+    .from("entity_notes")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as EntityNote[];
 }

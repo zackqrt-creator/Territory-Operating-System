@@ -93,6 +93,8 @@ export default function Home() {
     (p) => p.kind === "todo" && p.assignee_id === profile?.id && !p.done,
   );
   const mentions = boardPosts.filter((p) => profile && p.mentioned_ids.includes(profile.id));
+  const wallSeen = localStorage.getItem("ct_wall_seen") ?? "";
+  const newPosts = boardPosts.filter((p) => p.created_at > wallSeen).length;
 
   // Expiry safety: never implant an expired device. Loaner-tote wrappers excluded.
   const expiryFlags = items.filter(
@@ -223,17 +225,20 @@ export default function Home() {
               <p className="text-sm text-slate-400">
                 {openTodos.length > 0
                   ? `${openTodos.length} to-do${openTodos.length === 1 ? "" : "s"} assigned to you`
-                  : mentions.length > 0
-                    ? `${mentions.length} post${mentions.length === 1 ? "" : "s"} mention you`
-                    : "Notes, hand-offs & to-dos"}
+                  : newPosts > 0
+                    ? `${newPosts} new post${newPosts === 1 ? "" : "s"} since your last visit`
+                    : mentions.length > 0
+                      ? `${mentions.length} post${mentions.length === 1 ? "" : "s"} mention you`
+                      : "Notes, hand-offs & to-dos"}
               </p>
             </div>
             <span className="text-2xl">💬</span>
           </Link>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {[
               { to: "/tasks", icon: "☑️", label: "Tasks" },
+              { to: "/notes", icon: "🗒️", label: "Notes" },
               { to: "/qa", icon: "❓", label: "Q&A" },
               { to: "/billing", icon: "💵", label: "Billing" },
               { to: "/compliance", icon: "🪪", label: "Creds" },

@@ -117,7 +117,13 @@ trunk. Built with React + Vite + Supabase.
     location or set its address in-app — so once you learn where an RM's stock actually
     lives, fix it in two taps, no database access needed.
   - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` then `013_entity_notes.sql`
-    then `014_manager_locations.sql` (after 010) to enable all of it.
+    then `014_manager_locations.sql` then `015_wall_categories.sql`.
+  - **Global notes search** (`/notes`, Notes chip on Home) — every note the team has written,
+    across cases, surgeons, facilities, and items, in one searchable place with filter chips.
+    Type "cement" or "door code" and find it, with what it's attached to.
+  - **Team wall channels + unread** — every post carries a topic (#general #inventory #cases
+    #schedule) picked in the composer, with filter chips on the wall. The Home card shows
+    "N new posts since your last visit" (tracked per device). (after 010) to enable all of it.
 - **Team board** (`/team`) — a shared, territory-wide space for the whole crew: post notes and
   hand-offs, turn any post into a **to-do assigned to a teammate**, **@-tag** whoever needs to see
   it, and reply in a thread. Filters for All / To-dos / Assigned to me / Mentions me. Home shows a

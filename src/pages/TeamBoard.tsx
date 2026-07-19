@@ -9,7 +9,14 @@ import {
   listProfiles,
   setTodoDone,
 } from "../lib/api";
-import type { BoardComment, BoardPost, Profile } from "../lib/types";
+import type { BoardCategory, BoardComment, BoardPost, Profile } from "../lib/types";
+
+const CATEGORIES: { value: BoardCategory; label: string }[] = [
+  { value: "general", label: "General" },
+  { value: "inventory", label: "Inventory" },
+  { value: "cases", label: "Cases" },
+  { value: "schedule", label: "Schedule" },
+];
 import { formatRelativeDay, formatTimeOfDay } from "../utils/dates";
 
 type Filter = "all" | "todos" | "mine" | "mentions";
@@ -21,6 +28,12 @@ export default function TeamBoard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
+  const [catFilter, setCatFilter] = useState<BoardCategory | "all">("all");
+
+  // Read-state: remember the visit so Home can show "N new since last visit".
+  useEffect(() => {
+    localStorage.setItem("ct_wall_seen", new Date().toISOString());
+  }, []);
 
   function refresh() {
     return Promise.all([listBoardPosts(), listBoardComments(), listProfiles()]).then(
@@ -44,6 +57,7 @@ export default function TeamBoard() {
   const teammates = profiles.filter((p) => p.id !== profile?.id);
 
   const visible = posts.filter((p) => {
+    if (catFilter !== "all" && p.category !== catFilter) return false;
     if (filter === "todos") return p.kind === "todo";
     if (filter === "mine") return p.kind === "todo" && p.assignee_id === profile?.id && !p.done;
     if (filter === "mentions") return profile ? p.mentioned_ids.includes(profile.id) : false;
@@ -91,6 +105,28 @@ export default function TeamBoard() {
         ))}
       </div>
 
+      <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={() => setCatFilter("all")}
+          className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
+            catFilter === "all" ? "bg-slate-600 text-white" : "bg-slate-800/70 text-slate-500"
+          }`}
+        >
+          All topics
+        </button>
+        {CATEGORIES.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => setCatFilter(c.value)}
+            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
+              catFilter === c.value ? "bg-slate-600 text-white" : "bg-slate-800/70 text-slate-500"
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : visible.length === 0 ? (
@@ -125,6 +161,7 @@ function Composer({
 }) {
   const [body, setBody] = useState("");
   const [isTodo, setIsTodo] = useState(false);
+  const [category, setCategory] = useState<BoardCategory>("general");
   const [assignee, setAssignee] = useState<string>("");
   const [tagged, setTagged] = useState<string[]>([]);
   const [posting, setPosting] = useState(false);
@@ -140,6 +177,7 @@ function Composer({
       await createBoardPost({
         body: body.trim(),
         kind: isTodo ? "todo" : "note",
+        category,
         assignee_id: isTodo ? assignee || null : null,
         mentioned_ids: tagged,
         territory_id: profile.territory_id,
@@ -147,6 +185,7 @@ function Composer({
       });
       setBody("");
       setIsTodo(false);
+      setCategory("general");
       setAssignee("");
       setTagged([]);
       onPosted();
@@ -189,6 +228,20 @@ function Composer({
             <option value={profile.id}>Myself</option>
           </select>
         )}
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {CATEGORIES.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => setCategory(c.value)}
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              category === c.value ? "bg-slate-600 text-white" : "bg-slate-800 text-slate-500"
+            }`}
+          >
+            #{c.label.toLowerCase()}
+          </button>
+        ))}
       </div>
 
       {teammates.length > 0 && (
@@ -309,6 +362,9 @@ function PostCard({
             {post.body}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+            <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-slate-400">
+              #{post.category}
+            </span>
             <span>{nameOf(post.author_id)}</span>
             <span>·</span>
             <span>

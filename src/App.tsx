@@ -17,6 +17,7 @@ import QaWall from "./pages/QaWall";
 import Compliance from "./pages/Compliance";
 import Billing from "./pages/Billing";
 import Tasks from "./pages/Tasks";
+import NotesSearch from "./pages/NotesSearch";
 import BottomNav from "./components/BottomNav";
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
         <Route path="/compliance" element={<Compliance />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/tasks" element={<Tasks />} />
+        <Route path="/notes" element={<NotesSearch />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

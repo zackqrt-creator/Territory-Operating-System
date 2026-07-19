@@ -201,12 +201,15 @@ export interface SurgeonPreferenceWithTotes extends SurgeonPreference {
 
 export type BoardPostKind = "note" | "todo";
 
+export type BoardCategory = "general" | "inventory" | "cases" | "schedule";
+
 export interface BoardPost {
   id: string;
   territory_id: string;
   author_id: string | null;
   body: string;
   kind: BoardPostKind;
+  category: BoardCategory;
   assignee_id: string | null;
   done: boolean;
   done_at: string | null;
