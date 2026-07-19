@@ -80,3 +80,39 @@ export function formatRelativeDay(isoTimestamp: string): string {
   if (day === addDays(today, -1)) return "Yesterday";
   return formatDateShort(day);
 }
+
+export function monthAnchor(iso?: string): string {
+  const d = iso ? new Date(`${iso}T00:00:00`) : new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+export function addMonths(anchorISO: string, delta: number): string {
+  const d = new Date(`${anchorISO}T00:00:00`);
+  d.setMonth(d.getMonth() + delta);
+  return monthAnchor(toISODate(d));
+}
+
+export function monthLabel(anchorISO: string): string {
+  return new Date(`${anchorISO}T00:00:00`).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** All grid days for a month view: Sunday on/before the 1st through Saturday
+ * on/after the last day. Always full weeks. */
+export function monthGridDays(anchorISO: string): string[] {
+  const first = new Date(`${anchorISO}T00:00:00`);
+  const start = new Date(first);
+  start.setDate(1 - first.getDay());
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+  const end = new Date(last);
+  end.setDate(last.getDate() + (6 - last.getDay()));
+  const out: string[] = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    out.push(toISODate(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}

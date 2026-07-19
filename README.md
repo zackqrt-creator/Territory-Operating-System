@@ -11,7 +11,10 @@ trunk. Built with React + Vite + Supabase.
 - Camera barcode/QR scanning (check items in/out) with a 3-tap manual fallback
 - Every inventory move writes an immutable audit-log row (`movements`)
 - Supabase auth (email magic link), multi-tenant schema (`territory_id` everywhere)
-- **Surgery calendar**, Wednesday-anchored week view. Each case is matched to its case template
+- **Surgery calendar**, Wednesday-anchored, with a Week/Month toggle. The month grid shows a
+  readiness-colored dot per day (green = all cases ready, red = something needs attention) plus a
+  case count on multi-case days — a one-glance view of the whole month's load. Tapping any day
+  drops into that day's case cards. Each case is matched to its case template
   (TKA/THA/Partial Knee/Partial Hip) and checked against live inventory at that case's facility.
   Gaps show red, right down to which other facility has the item — tapping a case opens the full
   checklist, and a gap has a one-tap "Move to [facility]" action wired straight into the
@@ -372,7 +375,7 @@ src/lib/loaners.ts        # loaner return countdown + extend/swap suggestion eng
 src/lib/activity.ts       # turns movements rows into plain-language feed sentences
 src/lib/packlist.ts       # surgeon-preference-driven pack list / demand aggregation engine
 src/hooks/useAuth.tsx     # session + profile state
-src/pages/Calendar.tsx    # Wednesday-anchored week view (route: /cases)
+src/pages/Calendar.tsx    # Week + month calendar views (route: /cases)
 src/pages/StagingReport.tsx  # the staging report (route: /staging)
 src/pages/LoanerReturns.tsx  # the loaner return countdown (route: /loaners)
 src/pages/ActivityFeed.tsx   # the team activity feed (route: /activity)
