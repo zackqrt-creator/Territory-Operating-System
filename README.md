@@ -152,6 +152,17 @@ trunk. Built with React + Vite + Supabase.
   hand-offs, turn any post into a **to-do assigned to a teammate**, **@-tag** whoever needs to see
   it, and reply in a thread. Filters for All / To-dos / Assigned to me / Mentions me. Home shows a
   card with how many open to-dos are assigned to you. (In-app only — no push/SMS yet.)
+- **Sticker sheet → auto-deduct → reorder task** — after a case, every implanted device's
+  peel-off sticker goes on the case paper. Open the case, tap "📸 Scan sticker sheet," and
+  photograph that paper: on-device OCR reads **every sticker on the page** (REF + lot), matches
+  each against your territory inventory (exact lot at the case facility ✓ green → lot at another
+  site → same product with a differing lot ≈ amber → not found = red, **never deducted**), and
+  shows a review list. Uncheck anything wrong, confirm, and the used units are deducted with an
+  audit movement tied to the case — two stickers can never double-deduct the same unit, and a
+  sheet with more used than in stock flags the shortfall instead of going negative. One reorder
+  task lands on your board due tomorrow listing exactly what was used, its lot, and which
+  location it came from, with unmatched stickers called out for a judgment call. Multi-page
+  sheets: just "Scan another page" and the lists merge.
 - **Scan a label to auto-fill** — adding a consignment item, tap "📷 Scan label to auto-fill,"
   snap the printed label, and it reads the REF, size, side, cement, lot, and expiration **on the
   phone** (no server, no per-scan cost, photo never leaves the device). Because the catalog now
@@ -396,6 +407,7 @@ src/lib/loaners.ts        # loaner return countdown + extend/swap suggestion eng
 src/lib/activity.ts       # turns movements rows into plain-language feed sentences
 src/lib/packlist.ts       # surgeon-preference-driven pack list / demand aggregation engine
 src/lib/runsheet.ts       # day ordering, load warnings, rep initials/attribution
+src/lib/stickerSheet.ts   # multi-sticker OCR parse + inventory allocation (no double-deduct)
 src/hooks/useAuth.tsx     # session + profile state
 src/pages/Calendar.tsx    # Week + month calendar views (route: /cases)
 src/pages/RunSheet.tsx    # day-of chronological run sheet (route: /runsheet)

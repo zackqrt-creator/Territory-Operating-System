@@ -20,6 +20,7 @@ import { scoreCase, type CheckStatus } from "../lib/crm";
 import MoveItemSheet from "./MoveItemSheet";
 import NotesSection from "./NotesSection";
 import QuickLogSheet from "./QuickLogSheet";
+import StickerSheetCapture from "./StickerSheetCapture";
 import { formatDateShort } from "../utils/dates";
 
 const CHECK_STYLE: Record<CheckStatus, { icon: string; text: string }> = {
@@ -59,6 +60,7 @@ export default function ReadinessSheet({
 }) {
   const [moving, setMoving] = useState<{ item: InventoryItem; target: Facility } | null>(null);
   const [logging, setLogging] = useState(false);
+  const [scanningStickers, setScanningStickers] = useState(false);
   const [certs, setCerts] = useState<RepCertification[]>([]);
   const [plans, setPlans] = useState<CaseItemPlan[]>([]);
   const [qa, setQa] = useState<{ q: QaQuestion; answers: QaAnswer[] }[]>([]);
@@ -183,6 +185,12 @@ export default function ReadinessSheet({
             Log case
           </button>
         )}
+        <button
+          onClick={() => setScanningStickers(true)}
+          className="mt-2 w-full rounded-lg border border-sky-800 bg-sky-950/30 px-4 py-3 font-medium text-sky-300 active:bg-sky-950/60"
+        >
+          📸 Scan sticker sheet
+        </button>
 
         <div className="mt-5">
           {!readiness.applicable ? (
@@ -254,6 +262,16 @@ export default function ReadinessSheet({
             setMoving(null);
             onRefresh();
           }}
+        />
+      )}
+
+      {scanningStickers && (
+        <StickerSheetCapture
+          caseRow={caseRow}
+          inventory={inventory}
+          facilities={facilities}
+          onClose={() => setScanningStickers(false)}
+          onDone={onRefresh}
         />
       )}
 

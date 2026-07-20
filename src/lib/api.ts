@@ -414,6 +414,40 @@ export async function logCaseUsage(params: {
  * case, and logs an audit movement. Clears any prior extension, since the
  * clock has restarted for this use.
  */
+/**
+ * Deduct the confirmed sticker-sheet allocations from inventory, one audit
+ * movement per row touched. Caller has already shown the review screen —
+ * only rep-confirmed lines reach here. Rows may hit zero but are kept, same
+ * as logCaseUsage, so the "we're out of this" signal is visible.
+ */
+export async function consumeStickerUsage(params: {
+  allocations: { item: InventoryItem; quantity: number }[];
+  caseId: string | null;
+  movedBy: string;
+  territoryId: string;
+}): Promise<void> {
+  const { allocations, caseId, movedBy, territoryId } = params;
+  for (const a of allocations) {
+    if (a.quantity <= 0) continue;
+    const { error: updateError } = await supabase
+      .from("inventory_items")
+      .update({ quantity: Math.max(0, a.item.quantity - a.quantity) })
+      .eq("id", a.item.id);
+    if (updateError) throw updateError;
+
+    const { error: moveError } = await supabase.from("movements").insert({
+      territory_id: territoryId,
+      item_id: a.item.id,
+      from_location: a.item.location_id,
+      to_location: a.item.location_id,
+      moved_by: movedBy,
+      related_case_id: caseId,
+      note: `Used ${a.quantity} in case (sticker sheet)`,
+    });
+    if (moveError) throw moveError;
+  }
+}
+
 export async function markLoanerUsed(params: {
   item: InventoryItem;
   caseRow: CaseRow;
