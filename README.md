@@ -160,9 +160,10 @@ trunk. Built with React + Vite + Supabase.
   shows a review list. Uncheck anything wrong, confirm, and the used units are deducted with an
   audit movement tied to the case — two stickers can never double-deduct the same unit, and a
   sheet with more used than in stock flags the shortfall instead of going negative. One reorder
-  task lands on your board due tomorrow listing exactly what was used, its lot, and which
-  location it came from, with unmatched stickers called out for a judgment call. Multi-page
-  sheets: just "Scan another page" and the lists merge.
+  task lands due tomorrow listing exactly what was used, its lot, and which location it came
+  from, with unmatched stickers called out for a judgment call. The task defaults to your own
+  board, with a "Reorder task for" picker on the confirm screen to hand it to whoever places
+  orders instead. Multi-page sheets: just "Scan another page" and the lists merge.
 - **Scan a label to auto-fill** — adding a consignment item, tap "📷 Scan label to auto-fill,"
   snap the printed label, and it reads the REF, size, side, cement, lot, and expiration **on the
   phone** (no server, no per-scan cost, photo never leaves the device). Because the catalog now

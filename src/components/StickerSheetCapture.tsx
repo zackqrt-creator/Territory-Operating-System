@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { consumeStickerUsage, createTask, listCatalogItems } from "../lib/api";
-import type { CaseRow, CatalogItem, Facility, InventoryItem } from "../lib/types";
+import { consumeStickerUsage, createTask, listCatalogItems, listProfiles } from "../lib/api";
+import type { CaseRow, CatalogItem, Facility, InventoryItem, Profile } from "../lib/types";
 import {
   buildReorderNotes,
   matchSheet,
@@ -41,6 +41,8 @@ export default function StickerSheetCapture({
 }) {
   const { profile } = useAuth();
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [assignTo, setAssignTo] = useState<string | null>(null);
   const [stickers, setStickers] = useState<SheetSticker[]>([]);
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [pages, setPages] = useState(0);
@@ -52,7 +54,13 @@ export default function StickerSheetCapture({
 
   useEffect(() => {
     listCatalogItems().then(setCatalog).catch(() => {});
+    listProfiles().then(setProfiles).catch(() => {});
   }, []);
+
+  const teammates = profiles.filter((p) => p.id !== profile?.id);
+  const assigneeName = assignTo
+    ? (profiles.find((p) => p.id === assignTo)?.display_name ?? "teammate")
+    : null;
 
   const matches: StickerMatch[] = matchSheet(stickers, inventory, caseRow.facility_id);
 
@@ -123,6 +131,7 @@ export default function StickerSheetCapture({
         title: `Reorder: ${unitCount} implant${unitCount === 1 ? "" : "s"} used ${formatDateShort(caseRow.surgery_date)}`,
         notes: buildReorderNotes(confirmed, unmatchedOnly, facilities),
         due_date: tomorrow(),
+        assigned_to: assignTo,
         territory_id: profile.territory_id,
         owner_id: profile.id,
       });
@@ -151,7 +160,8 @@ export default function StickerSheetCapture({
             <h2 className="text-lg font-semibold text-white">Sticker sheet logged ✓</h2>
             <p className="mt-2 text-sm text-slate-300">
               {result.deducted} unit{result.deducted === 1 ? "" : "s"} deducted from inventory with
-              an audit trail on this case, and a reorder task is on your board due tomorrow.
+              an audit trail on this case, and a reorder task is on{" "}
+              {assigneeName ? `${assigneeName}'s` : "your"} board due tomorrow.
             </p>
             {result.flagged > 0 && (
               <p className="mt-2 rounded-lg border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200">
@@ -260,6 +270,33 @@ export default function StickerSheetCapture({
                     );
                   })}
                 </div>
+
+                {teammates.length > 0 && (
+                  <div className="mt-4">
+                    <p className="mb-1 text-xs text-slate-500">Reorder task for</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => setAssignTo(null)}
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          assignTo === null ? "bg-sky-700 text-white" : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        Me
+                      </button>
+                      {teammates.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setAssignTo((prev) => (prev === t.id ? null : t.id))}
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            assignTo === t.id ? "bg-sky-700 text-white" : "bg-slate-800 text-slate-400"
+                          }`}
+                        >
+                          {t.display_name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={onConfirm}
