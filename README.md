@@ -117,19 +117,31 @@ trunk. Built with React + Vite + Supabase.
     its owner unless explicitly shared with chosen teammates, and that's enforced by row-level
     security in the database, not just hidden in the UI. **Duplicate** any task with a new date
     so recurring work (weekly counts, restock runs) never gets retyped. Overdue tasks flag red.
+    **Task delegation** (migration 016) — the composer has an "Assign to" row: assign a task to
+    a teammate and it lands on their board tagged "📌 assigned by you", while your board shows
+    "→ their name" so you can see status without asking. Assignees can move the task through
+    the columns; only the owner can delete it. Same RLS layer as task privacy.
   - **Universal notes** — an "+ Add note" button on pretty much everything: case detail,
     inventory item edit, loaner tote detail, and surgeon cards all carry a timestamped,
     authored note thread. Anyone on the team can add a note any time; authors can edit
     (marked "edited") or delete their own. One shared system (`entity_notes`), so a note
     follows its record everywhere. Personal tasks keep their own private notes field
-    (this thread is team-visible by design).
+    (this thread is team-visible by design). Every note also has an **"⏰ follow up"** action:
+    pick a date and it creates a linked task ("Follow up: <the note>") on your board, so intel
+    written down in the field actually carries forward instead of dying in the thread.
   - **Regional manager locations + in-app location editing** — "Matt Inventory (RM)" and
     "Karl Inventory (RM)" are seeded as inventory locations (migration 014), and the
     Compliance page has a **Locations** card where anyone on the team can rename any
     location or set its address in-app — so once you learn where an RM's stock actually
     lives, fix it in two taps, no database access needed.
+  - **Case-day autopilot** — the night before a case day, Home's "🌙 Tomorrow" card pre-builds
+    your morning: case count with readiness pills (● ready / ● to check / ● at risk), items
+    left to haul, loaners to ship or still inbound, and a door-check warning if a credential
+    lapses before tomorrow's case — with one-tap Run sheet and Staging buttons for that exact
+    day. Green card = walk out the door; red card = fix something tonight.
   - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` then `013_entity_notes.sql`
-    then `014_manager_locations.sql` then `015_wall_categories.sql`.
+    then `014_manager_locations.sql` then `015_wall_categories.sql` then
+    `016_task_assignment_and_followups.sql`.
   - **Global notes search** (`/notes`, Notes chip on Home) — every note the team has written,
     across cases, surgeons, facilities, and items, in one searchable place with filter chips.
     Type "cement" or "door code" and find it, with what it's attached to.

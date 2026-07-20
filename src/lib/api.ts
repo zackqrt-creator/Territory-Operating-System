@@ -774,6 +774,8 @@ export async function createTask(input: {
   due_date?: string | null;
   shared_with?: string[];
   status?: TaskStatus;
+  assigned_to?: string | null;
+  source_note_id?: string | null;
   territory_id: string;
   owner_id: string;
 }): Promise<PersonalTask> {
@@ -784,7 +786,9 @@ export async function createTask(input: {
 
 export async function updateTask(
   id: string,
-  patch: Partial<Pick<PersonalTask, "title" | "notes" | "due_date" | "status" | "shared_with" | "done_at">>,
+  patch: Partial<
+    Pick<PersonalTask, "title" | "notes" | "due_date" | "status" | "shared_with" | "assigned_to" | "done_at">
+  >,
 ): Promise<void> {
   const { error } = await supabase.from("tasks").update(patch).eq("id", id);
   if (error) throw error;

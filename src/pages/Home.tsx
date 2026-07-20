@@ -13,6 +13,7 @@ import {
   listBoardPosts,
   listFacilityCredentials,
   listCatalogItems,
+  listRepCertifications,
 } from "../lib/api";
 import type {
   BoardPost,
@@ -24,12 +25,14 @@ import type {
   InventoryItem,
   Movement,
   Profile,
+  RepCertification,
 } from "../lib/types";
 import { buildStagingReport } from "../lib/staging";
 import { buildLoanerReport } from "../lib/loaners";
 import { buildActivityFeed } from "../lib/activity";
 import { daysUntil, formatDateShort, formatTimeOfDay, toISODate, tomorrow } from "../utils/dates";
-import { credentialConflicts, expiringLotSuggestions } from "../lib/crm";
+import { credentialConflicts, expiringLotSuggestions, scoreCase } from "../lib/crm";
+import { computeReadiness } from "../lib/readiness";
 
 export default function Home() {
   const { profile, signOut } = useAuth();
@@ -43,6 +46,7 @@ export default function Home() {
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>([]);
   const [credentials, setCredentials] = useState<FacilityCredential[]>([]);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [certs, setCerts] = useState<RepCertification[]>([]);
   const [loading, setLoading] = useState(true);
 
   function refresh() {
@@ -56,7 +60,8 @@ export default function Home() {
       listBoardPosts(),
       listFacilityCredentials(),
       listCatalogItems(),
-    ]).then(async ([c, i, f, t, m, p, b, fc, cat]) => {
+      listRepCertifications(),
+    ]).then(async ([c, i, f, t, m, p, b, fc, cat, rc]) => {
       setCases(c);
       setItems(i);
       setFacilities(f);
@@ -66,6 +71,7 @@ export default function Home() {
       setBoardPosts(b);
       setCredentials(fc);
       setCatalog(cat);
+      setCerts(rc);
       const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
       setActivityCases(await listCasesByIds(caseIds));
     });
@@ -86,6 +92,24 @@ export default function Home() {
     [cases, templates, items, facilities],
   );
   const haulCount = staging.routes.reduce((sum, r) => sum + r.items.length, 0);
+
+  // Case-day autopilot: everything tomorrow needs, scored, in one card.
+  const tomorrowISO = tomorrow();
+  const tomorrowCases = cases.filter(
+    (c) => c.surgery_date === tomorrowISO && c.status === "scheduled",
+  );
+  const tomorrowScores = useMemo(() => {
+    const counts = { green: 0, yellow: 0, red: 0 };
+    for (const c of tomorrowCases) {
+      const r = computeReadiness(c, templates, items, facilities);
+      counts[scoreCase(c, r, items, certs).color]++;
+    }
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cases, templates, items, facilities, certs]);
+  const loanersInTransit = items.filter(
+    (i) => i.delivery_status && i.delivery_status !== "delivered",
+  ).length;
   const activity = buildActivityFeed(movements, items, facilities, profiles, activityCases);
   const reserveAlerts = activity.filter((entry) => entry.reserveAlert && !entry.movement.acknowledged_at);
 
@@ -274,27 +298,59 @@ export default function Home() {
             </div>
           )}
 
-          {staging.cases.length > 0 && (
-            <Link
-              to="/staging"
-              className={`block rounded-xl border p-4 ${
-                haulCount > 0 || staging.loanerReturns.length > 0
-                  ? "border-amber-800 bg-amber-950/30"
-                  : "border-emerald-800 bg-emerald-950/30"
+          {tomorrowCases.length > 0 && (
+            <div
+              className={`rounded-xl border p-4 ${
+                tomorrowScores.red > 0
+                  ? "border-red-800 bg-red-950/30"
+                  : haulCount > 0 || staging.loanerReturns.length > 0 || tomorrowScores.yellow > 0
+                    ? "border-amber-800 bg-amber-950/30"
+                    : "border-emerald-800 bg-emerald-950/30"
               }`}
             >
-              <h2 className="text-sm font-medium text-amber-200">
-                Tomorrow's staging &mdash; {staging.cases.length} case
-                {staging.cases.length === 1 ? "" : "s"}
+              <h2 className="text-sm font-medium text-slate-200">
+                🌙 Tomorrow &mdash; {tomorrowCases.length} case{tomorrowCases.length === 1 ? "" : "s"}
               </h2>
-              <p className="mt-1 text-sm text-slate-200">
+              <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                {tomorrowScores.green > 0 && (
+                  <span className="text-emerald-300">● {tomorrowScores.green} ready</span>
+                )}
+                {tomorrowScores.yellow > 0 && (
+                  <span className="text-amber-300">● {tomorrowScores.yellow} to check</span>
+                )}
+                {tomorrowScores.red > 0 && (
+                  <span className="font-medium text-red-300">● {tomorrowScores.red} at risk</span>
+                )}
+              </p>
+              <p className="mt-1 text-sm text-slate-300">
                 {haulCount > 0 ? `${haulCount} item${haulCount === 1 ? "" : "s"} to haul` : "Everything staged"}
                 {staging.loanerReturns.length > 0
                   ? ` · ${staging.loanerReturns.length} loaner${staging.loanerReturns.length === 1 ? "" : "s"} to ship`
                   : ""}
+                {loanersInTransit > 0
+                  ? ` · ${loanersInTransit} loaner${loanersInTransit === 1 ? "" : "s"} still inbound`
+                  : ""}
               </p>
-              <span className="mt-2 inline-block text-sm text-amber-300">Open staging report &rarr;</span>
-            </Link>
+              {doorChecks.some((d) => d.firstAffectedCase.surgery_date === tomorrowISO) && (
+                <p className="mt-1 text-sm font-medium text-red-300">
+                  🚪 A credential lapses before tomorrow's case — check compliance.
+                </p>
+              )}
+              <div className="mt-2.5 flex gap-2">
+                <Link
+                  to={`/runsheet?date=${tomorrowISO}`}
+                  className="flex-1 rounded-lg bg-sky-600 py-2 text-center text-sm font-medium text-white"
+                >
+                  Run sheet →
+                </Link>
+                <Link
+                  to={`/staging?date=${tomorrowISO}`}
+                  className="flex-1 rounded-lg bg-slate-800 py-2 text-center text-sm font-medium text-slate-200"
+                >
+                  Staging →
+                </Link>
+              </div>
+            </div>
           )}
 
           <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">

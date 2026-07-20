@@ -27,6 +27,7 @@ export default function Tasks() {
   const [notes, setNotes] = useState("");
   const [due, setDue] = useState("");
   const [sharedWith, setSharedWith] = useState<string[]>([]);
+  const [assignTo, setAssignTo] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -53,6 +54,7 @@ export default function Tasks() {
         notes: notes.trim() || null,
         due_date: due || null,
         shared_with: sharedWith,
+        assigned_to: assignTo,
         territory_id: profile.territory_id,
         owner_id: profile.id,
       });
@@ -60,6 +62,7 @@ export default function Tasks() {
       setNotes("");
       setDue("");
       setSharedWith([]);
+      setAssignTo(null);
       setShowForm(false);
       await refresh();
     } finally {
@@ -82,8 +85,8 @@ export default function Tasks() {
         </button>
       </div>
       <p className="mt-1 text-sm text-slate-400">
-        Private to you unless you share one with a teammate. Duplicate a recurring task instead of
-        retyping it.
+        Private to you unless you share or assign one to a teammate. Assigned tasks land on their
+        board with your name on them. Duplicate a recurring task instead of retyping it.
       </p>
 
       {showForm && (
@@ -113,6 +116,32 @@ export default function Tasks() {
           </div>
           {teammates.length > 0 && (
             <div className="mt-2">
+              <p className="mb-1 text-xs text-slate-500">Assign to</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setAssignTo(null)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    assignTo === null ? "bg-sky-700 text-white" : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  Me
+                </button>
+                {teammates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setAssignTo((prev) => (prev === t.id ? null : t.id))}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      assignTo === t.id ? "bg-sky-700 text-white" : "bg-slate-800 text-slate-400"
+                    }`}
+                  >
+                    {t.display_name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {teammates.length > 0 && (
+            <div className="mt-2">
               <p className="mb-1 text-xs text-slate-500">Share with (optional — private otherwise)</p>
               <div className="flex flex-wrap gap-1.5">
                 {teammates.map((t) => (
@@ -138,7 +167,13 @@ export default function Tasks() {
             disabled={saving || !title.trim()}
             className="mt-3 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-sky-950/40 disabled:opacity-50"
           >
-            {saving ? "Saving…" : sharedWith.length > 0 ? "Create shared task" : "Create private task"}
+            {saving
+              ? "Saving…"
+              : assignTo
+                ? `Assign to ${teammates.find((t) => t.id === assignTo)?.display_name ?? "teammate"}`
+                : sharedWith.length > 0
+                  ? "Create shared task"
+                  : "Create private task"}
           </button>
         </div>
       )}
@@ -293,13 +328,26 @@ function TaskCard({
                 {overdue ? " · overdue" : ""}
               </span>
             )}
-            {!mine && <span className="text-sky-300">from {nameOf(task.owner_id)}</span>}
+            {task.assigned_to === meId && !mine && (
+              <span className="rounded-full bg-violet-900/50 px-2 py-0.5 font-medium text-violet-300">
+                📌 assigned by {nameOf(task.owner_id)}
+              </span>
+            )}
+            {mine && task.assigned_to && task.assigned_to !== meId && (
+              <span className="rounded-full bg-violet-900/50 px-2 py-0.5 text-violet-300">
+                → {nameOf(task.assigned_to)}
+              </span>
+            )}
+            {!mine && task.assigned_to !== meId && (
+              <span className="text-sky-300">from {nameOf(task.owner_id)}</span>
+            )}
+            {task.source_note_id && <span>⏰ from a note</span>}
             {task.shared_with.length > 0 && (
               <span className="rounded-full bg-sky-900/50 px-2 py-0.5 text-sky-300">
                 👥 {task.shared_with.map(nameOf).join(", ")}
               </span>
             )}
-            {task.shared_with.length === 0 && mine && <span>🔒 private</span>}
+            {task.shared_with.length === 0 && !task.assigned_to && mine && <span>🔒 private</span>}
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">

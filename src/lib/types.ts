@@ -291,6 +291,10 @@ export interface PersonalTask {
   status: TaskStatus;
   /** Profile ids this task is shared with; empty = private to the owner. */
   shared_with: string[];
+  /** Teammate this task is delegated to; null = the owner's own task. */
+  assigned_to: string | null;
+  /** Entity note this task was spawned from ("Follow up" on a note). */
+  source_note_id: string | null;
   done_at: string | null;
   created_at: string;
 }

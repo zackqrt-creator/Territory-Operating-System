@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
   createEntityNote,
+  createTask,
   deleteEntityNote,
   listEntityNotes,
   listProfiles,
   updateEntityNote,
 } from "../lib/api";
 import type { EntityNote, NoteEntityType, Profile } from "../lib/types";
-import { formatRelativeDay, formatTimeOfDay } from "../utils/dates";
+import { formatRelativeDay, formatTimeOfDay, tomorrow } from "../utils/dates";
 
 /**
  * Universal note thread — drop onto any record (case, item, tote, surgeon).
@@ -34,6 +35,9 @@ export default function NotesSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [followUpId, setFollowUpId] = useState<string | null>(null);
+  const [followUpDate, setFollowUpDate] = useState(tomorrow());
+  const [followUpDone, setFollowUpDone] = useState<Set<string>>(new Set());
 
   function refresh() {
     return listEntityNotes(entityType, entityId).then(setNotes);
@@ -83,6 +87,27 @@ export default function NotesSection({
     try {
       await deleteEntityNote(id);
       await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCreateFollowUp(note: EntityNote) {
+    if (!profile) return;
+    setBusy(true);
+    try {
+      const snippet = note.body.length > 60 ? `${note.body.slice(0, 60)}…` : note.body;
+      await createTask({
+        title: `Follow up: ${snippet}`,
+        notes: note.body,
+        due_date: followUpDate || null,
+        source_note_id: note.id,
+        territory_id: profile.territory_id,
+        owner_id: profile.id,
+      });
+      setFollowUpId(null);
+      setFollowUpDate(tomorrow());
+      setFollowUpDone((prev) => new Set(prev).add(note.id));
     } finally {
       setBusy(false);
     }
@@ -169,12 +194,41 @@ export default function NotesSection({
           ) : (
             <div key={n.id} className="rounded-lg bg-slate-800/60 px-3 py-2">
               <p className="whitespace-pre-wrap text-sm text-slate-200">{n.body}</p>
-              <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span>
                   {nameOf(n.author_id)} · {formatRelativeDay(n.created_at)}{" "}
                   {formatTimeOfDay(n.created_at)}
                   {n.updated_at ? " · edited" : ""}
                 </span>
+                {followUpDone.has(n.id) ? (
+                  <span className="text-emerald-400">✓ task created</span>
+                ) : followUpId === n.id ? (
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={followUpDate}
+                      onChange={(e) => setFollowUpDate(e.target.value)}
+                      className="min-h-0 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-white"
+                    />
+                    <button
+                      onClick={() => onCreateFollowUp(n)}
+                      disabled={busy}
+                      className="min-h-0 rounded bg-sky-600 px-2 py-0.5 font-medium text-white disabled:opacity-50"
+                    >
+                      Create task
+                    </button>
+                    <button onClick={() => setFollowUpId(null)} className="min-h-0 text-slate-500 underline">
+                      cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setFollowUpId(n.id)}
+                    className="min-h-0 text-sky-400 underline"
+                  >
+                    ⏰ follow up
+                  </button>
+                )}
                 {n.author_id === profile?.id && (
                   <>
                     <button
