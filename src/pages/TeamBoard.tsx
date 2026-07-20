@@ -7,6 +7,8 @@ import {
   listBoardComments,
   listBoardPosts,
   listProfiles,
+  setPostAcks,
+  setPostPinned,
   setTodoDone,
 } from "../lib/api";
 import type { BoardCategory, BoardComment, BoardPost, Profile } from "../lib/types";
@@ -56,13 +58,15 @@ export default function TeamBoard() {
 
   const teammates = profiles.filter((p) => p.id !== profile?.id);
 
-  const visible = posts.filter((p) => {
-    if (catFilter !== "all" && p.category !== catFilter) return false;
-    if (filter === "todos") return p.kind === "todo";
-    if (filter === "mine") return p.kind === "todo" && p.assignee_id === profile?.id && !p.done;
-    if (filter === "mentions") return profile ? p.mentioned_ids.includes(profile.id) : false;
-    return true;
-  });
+  const visible = posts
+    .filter((p) => {
+      if (catFilter !== "all" && p.category !== catFilter) return false;
+      if (filter === "todos") return p.kind === "todo";
+      if (filter === "mine") return p.kind === "todo" && p.assignee_id === profile?.id && !p.done;
+      if (filter === "mentions") return profile ? p.mentioned_ids.includes(profile.id) : false;
+      return true;
+    })
+    .sort((a, b) => Number(b.pinned ?? false) - Number(a.pinned ?? false));
 
   const openForMe = posts.filter(
     (p) => p.kind === "todo" && p.assignee_id === profile?.id && !p.done,
@@ -333,6 +337,31 @@ function PostCard({
     }
   }
 
+  async function onTogglePin() {
+    setBusy(true);
+    try {
+      await setPostPinned(post.id, !post.pinned);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const acked = (post.acked_by ?? []).includes(meId);
+
+  async function onToggleAck() {
+    setBusy(true);
+    try {
+      const next = acked
+        ? (post.acked_by ?? []).filter((id) => id !== meId)
+        : [...(post.acked_by ?? []), meId];
+      await setPostAcks(post.id, next);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const isTodo = post.kind === "todo";
 
   return (
@@ -362,6 +391,7 @@ function PostCard({
             {post.body}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+            {post.pinned && <span className="font-semibold text-amber-400">📌</span>}
             <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-slate-400">
               #{post.category}
             </span>
@@ -422,12 +452,31 @@ function PostCard({
           </button>
         </div>
       ) : (
-        <button
-          onClick={() => setShowReply(true)}
-          className="mt-2 text-xs text-slate-500 underline"
-        >
-          Reply
-        </button>
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            onClick={onToggleAck}
+            disabled={busy}
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              acked ? "bg-sky-700 text-white" : "bg-slate-800 text-slate-400"
+            }`}
+          >
+            👍 {acked ? "Seen" : "Seen it"}
+            {(post.acked_by ?? []).length > 0 ? ` · ${(post.acked_by ?? []).length}` : ""}
+          </button>
+          <button
+            onClick={onTogglePin}
+            disabled={busy}
+            className="text-xs text-slate-500 underline"
+          >
+            {post.pinned ? "unpin" : "pin"}
+          </button>
+          <button
+            onClick={() => setShowReply(true)}
+            className="text-xs text-slate-500 underline"
+          >
+            Reply
+          </button>
+        </div>
       )}
     </div>
   );

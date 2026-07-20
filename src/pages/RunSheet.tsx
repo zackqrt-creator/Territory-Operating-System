@@ -7,6 +7,7 @@ import {
   listInventory,
   listProfiles,
   listRepCertifications,
+  listTimeOff,
 } from "../lib/api";
 import type {
   CaseRow,
@@ -15,6 +16,7 @@ import type {
   InventoryItem,
   Profile,
   RepCertification,
+  TimeOff,
 } from "../lib/types";
 import { computeReadiness } from "../lib/readiness";
 import { scoreCase, type ScoreColor } from "../lib/crm";
@@ -37,6 +39,7 @@ export default function RunSheet() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [certs, setCerts] = useState<RepCertification[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCase, setOpenCase] = useState<CaseRow | null>(null);
 
@@ -49,14 +52,16 @@ export default function RunSheet() {
       listInventory(),
       listRepCertifications(),
       listProfiles(),
+      listTimeOff(),
     ])
-      .then(([c, f, t, i, rc, p]) => {
+      .then(([c, f, t, i, rc, p, to]) => {
         setCases(c);
         setFacilities(f);
         setTemplates(t);
         setInventory(i);
         setCerts(rc);
         setProfiles(p);
+        setTimeOff(to);
       })
       .finally(() => setLoading(false));
   }
@@ -100,6 +105,19 @@ export default function RunSheet() {
           ›
         </button>
       </div>
+
+      {timeOff.some((t) => t.start_date <= date && t.end_date >= date) && (
+        <p className="mt-3 rounded-lg border border-violet-800/60 bg-violet-950/25 px-3 py-2 text-sm text-violet-300">
+          🏖️{" "}
+          {timeOff
+            .filter((t) => t.start_date <= date && t.end_date >= date)
+            .map((t) => {
+              const p = profiles.find((x) => x.id === t.rep_id);
+              return `${p?.display_name ?? "A teammate"} is out${t.reason ? ` (${t.reason})` : ""}`;
+            })
+            .join(" · ")}
+        </p>
+      )}
 
       {warnings.length > 0 && (
         <div className="mt-4 space-y-1 rounded-lg border border-amber-800 bg-amber-950/30 p-3">

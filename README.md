@@ -161,7 +161,7 @@ trunk. Built with React + Vite + Supabase.
   - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` then `013_entity_notes.sql`
     then `014_manager_locations.sql` then `015_wall_categories.sql` then
     `016_task_assignment_and_followups.sql` then `017_note_pins.sql` then
-    `018_time_off_and_billing_aging.sql`.
+    `018_time_off_and_billing_aging.sql` then `019_wall_pins_and_acks.sql`.
   - **Global notes search** (`/notes`, Notes chip on Home) — every note the team has written,
     across cases, surgeons, facilities, and items, in one searchable place with filter chips.
     Type "cement" or "door code" and find it, with what it's attached to.
@@ -171,7 +171,9 @@ trunk. Built with React + Vite + Supabase.
 - **Team board** (`/team`) — a shared, territory-wide space for the whole crew: post notes and
   hand-offs, turn any post into a **to-do assigned to a teammate**, **@-tag** whoever needs to see
   it, and reply in a thread. Filters for All / To-dos / Assigned to me / Mentions me. Home shows a
-  card with how many open to-dos are assigned to you. (In-app only — no push/SMS yet.)
+  card with how many open to-dos are assigned to you. **📌 Pin** any post (migration 019) and it
+  stays at the top of the wall; **👍 Seen it** puts a visible acknowledgment count on a post, so
+  "did anyone read my hand-off?" has an answer instead of a guess. (In-app only — no push/SMS yet.)
 - **Sticker sheet → auto-deduct → reorder task** — after a case, every implanted device's
   peel-off sticker goes on the case paper. Open the case, tap "📸 Scan sticker sheet," and
   photograph that paper: on-device OCR reads **every sticker on the page** (REF + lot), matches

@@ -803,6 +803,16 @@ export async function setTodoDone(
   if (error) throw error;
 }
 
+export async function setPostPinned(postId: string, pinned: boolean): Promise<void> {
+  const { error } = await supabase.from("board_posts").update({ pinned }).eq("id", postId);
+  if (error) throw error;
+}
+
+export async function setPostAcks(postId: string, ackedBy: string[]): Promise<void> {
+  const { error } = await supabase.from("board_posts").update({ acked_by: ackedBy }).eq("id", postId);
+  if (error) throw error;
+}
+
 export async function deleteBoardPost(postId: string): Promise<void> {
   const { error } = await supabase.from("board_posts").delete().eq("id", postId);
   if (error) throw error;

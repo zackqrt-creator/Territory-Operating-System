@@ -227,6 +227,10 @@ export interface BoardPost {
   done_at: string | null;
   done_by: string | null;
   mentioned_ids: string[];
+  /** Stays at the top of the wall; any teammate can pin/unpin. */
+  pinned: boolean;
+  /** Profile ids that tapped "seen it" on this post. */
+  acked_by: string[];
   created_at: string;
 }
 
