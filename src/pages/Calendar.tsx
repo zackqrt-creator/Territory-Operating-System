@@ -97,11 +97,9 @@ export default function Calendar() {
   }
 
   function goMonth(delta: number) {
-    setMAnchor((m) => {
-      const next = addMonths(m, delta);
-      setSelectedDate(next);
-      return next;
-    });
+    const next = addMonths(mAnchor, delta);
+    setMAnchor(next);
+    setSelectedDate(next);
   }
 
   function switchView(next: "week" | "month") {
