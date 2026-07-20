@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   listCasesInRange,
   listCaseTemplatesWithItems,
@@ -18,7 +19,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 export default function StagingReport() {
-  const [date, setDate] = useState(tomorrow());
+  const [params] = useSearchParams();
+  const [date, setDate] = useState(() => params.get("date") ?? tomorrow());
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [templates, setTemplates] = useState<CaseTemplateWithItems[]>([]);

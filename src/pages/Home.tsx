@@ -235,8 +235,9 @@ export default function Home() {
             <span className="text-2xl">💬</span>
           </Link>
 
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-6 gap-1.5">
             {[
+              { to: "/runsheet", icon: "📋", label: "Today" },
               { to: "/tasks", icon: "☑️", label: "Tasks" },
               { to: "/notes", icon: "🗒️", label: "Notes" },
               { to: "/qa", icon: "❓", label: "Q&A" },

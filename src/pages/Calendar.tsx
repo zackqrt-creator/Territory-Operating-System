@@ -5,6 +5,7 @@ import {
   listCaseTemplatesWithItems,
   listFacilities,
   listInventory,
+  listProfiles,
   listRepCertifications,
 } from "../lib/api";
 import type {
@@ -12,10 +13,13 @@ import type {
   CaseTemplateWithItems,
   Facility,
   InventoryItem,
+  Profile,
   RepCertification,
 } from "../lib/types";
 import { computeReadiness } from "../lib/readiness";
 import { scoreCase, type ScoreColor } from "../lib/crm";
+import { caseRepId, dayLoadWarnings, repInitials } from "../lib/runsheet";
+import { useAuth } from "../hooks/useAuth";
 import ReadinessSheet from "../components/ReadinessSheet";
 import {
   addDays,
@@ -33,7 +37,9 @@ import {
 const DAY_LABEL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function Calendar() {
+  const { profile } = useAuth();
   const [view, setView] = useState<"week" | "month">("week");
+  const [repFilter, setRepFilter] = useState<"all" | "mine">("all");
   const [wStart, setWStart] = useState(() => weekStart(nextWednesday()));
   const [mAnchor, setMAnchor] = useState(() => monthAnchor(nextWednesday()));
   const [selectedDate, setSelectedDate] = useState(() => nextWednesday());
@@ -42,6 +48,7 @@ export default function Calendar() {
   const [templates, setTemplates] = useState<CaseTemplateWithItems[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [certs, setCerts] = useState<RepCertification[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCase, setOpenCase] = useState<CaseRow | null>(null);
 
@@ -58,13 +65,15 @@ export default function Calendar() {
       listCaseTemplatesWithItems(),
       listInventory(),
       listRepCertifications(),
+      listProfiles(),
     ])
-      .then(([c, f, t, i, rc]) => {
+      .then(([c, f, t, i, rc, p]) => {
         setCases(c);
         setFacilities(f);
         setTemplates(t);
         setInventory(i);
         setCerts(rc);
+        setProfiles(p);
       })
       .finally(() => setLoading(false));
   }
@@ -97,15 +106,22 @@ export default function Calendar() {
     }
   }
 
+  const visibleCases = useMemo(() => {
+    if (repFilter === "mine" && profile) {
+      return cases.filter((c) => caseRepId(c) === profile.id);
+    }
+    return cases;
+  }, [cases, repFilter, profile]);
+
   const casesByDay = useMemo(() => {
     const map = new Map<string, CaseRow[]>();
-    for (const c of cases) {
+    for (const c of visibleCases) {
       const list = map.get(c.surgery_date) ?? [];
       list.push(c);
       map.set(c.surgery_date, list);
     }
     return map;
-  }, [cases]);
+  }, [visibleCases]);
 
   function dayStatus(date: string): "ready" | "gap" | "none" {
     const dayCases = casesByDay.get(date) ?? [];
@@ -120,6 +136,7 @@ export default function Calendar() {
 
   const facilityName = (id: string | null) => facilities.find((f) => f.id === id)?.name ?? "—";
   const selectedCases = casesByDay.get(selectedDate) ?? [];
+  const selectedWarnings = dayLoadWarnings(selectedCases, facilities);
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
@@ -148,7 +165,7 @@ export default function Calendar() {
         </button>
       </div>
 
-      <div className="mt-2 flex justify-center">
+      <div className="mt-2 flex items-center justify-center gap-2">
         <div className="flex rounded-lg bg-slate-900 p-0.5">
           {(["week", "month"] as const).map((v) => (
             <button
@@ -162,6 +179,19 @@ export default function Calendar() {
             </button>
           ))}
         </div>
+        <div className="flex rounded-lg bg-slate-900 p-0.5">
+          {(["all", "mine"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setRepFilter(f)}
+              className={`rounded-md px-4 py-1 text-xs font-medium ${
+                repFilter === f ? "bg-slate-700 text-white" : "text-slate-500"
+              }`}
+            >
+              {f === "all" ? "Everyone" : "Mine"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {view === "week" ? (
@@ -170,6 +200,7 @@ export default function Calendar() {
             const status = dayStatus(date);
             const selected = date === selectedDate;
             const emphasize = i === 3 || i === 5; // Wed, Fri — the primary case days
+            const count = (casesByDay.get(date) ?? []).length;
             return (
               <button
                 key={date}
@@ -193,6 +224,13 @@ export default function Calendar() {
                         : "bg-transparent"
                   }`}
                 />
+                <span
+                  className={`h-3 text-[9px] leading-3 ${
+                    count >= 3 ? "font-semibold text-amber-400" : "text-slate-400"
+                  }`}
+                >
+                  {count > 1 ? count : ""}
+                </span>
               </button>
             );
           })}
@@ -234,7 +272,11 @@ export default function Calendar() {
                           : "bg-transparent"
                     }`}
                   />
-                  <span className="h-3 text-[9px] leading-3 text-slate-400">
+                  <span
+                    className={`h-3 text-[9px] leading-3 ${
+                      count >= 3 ? "font-semibold text-amber-400" : "text-slate-400"
+                    }`}
+                  >
                     {count > 1 ? count : ""}
                   </span>
                 </button>
@@ -250,6 +292,16 @@ export default function Calendar() {
         <p className="mt-8 text-slate-400">No cases on this day.</p>
       ) : (
         <div className="mt-5 space-y-2">
+          <div className="flex items-center justify-between">
+            {selectedWarnings.length > 0 ? (
+              <span className="text-xs text-amber-400">⚠ {selectedWarnings[0]}</span>
+            ) : (
+              <span />
+            )}
+            <Link to={`/runsheet?date=${selectedDate}`} className="text-xs font-medium text-sky-400">
+              Run sheet →
+            </Link>
+          </div>
           {selectedCases.map((c) => {
             const readiness = computeReadiness(c, templates, inventory, facilities);
             const score = scoreCase(c, readiness, inventory, certs);
@@ -267,14 +319,25 @@ export default function Calendar() {
                   flagged ? "border-red-800 bg-red-950/30" : "border-slate-700 bg-slate-800/50"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-white">
-                    {c.surgery_type === "KNEE" ? "Knee" : c.surgery_type === "HIP" ? "Hip" : "Instrument"}
-                    {c.variant === "partial" ? " · Partial" : ""}
-                    {c.side ? ` · ${c.side === "LEFT" ? "L" : "R"}` : ""}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-2 font-medium text-white">
+                    <span
+                      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                        caseRepId(c) === profile?.id
+                          ? "bg-sky-500/20 text-sky-300"
+                          : "bg-slate-700 text-slate-300"
+                      }`}
+                    >
+                      {repInitials(profiles.find((p) => p.id === caseRepId(c)))}
+                    </span>
+                    <span className="truncate">
+                      {c.surgery_type === "KNEE" ? "Knee" : c.surgery_type === "HIP" ? "Hip" : "Instrument"}
+                      {c.variant === "partial" ? " · Partial" : ""}
+                      {c.side ? ` · ${c.side === "LEFT" ? "L" : "R"}` : ""}
+                    </span>
                   </span>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${scoreStyle[score.color]}`}
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${scoreStyle[score.color]}`}
                   >
                     {score.color === "green" ? "● Ready" : score.color === "yellow" ? "● Check" : "● At risk"}
                   </span>

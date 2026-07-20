@@ -18,7 +18,16 @@ trunk. Built with React + Vite + Supabase.
   (TKA/THA/Partial Knee/Partial Hip) and checked against live inventory at that case's facility.
   Gaps show red, right down to which other facility has the item — tapping a case opens the full
   checklist, and a gap has a one-tap "Move to [facility]" action wired straight into the
-  inventory move flow.
+  inventory move flow. Case cards carry the covering rep's initials (explicit assignment, else
+  whoever created the case), and an Everyone/Mine toggle filters the whole calendar — dots,
+  counts, and cards — to just your cases. Days with 3+ cases get an amber count, and heavy days
+  show a load warning above the case list.
+- **Day-of run sheet** (`/runsheet`, also the "Today" chip on Home) — the selected day as a
+  chronological timeline: start time (TBA last), case, facility, surgeon, rep initials, readiness
+  badge, and case notes, with plain-language load warnings up top ("Heavy day: 3 cases",
+  "Cases at 2 facilities — plan travel time", "Two cases start at the same time at X and Y —
+  someone needs coverage", "1 case still TBA"). Tapping a case opens the full readiness
+  checklist; a "Staging →" button jumps to the staging report for the same day.
 - **Staging report** (`/staging`, the killer feature) — pick a day (defaults to tomorrow) and it
   rolls up every case that day into one run sheet: a haul list grouped by "from facility → to
   facility" with a one-tap move per item, a count of what's already staged, anything required
@@ -374,8 +383,10 @@ src/lib/staging.ts        # rolls up a day's cases into the haul list + loaner s
 src/lib/loaners.ts        # loaner return countdown + extend/swap suggestion engine
 src/lib/activity.ts       # turns movements rows into plain-language feed sentences
 src/lib/packlist.ts       # surgeon-preference-driven pack list / demand aggregation engine
+src/lib/runsheet.ts       # day ordering, load warnings, rep initials/attribution
 src/hooks/useAuth.tsx     # session + profile state
 src/pages/Calendar.tsx    # Week + month calendar views (route: /cases)
+src/pages/RunSheet.tsx    # day-of chronological run sheet (route: /runsheet)
 src/pages/StagingReport.tsx  # the staging report (route: /staging)
 src/pages/LoanerReturns.tsx  # the loaner return countdown (route: /loaners)
 src/pages/ActivityFeed.tsx   # the team activity feed (route: /activity)
