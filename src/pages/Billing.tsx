@@ -97,6 +97,24 @@ export default function Billing() {
                     {c.purchase_order_no ? ` · PO ${c.purchase_order_no}` : " · no PO on file"}
                     {c.invoice_no ? ` · Inv ${c.invoice_no}` : ""}
                   </p>
+                  {(() => {
+                    if (c.billing_status === "paid" || c.billing_status === "none" || !c.billing_updated_at)
+                      return null;
+                    const days = Math.floor(
+                      (Date.now() - new Date(c.billing_updated_at).getTime()) / 86400000,
+                    );
+                    if (days < 1) return null;
+                    return (
+                      <p
+                        className={`mt-1 text-xs font-medium ${
+                          days >= 14 ? "text-red-400" : days >= 7 ? "text-amber-400" : "text-slate-500"
+                        }`}
+                      >
+                        ⏱ {days} day{days === 1 ? "" : "s"} in this stage
+                        {days >= 14 ? " — chase it" : ""}
+                      </p>
+                    );
+                  })()}
                 </div>
               );
             })}

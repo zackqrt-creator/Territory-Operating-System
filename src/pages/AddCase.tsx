@@ -9,7 +9,9 @@ import {
   listFacilities,
   listInventory,
   listRecentMovements,
+  listProfiles,
   listSurgeons,
+  listTimeOff,
   listUpcomingCases,
   updateLastFacility,
 } from "../lib/api";
@@ -19,9 +21,11 @@ import type {
   Facility,
   InventoryItem,
   Movement,
+  Profile,
   Side,
   Surgeon,
   SurgeryType,
+  TimeOff,
 } from "../lib/types";
 import { buildPreferenceCard, type SuggestedItem, type SuggestionMode } from "../lib/crm";
 import { dayLoadWarnings } from "../lib/runsheet";
@@ -119,6 +123,8 @@ function QuickAddForm({
     movements: Movement[];
     inventory: InventoryItem[];
   } | null>(null);
+  const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
+  const [teamProfiles, setTeamProfiles] = useState<Profile[]>([]);
   const [mode, setMode] = useState<SuggestionMode>("frequent");
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [manualItems, setManualItems] = useState<SuggestedItem[]>([]);
@@ -128,6 +134,8 @@ function QuickAddForm({
     Promise.all([listUpcomingCases(), listRecentMovements(500), listInventory()])
       .then(([c, m, i]) => setHistory({ cases: c, movements: m, inventory: i }))
       .catch(() => {});
+    listTimeOff().then(setTimeOff).catch(() => {});
+    listProfiles().then(setTeamProfiles).catch(() => {});
   }, []);
 
   const matchedSurgeon = surgeons.find(
@@ -171,6 +179,7 @@ function QuickAddForm({
         )
       : [];
   const facName = (id: string | null) => facilities.find((f) => f.id === id)?.name ?? "—";
+  const outThatDay = timeOff.filter((t) => t.start_date <= date && t.end_date >= date);
 
   /** Resolves the typed surgeon name to an existing profile (case-insensitive),
    * creating a new one if it doesn't match — so pack-list preferences can
@@ -240,6 +249,17 @@ function QuickAddForm({
           className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
         />
       </div>
+
+      {outThatDay.length > 0 && (
+        <div className="rounded-xl border border-violet-800/60 bg-violet-950/25 p-3">
+          {outThatDay.map((t) => (
+            <p key={t.id} className="text-sm font-medium text-violet-300">
+              🏖️ {teamProfiles.find((p) => p.id === t.rep_id)?.display_name ?? "A teammate"} is out
+              this day{t.reason ? ` (${t.reason})` : ""} — plan coverage.
+            </p>
+          ))}
+        </div>
+      )}
 
       {sameDayCases.length > 0 && (
         <div className="rounded-xl border border-amber-800 bg-amber-950/25 p-3">

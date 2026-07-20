@@ -47,6 +47,18 @@ export interface CaseRow {
   purchase_order_no: string | null;
   invoice_no: string | null;
   billing_status: BillingStatus;
+  /** When the billing stage last moved; null until the first change. */
+  billing_updated_at: string | null;
+  created_at: string;
+}
+
+export interface TimeOff {
+  id: string;
+  territory_id: string;
+  rep_id: string;
+  start_date: string; // YYYY-MM-DD inclusive
+  end_date: string; // YYYY-MM-DD inclusive
+  reason: string | null;
   created_at: string;
 }
 

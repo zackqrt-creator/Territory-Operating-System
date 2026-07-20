@@ -13,6 +13,7 @@ import type {
   EntityNote,
   NoteEntityType,
   TaskStatus,
+  TimeOff,
   CaseRow,
   CaseTemplateWithItems,
   CatalogItem,
@@ -713,7 +714,38 @@ export async function updateCaseBilling(
   caseId: string,
   patch: { billing_status?: BillingStatus; purchase_order_no?: string | null; invoice_no?: string | null },
 ): Promise<void> {
-  const { error } = await supabase.from("cases").update(patch).eq("id", caseId);
+  const stamped = patch.billing_status
+    ? { ...patch, billing_updated_at: new Date().toISOString() }
+    : patch;
+  const { error } = await supabase.from("cases").update(stamped).eq("id", caseId);
+  if (error) throw error;
+}
+
+// ---- Time off ---------------------------------------------------------------
+
+export async function listTimeOff(): Promise<TimeOff[]> {
+  const { data, error } = await supabase
+    .from("rep_time_off")
+    .select("*")
+    .order("start_date", { ascending: true });
+  if (error) throw error;
+  return data as TimeOff[];
+}
+
+export async function createTimeOff(input: {
+  territory_id: string;
+  rep_id: string;
+  start_date: string;
+  end_date: string;
+  reason?: string | null;
+}): Promise<TimeOff> {
+  const { data, error } = await supabase.from("rep_time_off").insert(input).select().single();
+  if (error) throw error;
+  return data as TimeOff;
+}
+
+export async function deleteTimeOff(id: string): Promise<void> {
+  const { error } = await supabase.from("rep_time_off").delete().eq("id", id);
   if (error) throw error;
 }
 

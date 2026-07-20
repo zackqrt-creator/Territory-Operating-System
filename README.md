@@ -149,10 +149,19 @@ trunk. Built with React + Vite + Supabase.
     becomes with this case added ("Heavy day: 3 cases", "Two cases start at the same time at
     X and Y — someone needs coverage") — *before* you save, not after.
   - **Overdue-task badge** — the Tasks chip on Home carries a red count of tasks overdue or
-    due today, so open items can't hide.
+    due today, so open items can't hide. The Q&A chip counts unanswered questions the same way.
+  - **Time off / block-out days** (migration 018) — the 🏖️ button on the Calendar opens a
+    team time-off list: mark yourself out with a date range and reason, and the whole team
+    sees it on the calendar day ("Matt Rivera is out (vacation)") *and* as a purple warning
+    when anyone tries to schedule a case on a day you're gone. You can only add/remove your
+    own time off (RLS-enforced).
+  - **Billing aging** (migration 018) — every unpaid case in the pipeline shows how long it's
+    been sitting in its current stage ("⏱ 17 days in this stage — chase it": amber at 7 days,
+    red at 14). The clock starts the first time a stage moves, so no fake ages on old rows.
   - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` then `013_entity_notes.sql`
     then `014_manager_locations.sql` then `015_wall_categories.sql` then
-    `016_task_assignment_and_followups.sql` then `017_note_pins.sql`.
+    `016_task_assignment_and_followups.sql` then `017_note_pins.sql` then
+    `018_time_off_and_billing_aging.sql`.
   - **Global notes search** (`/notes`, Notes chip on Home) — every note the team has written,
     across cases, surgeons, facilities, and items, in one searchable place with filter chips.
     Type "cement" or "door code" and find it, with what it's attached to.

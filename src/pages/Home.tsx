@@ -15,6 +15,8 @@ import {
   listCatalogItems,
   listRepCertifications,
   listMyTasks,
+  listQaQuestions,
+  listQaAnswers,
 } from "../lib/api";
 import type {
   BoardPost,
@@ -50,6 +52,7 @@ export default function Home() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [certs, setCerts] = useState<RepCertification[]>([]);
   const [myTasks, setMyTasks] = useState<PersonalTask[]>([]);
+  const [openQuestions, setOpenQuestions] = useState(0);
   const [loading, setLoading] = useState(true);
 
   function refresh() {
@@ -65,7 +68,9 @@ export default function Home() {
       listCatalogItems(),
       listRepCertifications(),
       listMyTasks(),
-    ]).then(async ([c, i, f, t, m, p, b, fc, cat, rc, mt]) => {
+      listQaQuestions(),
+      listQaAnswers(),
+    ]).then(async ([c, i, f, t, m, p, b, fc, cat, rc, mt, qq, qa]) => {
       setCases(c);
       setItems(i);
       setFacilities(f);
@@ -77,6 +82,8 @@ export default function Home() {
       setCatalog(cat);
       setCerts(rc);
       setMyTasks(mt);
+      const answered = new Set(qa.map((a) => a.question_id));
+      setOpenQuestions(qq.filter((q) => !answered.has(q.id)).length);
       const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
       setActivityCases(await listCasesByIds(caseIds));
     });
@@ -274,7 +281,7 @@ export default function Home() {
               { to: "/runsheet", icon: "📋", label: "Today", badge: 0 },
               { to: "/tasks", icon: "☑️", label: "Tasks", badge: urgentTasks },
               { to: "/notes", icon: "🗒️", label: "Notes", badge: 0 },
-              { to: "/qa", icon: "❓", label: "Q&A", badge: 0 },
+              { to: "/qa", icon: "❓", label: "Q&A", badge: openQuestions },
               { to: "/billing", icon: "💵", label: "Billing", badge: 0 },
               { to: "/compliance", icon: "🪪", label: "Creds", badge: 0 },
             ].map((l) => (

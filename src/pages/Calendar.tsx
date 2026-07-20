@@ -7,6 +7,7 @@ import {
   listInventory,
   listProfiles,
   listRepCertifications,
+  listTimeOff,
 } from "../lib/api";
 import type {
   CaseRow,
@@ -15,12 +16,14 @@ import type {
   InventoryItem,
   Profile,
   RepCertification,
+  TimeOff,
 } from "../lib/types";
 import { computeReadiness } from "../lib/readiness";
 import { scoreCase, type ScoreColor } from "../lib/crm";
 import { caseRepId, dayLoadWarnings, repInitials } from "../lib/runsheet";
 import { useAuth } from "../hooks/useAuth";
 import ReadinessSheet from "../components/ReadinessSheet";
+import TimeOffSheet from "../components/TimeOffSheet";
 import {
   addDays,
   addMonths,
@@ -49,8 +52,10 @@ export default function Calendar() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [certs, setCerts] = useState<RepCertification[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCase, setOpenCase] = useState<CaseRow | null>(null);
+  const [showTimeOff, setShowTimeOff] = useState(false);
 
   const days = useMemo(() => weekDays(wStart), [wStart]);
   const gridDays = useMemo(() => monthGridDays(mAnchor), [mAnchor]);
@@ -66,14 +71,16 @@ export default function Calendar() {
       listInventory(),
       listRepCertifications(),
       listProfiles(),
+      listTimeOff(),
     ])
-      .then(([c, f, t, i, rc, p]) => {
+      .then(([c, f, t, i, rc, p, to]) => {
         setCases(c);
         setFacilities(f);
         setTemplates(t);
         setInventory(i);
         setCerts(rc);
         setProfiles(p);
+        setTimeOff(to);
       })
       .finally(() => setLoading(false));
   }
@@ -143,14 +150,26 @@ export default function Calendar() {
   const facilityName = (id: string | null) => facilities.find((f) => f.id === id)?.name ?? "—";
   const selectedCases = casesByDay.get(selectedDate) ?? [];
   const selectedWarnings = dayLoadWarnings(selectedCases, facilities);
+  const selectedTimeOff = timeOff.filter(
+    (t) => t.start_date <= selectedDate && t.end_date >= selectedDate,
+  );
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Calendar</h1>
-        <Link to="/cases/new" className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white">
-          + Add
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowTimeOff(true)}
+            className="rounded-lg bg-slate-800 px-3 py-2 text-sm"
+            title="Time off"
+          >
+            🏖️
+          </button>
+          <Link to="/cases/new" className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white">
+            + Add
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between">
@@ -292,6 +311,21 @@ export default function Calendar() {
         </div>
       )}
 
+      {selectedTimeOff.length > 0 && (
+        <p className="mt-3 rounded-lg border border-violet-800/60 bg-violet-950/25 px-3 py-2 text-sm text-violet-300">
+          🏖️{" "}
+          {selectedTimeOff
+            .map((t) => {
+              const who =
+                t.rep_id === profile?.id
+                  ? "You are"
+                  : `${profiles.find((p) => p.id === t.rep_id)?.display_name ?? "A teammate"} is`;
+              return `${who} out${t.reason ? ` (${t.reason})` : ""}`;
+            })
+            .join(" · ")}
+        </p>
+      )}
+
       {loading ? (
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : selectedCases.length === 0 ? (
@@ -359,6 +393,8 @@ export default function Calendar() {
           })}
         </div>
       )}
+
+      {showTimeOff && <TimeOffSheet onClose={() => setShowTimeOff(false)} onChanged={refresh} />}
 
       {openCase && (
         <ReadinessSheet
