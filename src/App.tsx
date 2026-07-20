@@ -20,6 +20,7 @@ import Tasks from "./pages/Tasks";
 import NotesSearch from "./pages/NotesSearch";
 import RunSheet from "./pages/RunSheet";
 import BottomNav from "./components/BottomNav";
+import BackLink from "./components/BackLink";
 
 function App() {
   const { session, profile, loading } = useAuth();
@@ -44,6 +45,7 @@ function App() {
 
   return (
     <>
+      <BackLink />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/cases" element={<Calendar />} />
