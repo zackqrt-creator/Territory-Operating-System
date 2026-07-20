@@ -6,6 +6,7 @@ import {
   deleteEntityNote,
   listEntityNotes,
   listProfiles,
+  setNotePinned,
   updateEntityNote,
 } from "../lib/api";
 import type { EntityNote, NoteEntityType, Profile } from "../lib/types";
@@ -38,6 +39,41 @@ export default function NotesSection({
   const [followUpId, setFollowUpId] = useState<string | null>(null);
   const [followUpDate, setFollowUpDate] = useState(tomorrow());
   const [followUpDone, setFollowUpDone] = useState<Set<string>>(new Set());
+  const [dictating, setDictating] = useState(false);
+
+  // Browser speech-to-text, where the platform offers it (iOS/Android/Chrome).
+  // No API, no server — and the button simply doesn't render elsewhere.
+  const SpeechRec =
+    typeof window !== "undefined"
+      ? ((window as unknown as Record<string, unknown>).SpeechRecognition ??
+        (window as unknown as Record<string, unknown>).webkitSpeechRecognition)
+      : undefined;
+
+  function startDictation() {
+    if (!SpeechRec) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec = new (SpeechRec as any)();
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    setDictating(true);
+    setAdding(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      const text = Array.from(e.results)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((r: any) => r[0]?.transcript ?? "")
+        .join(" ")
+        .trim();
+      if (text) setDraft((prev) => (prev ? `${prev} ${text}` : text));
+    };
+    rec.onend = () => setDictating(false);
+    rec.onerror = () => setDictating(false);
+    try {
+      rec.start();
+    } catch {
+      setDictating(false);
+    }
+  }
 
   function refresh() {
     return listEntityNotes(entityType, entityId).then(setNotes);
@@ -92,6 +128,16 @@ export default function NotesSection({
     }
   }
 
+  async function onTogglePin(note: EntityNote) {
+    setBusy(true);
+    try {
+      await setNotePinned(note.id, !note.pinned);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onCreateFollowUp(note: EntityNote) {
     if (!profile) return;
     setBusy(true);
@@ -119,13 +165,36 @@ export default function NotesSection({
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
           {title}{notes.length > 0 ? ` (${notes.length})` : ""}
         </p>
-        {!adding && (
-          <button
-            onClick={() => setAdding(true)}
-            className="min-h-0 rounded-lg bg-sky-600 px-2.5 py-1 text-xs font-medium text-white"
-          >
-            + Add note
-          </button>
+        {!adding ? (
+          <span className="flex items-center gap-1.5">
+            {!!SpeechRec && (
+              <button
+                onClick={startDictation}
+                className="min-h-0 rounded-lg bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200"
+                title="Dictate a note"
+              >
+                🎙️
+              </button>
+            )}
+            <button
+              onClick={() => setAdding(true)}
+              className="min-h-0 rounded-lg bg-sky-600 px-2.5 py-1 text-xs font-medium text-white"
+            >
+              + Add note
+            </button>
+          </span>
+        ) : (
+          !!SpeechRec && (
+            <button
+              onClick={startDictation}
+              disabled={dictating}
+              className={`min-h-0 rounded-lg px-2.5 py-1 text-xs font-medium ${
+                dictating ? "animate-pulse bg-red-700 text-white" : "bg-slate-700 text-slate-200"
+              }`}
+            >
+              {dictating ? "● Listening…" : "🎙️ Dictate"}
+            </button>
+          )
         )}
       </div>
 
@@ -165,7 +234,9 @@ export default function NotesSection({
       )}
 
       <div className="mt-2 space-y-2">
-        {notes.map((n) =>
+        {[...notes]
+          .sort((a, b) => Number(b.pinned ?? false) - Number(a.pinned ?? false))
+          .map((n) =>
           editingId === n.id ? (
             <div key={n.id}>
               <textarea
@@ -192,7 +263,17 @@ export default function NotesSection({
               </div>
             </div>
           ) : (
-            <div key={n.id} className="rounded-lg bg-slate-800/60 px-3 py-2">
+            <div
+              key={n.id}
+              className={`rounded-lg px-3 py-2 ${
+                n.pinned ? "border border-amber-800/60 bg-amber-950/20" : "bg-slate-800/60"
+              }`}
+            >
+              {n.pinned && (
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+                  📌 Pinned
+                </p>
+              )}
               <p className="whitespace-pre-wrap text-sm text-slate-200">{n.body}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span>
@@ -231,6 +312,13 @@ export default function NotesSection({
                 )}
                 {n.author_id === profile?.id && (
                   <>
+                    <button
+                      onClick={() => onTogglePin(n)}
+                      disabled={busy}
+                      className="min-h-0 text-amber-400 underline"
+                    >
+                      {n.pinned ? "unpin" : "pin"}
+                    </button>
                     <button
                       onClick={() => {
                         setEditingId(n.id);

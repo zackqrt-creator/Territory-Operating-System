@@ -129,6 +129,11 @@ trunk. Built with React + Vite + Supabase.
     (this thread is team-visible by design). Every note also has an **"⏰ follow up"** action:
     pick a date and it creates a linked task ("Follow up: <the note>") on your board, so intel
     written down in the field actually carries forward instead of dying in the thread.
+    **🎙️ Dictation** — on phones/browsers with speech recognition, a mic button dictates a note
+    hands-free (on-device browser API, nothing sent to a server; the button simply doesn't
+    appear where unsupported). **📌 Pins** (migration 017) — pin your note and it floats to the
+    top of its thread with an amber highlight, for the stuff that never changes ("door code is
+    4471", "ALWAYS bring extra 13mm inserts").
   - **Regional manager locations + in-app location editing** — "Matt Inventory (RM)" and
     "Karl Inventory (RM)" are seeded as inventory locations (migration 014), and the
     Compliance page has a **Locations** card where anyone on the team can rename any
@@ -139,9 +144,15 @@ trunk. Built with React + Vite + Supabase.
     left to haul, loaners to ship or still inbound, and a door-check warning if a credential
     lapses before tomorrow's case — with one-tap Run sheet and Staging buttons for that exact
     day. Green card = walk out the door; red card = fix something tonight.
+  - **Schedule-conflict warnings at case entry** — the Add-case form previews the chosen day
+    as you pick the date: what's already scheduled (time, type, facility) and what the day
+    becomes with this case added ("Heavy day: 3 cases", "Two cases start at the same time at
+    X and Y — someone needs coverage") — *before* you save, not after.
+  - **Overdue-task badge** — the Tasks chip on Home carries a red count of tasks overdue or
+    due today, so open items can't hide.
   - Run `011_crm_foundation.sql` then `012_personal_tasks.sql` then `013_entity_notes.sql`
     then `014_manager_locations.sql` then `015_wall_categories.sql` then
-    `016_task_assignment_and_followups.sql`.
+    `016_task_assignment_and_followups.sql` then `017_note_pins.sql`.
   - **Global notes search** (`/notes`, Notes chip on Home) — every note the team has written,
     across cases, surgeons, facilities, and items, in one searchable place with filter chips.
     Type "cement" or "door code" and find it, with what it's attached to.

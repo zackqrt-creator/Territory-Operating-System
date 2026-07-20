@@ -14,6 +14,7 @@ import {
   listFacilityCredentials,
   listCatalogItems,
   listRepCertifications,
+  listMyTasks,
 } from "../lib/api";
 import type {
   BoardPost,
@@ -24,6 +25,7 @@ import type {
   Facility,
   InventoryItem,
   Movement,
+  PersonalTask,
   Profile,
   RepCertification,
 } from "../lib/types";
@@ -47,6 +49,7 @@ export default function Home() {
   const [credentials, setCredentials] = useState<FacilityCredential[]>([]);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [certs, setCerts] = useState<RepCertification[]>([]);
+  const [myTasks, setMyTasks] = useState<PersonalTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   function refresh() {
@@ -61,7 +64,8 @@ export default function Home() {
       listFacilityCredentials(),
       listCatalogItems(),
       listRepCertifications(),
-    ]).then(async ([c, i, f, t, m, p, b, fc, cat, rc]) => {
+      listMyTasks(),
+    ]).then(async ([c, i, f, t, m, p, b, fc, cat, rc, mt]) => {
       setCases(c);
       setItems(i);
       setFacilities(f);
@@ -72,6 +76,7 @@ export default function Home() {
       setCredentials(fc);
       setCatalog(cat);
       setCerts(rc);
+      setMyTasks(mt);
       const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
       setActivityCases(await listCasesByIds(caseIds));
     });
@@ -125,6 +130,11 @@ export default function Home() {
     (i) => i.expiration_date && !i.loaner_code && daysUntil(i.expiration_date) <= 30,
   );
   const expiredCount = expiryFlags.filter((i) => daysUntil(i.expiration_date!) < 0).length;
+
+  // Tasks needing attention now: overdue or due today, not done.
+  const urgentTasks = myTasks.filter(
+    (t) => t.status !== "done" && t.due_date && daysUntil(t.due_date) <= 0,
+  ).length;
 
   const doorChecks = credentialConflicts(credentials, cases, facilities, profiles, today);
   const lotSuggestions = expiringLotSuggestions(
@@ -261,18 +271,23 @@ export default function Home() {
 
           <div className="grid grid-cols-6 gap-1.5">
             {[
-              { to: "/runsheet", icon: "📋", label: "Today" },
-              { to: "/tasks", icon: "☑️", label: "Tasks" },
-              { to: "/notes", icon: "🗒️", label: "Notes" },
-              { to: "/qa", icon: "❓", label: "Q&A" },
-              { to: "/billing", icon: "💵", label: "Billing" },
-              { to: "/compliance", icon: "🪪", label: "Creds" },
+              { to: "/runsheet", icon: "📋", label: "Today", badge: 0 },
+              { to: "/tasks", icon: "☑️", label: "Tasks", badge: urgentTasks },
+              { to: "/notes", icon: "🗒️", label: "Notes", badge: 0 },
+              { to: "/qa", icon: "❓", label: "Q&A", badge: 0 },
+              { to: "/billing", icon: "💵", label: "Billing", badge: 0 },
+              { to: "/compliance", icon: "🪪", label: "Creds", badge: 0 },
             ].map((l) => (
               <Link
                 key={l.to}
                 to={l.to}
-                className="rounded-xl border border-slate-700 bg-slate-800/50 px-2 py-3 text-center active:bg-slate-800"
+                className="relative rounded-xl border border-slate-700 bg-slate-800/50 px-2 py-3 text-center active:bg-slate-800"
               >
+                {l.badge > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {l.badge}
+                  </span>
+                )}
                 <span className="text-xl">{l.icon}</span>
                 <p className="mt-1 text-xs font-medium text-slate-300">{l.label}</p>
               </Link>

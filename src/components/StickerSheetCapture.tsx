@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { consumeStickerUsage, createTask, listCatalogItems, listProfiles } from "../lib/api";
+import {
+  completeCase,
+  consumeStickerUsage,
+  createTask,
+  listCatalogItems,
+  listProfiles,
+} from "../lib/api";
 import type { CaseRow, CatalogItem, Facility, InventoryItem, Profile } from "../lib/types";
 import {
   buildReorderNotes,
@@ -43,6 +49,7 @@ export default function StickerSheetCapture({
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [assignTo, setAssignTo] = useState<string | null>(null);
+  const [markComplete, setMarkComplete] = useState(caseRow.status !== "completed");
   const [stickers, setStickers] = useState<SheetSticker[]>([]);
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [pages, setPages] = useState(0);
@@ -135,6 +142,9 @@ export default function StickerSheetCapture({
         territory_id: profile.territory_id,
         owner_id: profile.id,
       });
+      if (markComplete && caseRow.status !== "completed") {
+        await completeCase(caseRow.id);
+      }
       setResult({ deducted: unitCount, flagged: flagged.length });
       onDone();
     } catch {
@@ -271,6 +281,16 @@ export default function StickerSheetCapture({
                   })}
                 </div>
 
+                {caseRow.status !== "completed" && (
+                  <label className="mt-4 flex items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={markComplete}
+                      onChange={(e) => setMarkComplete(e.target.checked)}
+                    />
+                    Mark this case completed
+                  </label>
+                )}
                 {teammates.length > 0 && (
                   <div className="mt-4">
                     <p className="mb-1 text-xs text-slate-500">Reorder task for</p>

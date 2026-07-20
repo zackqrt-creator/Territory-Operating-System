@@ -308,6 +308,8 @@ export interface EntityNote {
   entity_type: NoteEntityType;
   entity_id: string;
   body: string;
+  /** Floats to the top of its thread; author-controlled. */
+  pinned: boolean;
   created_at: string;
   updated_at: string | null;
 }

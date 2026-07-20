@@ -24,7 +24,8 @@ import type {
   SurgeryType,
 } from "../lib/types";
 import { buildPreferenceCard, type SuggestedItem, type SuggestionMode } from "../lib/crm";
-import { nextWednesday } from "../utils/dates";
+import { dayLoadWarnings } from "../lib/runsheet";
+import { formatTime, nextWednesday } from "../utils/dates";
 import { dedupeByCaseId, parsePasteText } from "../utils/parsePaste";
 import { dedupeMyopsRows, parseMyopsCsv } from "../utils/parseMyopsCsv";
 
@@ -151,6 +152,26 @@ function QuickAddForm({
     }
   }, [facilities, lastFacilityId, facilityId]);
 
+  // Conflict preview: what does this day look like once the new case is on it?
+  const sameDayCases = (history?.cases ?? []).filter(
+    (c) => c.surgery_date === date && c.status === "scheduled",
+  );
+  const prospective = {
+    id: "draft",
+    surgery_date: date,
+    surgery_time: null,
+    time_tba: true,
+    facility_id: facilityId || null,
+  } as CaseRow;
+  const loadWarnings =
+    sameDayCases.length > 0
+      ? dayLoadWarnings([...sameDayCases, prospective], facilities).filter(
+          // The draft always counts as TBA — don't nag about its own missing time.
+          (w) => !w.includes("TBA"),
+        )
+      : [];
+  const facName = (id: string | null) => facilities.find((f) => f.id === id)?.name ?? "—";
+
   /** Resolves the typed surgeon name to an existing profile (case-insensitive),
    * creating a new one if it doesn't match — so pack-list preferences can
    * find this case later without you having to pick from a separate list. */
@@ -219,6 +240,28 @@ function QuickAddForm({
           className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
         />
       </div>
+
+      {sameDayCases.length > 0 && (
+        <div className="rounded-xl border border-amber-800 bg-amber-950/25 p-3">
+          <p className="text-sm font-medium text-amber-200">
+            Already on this day ({sameDayCases.length}):
+          </p>
+          <div className="mt-1 space-y-0.5">
+            {sameDayCases.slice(0, 4).map((c) => (
+              <p key={c.id} className="text-sm text-amber-100/80">
+                {c.time_tba || !c.surgery_time ? "TBA" : formatTime(c.surgery_time)} ·{" "}
+                {c.surgery_type === "KNEE" ? "Knee" : c.surgery_type === "HIP" ? "Hip" : "Instr"}
+                {c.side ? ` ${c.side === "LEFT" ? "L" : "R"}` : ""} · {facName(c.facility_id)}
+              </p>
+            ))}
+          </div>
+          {loadWarnings.map((w) => (
+            <p key={w} className="mt-1 text-sm font-medium text-amber-300">
+              ⚠ {w}
+            </p>
+          ))}
+        </div>
+      )}
 
       <div>
         <label className="mb-1 block text-sm text-slate-400">Type</label>

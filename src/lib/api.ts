@@ -414,6 +414,16 @@ export async function logCaseUsage(params: {
  * case, and logs an audit movement. Clears any prior extension, since the
  * clock has restarted for this use.
  */
+export async function setNotePinned(id: string, pinned: boolean): Promise<void> {
+  const { error } = await supabase.from("entity_notes").update({ pinned }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function completeCase(caseId: string): Promise<void> {
+  const { error } = await supabase.from("cases").update({ status: "completed" }).eq("id", caseId);
+  if (error) throw error;
+}
+
 /**
  * Deduct the confirmed sticker-sheet allocations from inventory, one audit
  * movement per row touched. Caller has already shown the review screen —

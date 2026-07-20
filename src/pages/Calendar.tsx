@@ -84,11 +84,17 @@ export default function Calendar() {
   }, [view, wStart, mAnchor]);
 
   function goWeek(delta: number) {
+    // Carry the selection along so the case list below never goes stale.
+    setSelectedDate((d) => addDays(d, delta * 7));
     setWStart((w) => addDays(w, delta * 7));
   }
 
   function goMonth(delta: number) {
-    setMAnchor((m) => addMonths(m, delta));
+    setMAnchor((m) => {
+      const next = addMonths(m, delta);
+      setSelectedDate(next);
+      return next;
+    });
   }
 
   function switchView(next: "week" | "month") {
