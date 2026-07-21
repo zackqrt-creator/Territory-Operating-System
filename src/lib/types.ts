@@ -1,4 +1,50 @@
-export type FacilityType = "storage" | "surgery_center" | "hospital" | "corporate" | "vehicle";
+export type FacilityType =
+  | "storage"
+  | "surgery_center"
+  | "hospital"
+  | "corporate"
+  | "vehicle"
+  | "sterile_processing"
+  | "warehouse";
+
+export type TrackedAssetKind = "kaone_set" | "revision_tote";
+
+export type AssetStatus =
+  | "available"
+  | "at_hospital"
+  | "in_surgery"
+  | "awaiting_pickup"
+  | "sterile_processing"
+  | "in_transit";
+
+export interface TrackedAsset {
+  id: string;
+  territory_id: string;
+  kind: TrackedAssetKind;
+  code: string;
+  label: string | null;
+  location_id: string | null;
+  status: AssetStatus;
+  available_date: string | null;
+  assigned_case_id: string | null;
+  /** Seeded shell — location/details not yet human-confirmed; UI flags it. */
+  is_placeholder: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface AssetMovement {
+  id: string;
+  territory_id: string;
+  asset_id: string;
+  from_location: string | null;
+  to_location: string | null;
+  status_after: AssetStatus | null;
+  moved_by: string | null;
+  related_case_id: string | null;
+  note: string | null;
+  created_at: string;
+}
 
 export interface Facility {
   id: string;

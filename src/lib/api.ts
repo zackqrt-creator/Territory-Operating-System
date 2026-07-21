@@ -14,6 +14,9 @@ import type {
   NoteEntityType,
   TaskStatus,
   TimeOff,
+  TrackedAsset,
+  AssetMovement,
+  AssetStatus,
   CaseRow,
   CaseTemplateWithItems,
   CatalogItem,
@@ -415,6 +418,80 @@ export async function logCaseUsage(params: {
  * case, and logs an audit movement. Clears any prior extension, since the
  * clock has restarted for this use.
  */
+// ---- Tracked assets (KAONE sets, revision totes) --------------------------
+
+export async function listTrackedAssets(): Promise<TrackedAsset[]> {
+  const { data, error } = await supabase
+    .from("tracked_assets")
+    .select("*")
+    .order("kind", { ascending: true })
+    .order("code", { ascending: true });
+  if (error) throw error;
+  return data as TrackedAsset[];
+}
+
+export async function listAssetMovements(assetId: string): Promise<AssetMovement[]> {
+  const { data, error } = await supabase
+    .from("asset_movements")
+    .select("*")
+    .eq("asset_id", assetId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as AssetMovement[];
+}
+
+/**
+ * Move / re-status a tracked asset and log the change to its history in one go.
+ * Passing is_placeholder=false stamps the asset as human-confirmed the first
+ * time a real location is set, so the UI stops flagging it as a seeded shell.
+ */
+export async function moveAsset(params: {
+  asset: TrackedAsset;
+  toLocation: string | null;
+  status: AssetStatus;
+  availableDate?: string | null;
+  relatedCaseId?: string | null;
+  movedBy: string;
+  territoryId: string;
+  note?: string | null;
+}): Promise<void> {
+  const { asset, toLocation, status, availableDate, relatedCaseId, movedBy, territoryId, note } =
+    params;
+
+  const { error: updateError } = await supabase
+    .from("tracked_assets")
+    .update({
+      location_id: toLocation,
+      status,
+      available_date: availableDate ?? asset.available_date,
+      assigned_case_id: relatedCaseId ?? asset.assigned_case_id,
+      is_placeholder: false,
+    })
+    .eq("id", asset.id);
+  if (updateError) throw updateError;
+
+  const { error: moveError } = await supabase.from("asset_movements").insert({
+    territory_id: territoryId,
+    asset_id: asset.id,
+    from_location: asset.location_id,
+    to_location: toLocation,
+    status_after: status,
+    moved_by: movedBy,
+    related_case_id: relatedCaseId ?? null,
+    note: note ?? null,
+  });
+  if (moveError) throw moveError;
+}
+
+/** Rename an asset's code/label — real set IDs are learned over time. */
+export async function updateTrackedAsset(
+  id: string,
+  patch: Partial<Pick<TrackedAsset, "code" | "label" | "notes">>,
+): Promise<void> {
+  const { error } = await supabase.from("tracked_assets").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
 export async function setNotePinned(id: string, pinned: boolean): Promise<void> {
   const { error } = await supabase.from("entity_notes").update({ pinned }).eq("id", id);
   if (error) throw error;

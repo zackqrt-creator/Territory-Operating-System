@@ -19,6 +19,7 @@ import Billing from "./pages/Billing";
 import Tasks from "./pages/Tasks";
 import NotesSearch from "./pages/NotesSearch";
 import RunSheet from "./pages/RunSheet";
+import Sets from "./pages/Sets";
 import BottomNav from "./components/BottomNav";
 import BackLink from "./components/BackLink";
 
@@ -65,6 +66,7 @@ function App() {
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/notes" element={<NotesSearch />} />
         <Route path="/runsheet" element={<RunSheet />} />
+        <Route path="/sets" element={<Sets />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

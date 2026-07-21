@@ -276,9 +276,10 @@ export default function Home() {
             <span className="text-2xl">💬</span>
           </Link>
 
-          <div className="grid grid-cols-6 gap-1.5">
+          <div className="grid grid-cols-4 gap-1.5">
             {[
               { to: "/runsheet", icon: "📋", label: "Today", badge: 0 },
+              { to: "/sets", icon: "🧰", label: "Sets", badge: 0 },
               { to: "/tasks", icon: "☑️", label: "Tasks", badge: urgentTasks },
               { to: "/notes", icon: "🗒️", label: "Notes", badge: 0 },
               { to: "/qa", icon: "❓", label: "Q&A", badge: openQuestions },
