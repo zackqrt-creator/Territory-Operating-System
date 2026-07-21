@@ -375,3 +375,31 @@ export interface EntityNote {
   created_at: string;
   updated_at: string | null;
 }
+
+/** Canonical-page-eligible records — each gets at most one wiki page. */
+export type PageEntityType = "surgeon" | "facility" | "tote_template" | "catalog_item";
+
+export interface WikiPage {
+  id: string;
+  territory_id: string;
+  title: string;
+  slug: string;
+  body: string;
+  tags: string[];
+  entity_type: PageEntityType | null;
+  entity_id: string | null;
+  pinned: boolean;
+  created_by: string | null;
+  last_edited_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PageLink {
+  id: string;
+  territory_id: string;
+  source_page_id: string;
+  target_page_id: string | null;
+  target_title: string;
+  created_at: string;
+}

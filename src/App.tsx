@@ -20,6 +20,8 @@ import Tasks from "./pages/Tasks";
 import NotesSearch from "./pages/NotesSearch";
 import RunSheet from "./pages/RunSheet";
 import Sets from "./pages/Sets";
+import Wiki from "./pages/Wiki";
+import WikiPage from "./pages/WikiPage";
 import BottomNav from "./components/BottomNav";
 import BackLink from "./components/BackLink";
 
@@ -67,6 +69,8 @@ function App() {
         <Route path="/notes" element={<NotesSearch />} />
         <Route path="/runsheet" element={<RunSheet />} />
         <Route path="/sets" element={<Sets />} />
+        <Route path="/wiki" element={<Wiki />} />
+        <Route path="/wiki/:id" element={<WikiPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

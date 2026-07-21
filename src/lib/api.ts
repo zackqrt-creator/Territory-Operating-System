@@ -31,7 +31,11 @@ import type {
   Surgeon,
   SurgeonPreference,
   ToteTemplateWithItems,
+  WikiPage,
+  PageLink,
+  PageEntityType,
 } from "./types";
+import { extractLinkTitles, slugify } from "./wikilinks";
 
 export async function listFacilities(): Promise<Facility[]> {
   const { data, error } = await supabase
@@ -1020,4 +1024,188 @@ export async function listAllEntityNotes(limit = 500): Promise<EntityNote[]> {
     .limit(limit);
   if (error) throw error;
   return data as EntityNote[];
+}
+
+// ---- Wiki pages -------------------------------------------------------
+
+export async function listPages(): Promise<WikiPage[]> {
+  const { data, error } = await supabase
+    .from("pages")
+    .select("*")
+    .order("pinned", { ascending: false })
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data as WikiPage[];
+}
+
+export async function getPage(id: string): Promise<WikiPage | null> {
+  const { data, error } = await supabase.from("pages").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as WikiPage | null;
+}
+
+export async function getPageByEntity(
+  entityType: PageEntityType,
+  entityId: string,
+): Promise<WikiPage | null> {
+  const { data, error } = await supabase
+    .from("pages")
+    .select("*")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as WikiPage | null;
+}
+
+async function uniqueSlug(territoryId: string, title: string, excludeId?: string): Promise<string> {
+  const base = slugify(title);
+  let candidate = base;
+  for (let n = 2; ; n++) {
+    let query = supabase
+      .from("pages")
+      .select("id")
+      .eq("territory_id", territoryId)
+      .eq("slug", candidate);
+    if (excludeId) query = query.neq("id", excludeId);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    if (!data) return candidate;
+    candidate = `${base}-${n}`;
+  }
+}
+
+/** Re-derives the full link graph for one page from its current body — always a full replace, never a patch. */
+async function relinkPage(territoryId: string, pageId: string, body: string): Promise<void> {
+  const { error: delErr } = await supabase.from("page_links").delete().eq("source_page_id", pageId);
+  if (delErr) throw delErr;
+
+  const titles = extractLinkTitles(body);
+  if (titles.length === 0) return;
+
+  const { data: candidates, error: findErr } = await supabase
+    .from("pages")
+    .select("id, title")
+    .eq("territory_id", territoryId)
+    .in(
+      "title",
+      titles,
+    );
+  if (findErr) throw findErr;
+  const byTitle = new Map((candidates as { id: string; title: string }[]).map((p) => [p.title.toLowerCase(), p.id]));
+
+  const rows = titles.map((title) => ({
+    territory_id: territoryId,
+    source_page_id: pageId,
+    target_page_id: byTitle.get(title.toLowerCase()) ?? null,
+    target_title: title,
+  }));
+  const { error: insErr } = await supabase.from("page_links").insert(rows);
+  if (insErr) throw insErr;
+}
+
+export async function createPage(input: {
+  territory_id: string;
+  title: string;
+  body?: string;
+  tags?: string[];
+  entity_type?: PageEntityType | null;
+  entity_id?: string | null;
+  created_by: string;
+}): Promise<WikiPage> {
+  const slug = await uniqueSlug(input.territory_id, input.title);
+  const { data, error } = await supabase
+    .from("pages")
+    .insert({
+      territory_id: input.territory_id,
+      title: input.title,
+      slug,
+      body: input.body ?? "",
+      tags: input.tags ?? [],
+      entity_type: input.entity_type ?? null,
+      entity_id: input.entity_id ?? null,
+      created_by: input.created_by,
+      last_edited_by: input.created_by,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  const page = data as WikiPage;
+  await relinkPage(page.territory_id, page.id, page.body);
+  return page;
+}
+
+/** Finds a record's canonical page, creating an empty one on first visit. */
+export async function ensureCanonicalPage(
+  territoryId: string,
+  entityType: PageEntityType,
+  entityId: string,
+  title: string,
+  authorId: string,
+): Promise<WikiPage> {
+  const existing = await getPageByEntity(entityType, entityId);
+  if (existing) return existing;
+  return createPage({
+    territory_id: territoryId,
+    title,
+    entity_type: entityType,
+    entity_id: entityId,
+    created_by: authorId,
+  });
+}
+
+export async function updatePage(
+  id: string,
+  patch: { title?: string; body?: string; tags?: string[] },
+  editorId: string,
+): Promise<WikiPage> {
+  const current = await getPage(id);
+  if (!current) throw new Error("Page not found");
+
+  const updates: Record<string, unknown> = {
+    ...patch,
+    last_edited_by: editorId,
+    updated_at: new Date().toISOString(),
+  };
+  if (patch.title && patch.title !== current.title) {
+    updates.slug = await uniqueSlug(current.territory_id, patch.title, id);
+  }
+
+  const { data, error } = await supabase.from("pages").update(updates).eq("id", id).select("*").single();
+  if (error) throw error;
+  const page = data as WikiPage;
+  if (patch.body !== undefined) await relinkPage(page.territory_id, page.id, page.body);
+  return page;
+}
+
+export async function setPagePinned(id: string, pinned: boolean): Promise<void> {
+  const { error } = await supabase.from("pages").update({ pinned }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deletePage(id: string): Promise<void> {
+  const { error } = await supabase.from("pages").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/** Pages that link to this page, plus any that reference its title but haven't resolved yet. */
+export async function listBacklinks(pageId: string, title: string): Promise<(PageLink & { source: WikiPage })[]> {
+  const { data, error } = await supabase
+    .from("page_links")
+    .select("*, source:source_page_id(*)")
+    .or(`target_page_id.eq.${pageId},target_title.ilike.${title}`);
+  if (error) throw error;
+  return data as unknown as (PageLink & { source: WikiPage })[];
+}
+
+/** Case-insensitive title/body search across every page in the territory — powers [[link]] autocomplete and global search. */
+export async function searchPages(query: string, limit = 20): Promise<WikiPage[]> {
+  const { data, error } = await supabase
+    .from("pages")
+    .select("*")
+    .or(`title.ilike.%${query}%,body.ilike.%${query}%`)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as WikiPage[];
 }

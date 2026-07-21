@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createSurgeon,
+  ensureCanonicalPage,
   listSurgeonPreferences,
   listSurgeons,
   listToteTemplatesWithItems,
@@ -110,10 +112,30 @@ function SurgeonCard({
   cases: CaseRow[];
   onSaved: () => void;
 }) {
+  const { profile } = useAuth();
+  const navigate = useNavigate();
   const [notes, setNotes] = useState(surgeon.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [openingWiki, setOpeningWiki] = useState(false);
   const dirty = notes !== (surgeon.notes ?? "");
+
+  async function onOpenWiki() {
+    if (!profile || openingWiki) return;
+    setOpeningWiki(true);
+    try {
+      const page = await ensureCanonicalPage(
+        profile.territory_id,
+        "surgeon",
+        surgeon.id,
+        surgeon.name,
+        profile.id,
+      );
+      navigate(`/wiki/${page.id}`);
+    } finally {
+      setOpeningWiki(false);
+    }
+  }
 
   async function onSave() {
     setSaving(true);
@@ -176,6 +198,14 @@ function SurgeonCard({
           ))}
         </div>
       )}
+
+      <button
+        onClick={onOpenWiki}
+        disabled={openingWiki}
+        className="mt-2 flex items-center gap-1.5 rounded-lg bg-slate-800/60 px-3 py-2 text-xs font-medium text-sky-300 disabled:opacity-50"
+      >
+        🧠 Wiki page — facility rules, set preferences, exceptions
+      </button>
 
       <NotesSection entityType="surgeon" entityId={surgeon.id} />
 

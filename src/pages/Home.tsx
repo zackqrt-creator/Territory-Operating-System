@@ -282,6 +282,7 @@ export default function Home() {
               { to: "/sets", icon: "🧰", label: "Sets", badge: 0 },
               { to: "/tasks", icon: "☑️", label: "Tasks", badge: urgentTasks },
               { to: "/notes", icon: "🗒️", label: "Notes", badge: 0 },
+              { to: "/wiki", icon: "🧠", label: "Wiki", badge: 0 },
               { to: "/qa", icon: "❓", label: "Q&A", badge: openQuestions },
               { to: "/billing", icon: "💵", label: "Billing", badge: 0 },
               { to: "/compliance", icon: "🪪", label: "Creds", badge: 0 },
