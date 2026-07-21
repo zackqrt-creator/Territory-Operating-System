@@ -154,10 +154,14 @@ function QuickAddForm({
         )
       : [];
 
+  const surgicalFacilities = facilities.filter((f) => f.type === "hospital" || f.type === "surgery_center");
+
   useEffect(() => {
-    if (!facilityId && facilities.length > 0) {
-      setFacilityId(lastFacilityId ?? facilities[0].id);
+    if (!facilityId && surgicalFacilities.length > 0) {
+      const last = surgicalFacilities.find((f) => f.id === lastFacilityId);
+      setFacilityId(last?.id ?? surgicalFacilities[0].id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facilities, lastFacilityId, facilityId]);
 
   // Conflict preview: what does this day look like once the new case is on it?
@@ -285,8 +289,8 @@ function QuickAddForm({
 
       <div>
         <label className="mb-1 block text-sm text-slate-400">Type</label>
-        <div className="grid grid-cols-3 gap-2">
-          {(["KNEE", "HIP", "INSTRUMENT"] as SurgeryType[]).map((t) => (
+        <div className="grid grid-cols-2 gap-2">
+          {(["KNEE", "HIP"] as SurgeryType[]).map((t) => (
             <button
               key={t}
               onClick={() => setType(t)}
@@ -294,7 +298,7 @@ function QuickAddForm({
                 type === t ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-400"
               }`}
             >
-              {t === "KNEE" ? "Knee" : t === "HIP" ? "Hip" : "Instrument"}
+              {t === "KNEE" ? "Knee" : "Hip"}
             </button>
           ))}
         </div>
@@ -343,7 +347,8 @@ function QuickAddForm({
           onChange={(e) => setFacilityId(e.target.value)}
           className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
         >
-          {facilities.map((f) => (
+          {/* Only real surgical sites — a case can't happen at storage, corporate, or a rep's vehicle. */}
+          {surgicalFacilities.map((f) => (
             <option key={f.id} value={f.id}>
               {f.name}
             </option>
@@ -500,11 +505,14 @@ function PasteImport({
   const [facilityId, setFacilityId] = useState(lastFacilityId ?? "");
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const surgicalFacilities = facilities.filter((f) => f.type === "hospital" || f.type === "surgery_center");
 
   useEffect(() => {
-    if (!facilityId && facilities.length > 0) {
-      setFacilityId(lastFacilityId ?? facilities[0].id);
+    if (!facilityId && surgicalFacilities.length > 0) {
+      const last = surgicalFacilities.find((f) => f.id === lastFacilityId);
+      setFacilityId(last?.id ?? surgicalFacilities[0].id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facilities, lastFacilityId, facilityId]);
 
   function onParse() {
@@ -639,7 +647,7 @@ function PasteImport({
               onChange={(e) => setFacilityId(e.target.value)}
               className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
             >
-              {facilities.map((f) => (
+              {surgicalFacilities.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}
                 </option>
