@@ -75,8 +75,9 @@ export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan 
   else if (/\bCEMENTED\b/.test(upper)) cement = "cemented";
   if (cement) fieldsRead.push("cement");
 
-  // LOT: the number after LOT (labels use 6-8 digit lots)
-  const lotMatch = upper.match(/\bLOT\s*:?\s*#?\s*(\d{5,})/);
+  // LOT: the code after LOT — often alphanumeric (e.g. "L23A456", "23-K1204"),
+  // not always pure digits, so don't require digit-only here.
+  const lotMatch = upper.match(/\bLOT\.?\s*(?:NO\.?|NUMBER|NR\.?)?\s*:?\s*#?\s*([A-Z0-9][A-Z0-9-]{3,})/);
   const lot = lotMatch ? lotMatch[1] : null;
   if (lot) fieldsRead.push("lot");
 
