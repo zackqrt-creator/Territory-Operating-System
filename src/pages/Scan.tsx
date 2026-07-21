@@ -4,6 +4,7 @@ import { findItemByBarcode, listFacilities } from "../lib/api";
 import type { Facility, InventoryItem } from "../lib/types";
 import MoveItemSheet from "../components/MoveItemSheet";
 import AddItemSheet from "../components/AddItemSheet";
+import BatchScanSheet from "../components/BatchScanSheet";
 
 const SCANNER_ID = "casetrack-scanner";
 
@@ -13,6 +14,7 @@ export default function Scan() {
   const [found, setFound] = useState<InventoryItem | null>(null);
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
+  const [batchMode, setBatchMode] = useState(false);
 
   // Scan callbacks are registered once with the camera; a ref (not state)
   // lets them see the latest "is a sheet open" value without restarting the camera.
@@ -25,7 +27,10 @@ export default function Scan() {
     listFacilities().then(setFacilities);
   }, []);
 
+  // Batch mode owns its own camera full-screen — stop this one while it's open
+  // instead of running two scanners against the same device at once.
   useEffect(() => {
+    if (batchMode) return;
     const scanner = new Html5Qrcode(SCANNER_ID);
     const startPromise = scanner
       .start(
@@ -44,7 +49,7 @@ export default function Scan() {
       startPromise.then(() => scanner.stop().catch(() => {})).catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [batchMode]);
 
   async function onDetected(code: string) {
     const item = await findItemByBarcode(code);
@@ -60,10 +65,20 @@ export default function Scan() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Scan</h1>
-      <p className="mt-1 text-sm text-slate-400">
-        Point the camera at a loaner kit or tray barcode/QR to check it in or out.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Scan</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Point the camera at a loaner kit or tray barcode/QR to check it in or out.
+          </p>
+        </div>
+        <button
+          onClick={() => setBatchMode(true)}
+          className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white"
+        >
+          📦 Batch add
+        </button>
+      </div>
 
       <div id={SCANNER_ID} className="mt-4 overflow-hidden rounded-xl" />
 
@@ -105,6 +120,14 @@ export default function Scan() {
           prefillBarcode={unknownBarcode}
           onClose={() => setUnknownBarcode(null)}
           onCreated={() => setUnknownBarcode(null)}
+        />
+      )}
+
+      {batchMode && (
+        <BatchScanSheet
+          facilities={facilities}
+          onClose={() => setBatchMode(false)}
+          onSaved={() => setBatchMode(false)}
         />
       )}
     </div>

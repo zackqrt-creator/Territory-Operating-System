@@ -12,7 +12,7 @@ import type {
 } from "../lib/types";
 import LoanerIntake from "./LoanerIntake";
 import { ocrLabel } from "../lib/ocr";
-import { parseGs1, parseLabelText } from "../lib/labelParse";
+import { catalogLabel, parseGs1, parseLabelText } from "../lib/labelParse";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "loaner_kit", label: "Loaner kit" },
@@ -80,13 +80,6 @@ const PRODUCT_LINES: Record<CatalogJoint, string[]> = {
   ],
   NA: [],
 };
-
-function catalogLabel(c: CatalogItem): string {
-  const label = [c.name];
-  if (c.side && c.side !== "NA") label.push(c.side === "LEFT" ? "Left" : "Right");
-  if (c.size_label) label.push(`Size ${c.size_label}`);
-  return label.join(" · ");
-}
 
 export default function AddItemSheet({
   facilities,

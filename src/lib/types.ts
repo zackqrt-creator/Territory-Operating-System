@@ -203,6 +203,9 @@ export interface CatalogItem {
   joint: CatalogJoint;
   /** Free-text device grouping, e.g. "Femoral Stem", "Acetabular Cup", "Bone Cement". */
   device_type: string | null;
+  /** GTIN decoded from a scanned barcode (GS1 AI 01) — what a barcode scan actually identifies, vs item_number/REF which OCR reads off the printed label. Learned the first time a rep matches a scanned GTIN to this item. */
+  gtin: string | null;
+  equivalent_loaner_code: string | null;
   created_at: string;
 }
 

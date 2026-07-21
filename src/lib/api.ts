@@ -648,6 +648,12 @@ export async function createCatalogItem(input: NewCatalogItemInput): Promise<Cat
   return data as CatalogItem;
 }
 
+/** Remembers a scanned GTIN against a catalog item so future barcode scans of the same product auto-match without asking again. */
+export async function linkCatalogItemGtin(catalogItemId: string, gtin: string): Promise<void> {
+  const { error } = await supabase.from("catalog_items").update({ gtin }).eq("id", catalogItemId);
+  if (error) throw error;
+}
+
 /** Uploads a reference photo to the public `item-photos` bucket and returns its public URL. */
 export async function uploadItemPhoto(file: File, territoryId: string): Promise<string> {
   const ext = file.name.split(".").pop() ?? "jpg";

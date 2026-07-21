@@ -118,6 +118,14 @@ export function parseGs1(raw: string): Gs1Fields | null {
   return out.gtin || out.lot || out.expiration ? out : null;
 }
 
+/** Human-readable label for a catalog item in pickers/search — name plus side/size when set. */
+export function catalogLabel(c: CatalogItem): string {
+  const label = [c.name];
+  if (c.side && c.side !== "NA") label.push(c.side === "LEFT" ? "Left" : "Right");
+  if (c.size_label) label.push(`Size ${c.size_label}`);
+  return label.join(" · ");
+}
+
 export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan {
   const upper = text.toUpperCase();
   const fieldsRead: string[] = [];
