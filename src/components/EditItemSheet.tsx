@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { deleteInventoryItem, updateInventoryItem } from "../lib/api";
+import { deleteInventoryItem, updateCatalogItemName, updateInventoryItem } from "../lib/api";
 import type { DeliveryStatus, Facility, InventoryItem, SterilizationStatus } from "../lib/types";
 import NotesSection from "./NotesSection";
+import RenameField from "./RenameField";
+import WikiLinkButton from "./WikiLinkButton";
 
 /**
  * Fix or delete an inventory item — the escape hatch for typos during bulk
@@ -80,15 +82,35 @@ export default function EditItemSheet({
         <div className="mt-4 space-y-4">
           <div>
             <label className="mb-1 block text-sm text-slate-400">
-              Name {linked && <span className="text-slate-500">(from catalog — locked)</span>}
+              Name {linked && <span className="text-slate-500">(from catalog — rename below)</span>}
             </label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={linked}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white disabled:opacity-60"
-            />
+            {linked ? (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5">
+                <RenameField
+                  value={name}
+                  textClassName="text-white"
+                  onSave={async (next) => {
+                    await updateCatalogItemName(item.catalog_item_id as string, next);
+                    setName(next);
+                  }}
+                />
+              </div>
+            ) : (
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+              />
+            )}
           </div>
+
+          {linked && (
+            <WikiLinkButton
+              entityType="catalog_item"
+              entityId={item.catalog_item_id as string}
+              title={name}
+            />
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

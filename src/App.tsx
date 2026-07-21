@@ -23,7 +23,7 @@ import Sets from "./pages/Sets";
 import Wiki from "./pages/Wiki";
 import WikiPage from "./pages/WikiPage";
 import BottomNav from "./components/BottomNav";
-import BackLink from "./components/BackLink";
+import TopBar from "./components/TopBar";
 
 function App() {
   const { session, profile, loading } = useAuth();
@@ -48,7 +48,7 @@ function App() {
 
   return (
     <>
-      <BackLink />
+      <TopBar />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/cases" element={<Calendar />} />

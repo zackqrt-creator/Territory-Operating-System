@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   createSurgeon,
-  ensureCanonicalPage,
   listSurgeonPreferences,
   listSurgeons,
   listToteTemplatesWithItems,
   listUpcomingCases,
+  updateSurgeonName,
   updateSurgeonNotes,
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import NotesSection from "../components/NotesSection";
+import RenameField from "../components/RenameField";
+import WikiLinkButton from "../components/WikiLinkButton";
 import type { CaseRow, Surgeon, SurgeonPreference, ToteTemplateWithItems } from "../lib/types";
 import { formatDateShort } from "../utils/dates";
 
@@ -112,30 +113,10 @@ function SurgeonCard({
   cases: CaseRow[];
   onSaved: () => void;
 }) {
-  const { profile } = useAuth();
-  const navigate = useNavigate();
   const [notes, setNotes] = useState(surgeon.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [openingWiki, setOpeningWiki] = useState(false);
   const dirty = notes !== (surgeon.notes ?? "");
-
-  async function onOpenWiki() {
-    if (!profile || openingWiki) return;
-    setOpeningWiki(true);
-    try {
-      const page = await ensureCanonicalPage(
-        profile.territory_id,
-        "surgeon",
-        surgeon.id,
-        surgeon.name,
-        profile.id,
-      );
-      navigate(`/wiki/${page.id}`);
-    } finally {
-      setOpeningWiki(false);
-    }
-  }
 
   async function onSave() {
     setSaving(true);
@@ -167,7 +148,17 @@ function SurgeonCard({
 
   return (
     <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-      <h2 className="font-semibold text-white">{surgeon.name}</h2>
+      <div className="flex items-center justify-between gap-2">
+        <RenameField
+          value={surgeon.name}
+          textClassName="font-semibold text-white"
+          onSave={async (next) => {
+            await updateSurgeonName(surgeon.id, next);
+            onSaved();
+          }}
+        />
+        <WikiLinkButton entityType="surgeon" entityId={surgeon.id} title={surgeon.name} label="Wiki" className="shrink-0" />
+      </div>
 
       {done.length > 0 && (
         <div className="mt-2 rounded-lg bg-slate-800/50 p-2.5">
@@ -198,14 +189,6 @@ function SurgeonCard({
           ))}
         </div>
       )}
-
-      <button
-        onClick={onOpenWiki}
-        disabled={openingWiki}
-        className="mt-2 flex items-center gap-1.5 rounded-lg bg-slate-800/60 px-3 py-2 text-xs font-medium text-sky-300 disabled:opacity-50"
-      >
-        🧠 Wiki page — facility rules, set preferences, exceptions
-      </button>
 
       <NotesSection entityType="surgeon" entityId={surgeon.id} />
 

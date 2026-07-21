@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { listFacilities, listTrackedAssets, moveAsset, updateTrackedAsset } from "../lib/api";
-import type { AssetStatus, Facility, TrackedAsset } from "../lib/types";
+import {
+  listFacilities,
+  listToteTemplatesWithItems,
+  listTrackedAssets,
+  moveAsset,
+  updateToteTemplateName,
+  updateTrackedAsset,
+} from "../lib/api";
+import type { AssetStatus, Facility, ToteTemplateWithItems, TrackedAsset } from "../lib/types";
 import { formatDateShort } from "../utils/dates";
+import RenameField from "../components/RenameField";
+import WikiLinkButton from "../components/WikiLinkButton";
 
 const STATUS_META: Record<AssetStatus, { label: string; cls: string; dot: string }> = {
   available: { label: "Available", cls: "bg-emerald-500/15 text-emerald-300", dot: "bg-emerald-400" },
@@ -32,15 +41,17 @@ export default function Sets() {
   const { profile } = useAuth();
   const [assets, setAssets] = useState<TrackedAsset[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [templates, setTemplates] = useState<ToteTemplateWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<TrackedAsset | null>(null);
 
   function refresh() {
     setLoading(true);
-    return Promise.all([listTrackedAssets(), listFacilities()])
-      .then(([a, f]) => {
+    return Promise.all([listTrackedAssets(), listFacilities(), listToteTemplatesWithItems()])
+      .then(([a, f, t]) => {
         setAssets(a);
         setFacilities(f);
+        setTemplates(t);
       })
       .finally(() => setLoading(false));
   }
@@ -76,6 +87,47 @@ export default function Sets() {
           Two revision totes must be available for every surgery day, no matter how many cases.
         </p>
       </div>
+
+      {!loading && templates.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            Set definitions
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            What's in each set, and who it goes to — rename here, edit the rules on its wiki page.
+          </p>
+          <div className="mt-2 space-y-2">
+            {templates.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-slate-700 bg-slate-800/50 p-3"
+              >
+                <div className="min-w-0">
+                  <RenameField
+                    value={t.name}
+                    textClassName="font-medium text-white"
+                    onSave={async (next) => {
+                      await updateToteTemplateName(t.id, next);
+                      await refresh();
+                    }}
+                  />
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {t.tote_template_items.length} item{t.tote_template_items.length === 1 ? "" : "s"}
+                    {t.reusable ? " · reusable instrument set" : ""}
+                  </p>
+                </div>
+                <WikiLinkButton
+                  entityType="tote_template"
+                  entityId={t.id}
+                  title={t.name}
+                  label="Wiki"
+                  className="shrink-0"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <p className="mt-8 text-slate-400">Loading...</p>

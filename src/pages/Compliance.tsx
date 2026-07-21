@@ -13,6 +13,7 @@ import {
 import type { CaseRow, Facility, FacilityCredential, Profile, RepCertification } from "../lib/types";
 import { credentialConflicts } from "../lib/crm";
 import NotesSection from "../components/NotesSection";
+import WikiLinkButton from "../components/WikiLinkButton";
 import { daysUntil, formatDateShort, toISODate } from "../utils/dates";
 
 /**
@@ -276,7 +277,7 @@ function FacilityEditor({ facility, onSaved }: { facility: Facility; onSaved: ()
 
   if (!editing) {
     return (
-      <div className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-800/60 px-3 py-2">
         <div className="min-w-0">
           <p className="truncate text-sm text-slate-200">
             {facility.name}
@@ -284,12 +285,15 @@ function FacilityEditor({ facility, onSaved }: { facility: Facility; onSaved: ()
           </p>
           {facility.address && <p className="truncate text-xs text-slate-500">{facility.address}</p>}
         </div>
-        <button
-          onClick={() => setEditing(true)}
-          className="min-h-0 shrink-0 text-xs text-sky-400 underline"
-        >
-          Edit
-        </button>
+        <span className="flex shrink-0 items-center gap-2">
+          <WikiLinkButton entityType="facility" entityId={facility.id} title={facility.name} label="Wiki" />
+          <button
+            onClick={() => setEditing(true)}
+            className="min-h-0 shrink-0 text-xs text-sky-400 underline"
+          >
+            Edit
+          </button>
+        </span>
       </div>
     );
   }

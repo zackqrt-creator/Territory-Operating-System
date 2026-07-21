@@ -679,6 +679,21 @@ export async function updateSurgeonNotes(surgeonId: string, notes: string): Prom
   if (error) throw error;
 }
 
+export async function updateSurgeonName(surgeonId: string, name: string): Promise<void> {
+  const { error } = await supabase.from("surgeons").update({ name }).eq("id", surgeonId);
+  if (error) throw error;
+}
+
+export async function updateToteTemplateName(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from("tote_templates").update({ name }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateCatalogItemName(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from("catalog_items").update({ name }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function listSurgeonPreferences(): Promise<SurgeonPreference[]> {
   const { data, error } = await supabase.from("surgeon_preferences").select("*");
   if (error) throw error;
