@@ -12,7 +12,7 @@ import type {
 } from "../lib/types";
 import LoanerIntake from "./LoanerIntake";
 import { ocrLabel } from "../lib/ocr";
-import { parseLabelText } from "../lib/labelParse";
+import { parseGs1, parseLabelText } from "../lib/labelParse";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "loaner_kit", label: "Loaner kit" },
@@ -135,6 +135,22 @@ export default function AddItemSheet({
   useEffect(() => {
     listCatalogItems().then(setCatalog);
   }, []);
+
+  // A scanned data-matrix barcode is a GS1 UDI string, not a plain code — pull
+  // lot (AI 10) and expiration (AI 17) straight out of it, since those AIs are
+  // defined by the standard. Store the GTIN as the barcode value (cleaner and
+  // stable) rather than the whole raw element string.
+  useEffect(() => {
+    if (!prefillBarcode) return;
+    const gs1 = parseGs1(prefillBarcode);
+    if (!gs1) return;
+    if (gs1.lot) setLot((prev) => prev || gs1.lot!);
+    if (gs1.expiration) setExpiration((prev) => prev || gs1.expiration!);
+    if (gs1.gtin) setBarcode(gs1.gtin);
+    setScanNote(
+      `Read from barcode — lot ${gs1.lot ?? "?"}${gs1.expiration ? `, exp ${gs1.expiration}` : ""}. Pick the product and verify before saving.`,
+    );
+  }, [prefillBarcode]);
 
   const filteredCatalog = catalog.filter((c) => c.joint === joint);
 

@@ -34,6 +34,90 @@ function normalizeRef(raw: string): string {
   return raw.toUpperCase().replace(/\s+/g, "").replace(/O/g, "0");
 }
 
+export interface Gs1Fields {
+  gtin: string | null;
+  lot: string | null;
+  expiration: string | null; // YYYY-MM-DD
+}
+
+/** Fixed-length GS1 Application Identifiers we care about (data length after the AI). */
+const GS1_FIXED_LEN: Record<string, number> = {
+  "01": 14, // GTIN
+  "11": 6, // production date YYMMDD
+  "15": 6, // best-before
+  "17": 6, // expiration YYMMDD
+};
+
+/** YYMMDD → YYYY-MM-DD. Day "00" (GS1 "end of month") becomes the month's last day. */
+function gs1Date(yymmdd: string): string | null {
+  if (!/^\d{6}$/.test(yymmdd)) return null;
+  const year = 2000 + Number(yymmdd.slice(0, 2));
+  const month = Number(yymmdd.slice(2, 4));
+  let day = Number(yymmdd.slice(4, 6));
+  if (month < 1 || month > 12) return null;
+  if (day === 0) day = new Date(year, month, 0).getDate(); // last day of month
+  if (day < 1 || day > 31) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * Parses a GS1 UDI element string — the barcode on every Medacta box, and
+ * the "UDI (01)…(17)…(10)…" line printed beneath it. This is the reliable
+ * source of truth for lot/expiration/GTIN, since the AIs are defined by the
+ * standard: (01) GTIN, (17) expiration, (10) lot/batch.
+ *
+ * Handles both forms:
+ *  - human/OCR parenthesized:  (01)07630345716248(17)301014(10)2520862
+ *  - raw scanner output:       0107630345716248 17301014 10 2520862  with
+ *    optional FNC1/GS (\x1d) separators after variable-length fields.
+ * Returns null if it doesn't look like a GS1 string at all.
+ */
+export function parseGs1(raw: string): Gs1Fields | null {
+  const out: Gs1Fields = { gtin: null, lot: null, expiration: null };
+  const setAI = (ai: string, value: string) => {
+    const v = value.trim();
+    if (!v) return;
+    if (ai === "01") out.gtin = v.replace(/\D/g, "");
+    else if (ai === "17") out.expiration = gs1Date(v.replace(/\D/g, "")) ?? out.expiration;
+    else if (ai === "10") out.lot = v;
+  };
+
+  // Parenthesized form — what OCR reads off the printed UDI line.
+  if (raw.includes("(")) {
+    let found = false;
+    for (const m of raw.matchAll(/\((\d{2,4})\)\s*([^(]*)/g)) {
+      found = true;
+      setAI(m[1], m[2].replace(/\s+/g, ""));
+    }
+    return found && (out.gtin || out.lot || out.expiration) ? out : null;
+  }
+
+  // Raw element-string form (barcode scanners). Walk AI by AI; variable-length
+  // fields (like lot, AI 10) run until a GS separator or end of string.
+  const GS = String.fromCharCode(29); // ASCII 29 group separator
+  // Keep GS separators; strip only ordinary whitespace a scanner may inject.
+  const s = raw.replace(/[ \t\r\n]+/g, "");
+  if (!/^\d{2}/.test(s)) return null;
+  let i = 0;
+  let steps = 0;
+  while (i + 2 <= s.length && steps++ < 20) {
+    const ai = s.slice(i, i + 2);
+    i += 2;
+    const fixed = GS1_FIXED_LEN[ai];
+    if (fixed) {
+      setAI(ai, s.slice(i, i + fixed));
+      i += fixed;
+    } else {
+      // Variable-length: consume up to the next GS separator or end.
+      const gsIdx = s.indexOf(GS, i);
+      const end = gsIdx === -1 ? s.length : gsIdx;
+      setAI(ai, s.slice(i, end));
+      i = gsIdx === -1 ? s.length : gsIdx + 1;
+    }
+  }
+  return out.gtin || out.lot || out.expiration ? out : null;
+}
+
 export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan {
   const upper = text.toUpperCase();
   const fieldsRead: string[] = [];
@@ -75,27 +159,37 @@ export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan 
   else if (/\bCEMENTED\b/.test(upper)) cement = "cemented";
   if (cement) fieldsRead.push("cement");
 
-  // LOT: labels print "LOT" and its code in adjacent boxed cells, not always
-  // as contiguous text — OCR on a boxed/table layout doesn't reliably keep a
-  // cell's label and value textually adjacent, so instead of requiring the
-  // code right after "LOT", scan a window past it for the first
-  // digit-containing token that isn't another field's label or the REF code.
-  const LOT_STOPWORDS = new Set([
-    "LOT", "SIZE", "SIDE", "REF", "GTIN", "HEIGHT", "CEMENTED", "CEMENTLESS",
-    "LEFT", "RIGHT", "COMPONENT", "FEMORAL", "TIBIAL", "INSERT",
-  ]);
-  let lot: string | null = null;
-  const lotKeywordIdx = upper.search(/\bLOT\b/);
-  if (lotKeywordIdx !== -1) {
-    const window = upper.slice(lotKeywordIdx, lotKeywordIdx + 60);
-    const tokens = window.match(/\b[A-Z0-9][A-Z0-9-]{3,10}\b/g) ?? [];
-    lot = tokens.find((t) => /\d/.test(t) && !LOT_STOPWORDS.has(t)) ?? null;
+  // Most reliable source for lot + expiration: the GS1 UDI line printed under
+  // the barcode, e.g. "UDI (01)07630345716248(17)301014(10)2520862". The AIs
+  // are defined by the standard — (10) lot, (17) expiration — so this beats
+  // reading the boxed "LOT"/hourglass cells, which OCR reorders unpredictably.
+  const gs1 = parseGs1(text);
+
+  // LOT: prefer the UDI (10) value; else fall back to scanning past the "LOT"
+  // keyword for the first digit-containing token that isn't another field's
+  // label — labels print "LOT" and its code in adjacent cells, and OCR on a
+  // boxed layout doesn't reliably keep them textually adjacent.
+  let lot: string | null = gs1?.lot ?? null;
+  if (!lot) {
+    const LOT_STOPWORDS = new Set([
+      "LOT", "SIZE", "SIDE", "REF", "GTIN", "HEIGHT", "CEMENTED", "CEMENTLESS",
+      "LEFT", "RIGHT", "COMPONENT", "FEMORAL", "TIBIAL", "INSERT",
+    ]);
+    const lotKeywordIdx = upper.search(/\bLOT\b/);
+    if (lotKeywordIdx !== -1) {
+      const window = upper.slice(lotKeywordIdx, lotKeywordIdx + 60);
+      const tokens = window.match(/\b[A-Z0-9][A-Z0-9-]{3,10}\b/g) ?? [];
+      lot = tokens.find((t) => /\d/.test(t) && !LOT_STOPWORDS.has(t)) ?? null;
+    }
   }
   if (lot) fieldsRead.push("lot");
 
-  // Expiration: a 20xx-mm-dd date (the hourglass line on the label)
-  const expMatch = text.match(/\b(20\d{2})[-/.](\d{2})[-/.](\d{2})\b/);
-  const expiration = expMatch ? `${expMatch[1]}-${expMatch[2]}-${expMatch[3]}` : null;
+  // Expiration: prefer UDI (17); else the printed 20xx-mm-dd hourglass line.
+  let expiration: string | null = gs1?.expiration ?? null;
+  if (!expiration) {
+    const expMatch = text.match(/\b(20\d{2})[-/.](\d{2})[-/.](\d{2})\b/);
+    expiration = expMatch ? `${expMatch[1]}-${expMatch[2]}-${expMatch[3]}` : null;
+  }
   if (expiration) fieldsRead.push("expiration");
 
   return { refText, match, side, size, height, cement, lot, expiration, fieldsRead };
