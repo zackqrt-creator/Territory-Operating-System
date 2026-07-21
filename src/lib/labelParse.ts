@@ -75,10 +75,22 @@ export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan 
   else if (/\bCEMENTED\b/.test(upper)) cement = "cemented";
   if (cement) fieldsRead.push("cement");
 
-  // LOT: the code after LOT — often alphanumeric (e.g. "L23A456", "23-K1204"),
-  // not always pure digits, so don't require digit-only here.
-  const lotMatch = upper.match(/\bLOT\.?\s*(?:NO\.?|NUMBER|NR\.?)?\s*:?\s*#?\s*([A-Z0-9][A-Z0-9-]{3,})/);
-  const lot = lotMatch ? lotMatch[1] : null;
+  // LOT: labels print "LOT" and its code in adjacent boxed cells, not always
+  // as contiguous text — OCR on a boxed/table layout doesn't reliably keep a
+  // cell's label and value textually adjacent, so instead of requiring the
+  // code right after "LOT", scan a window past it for the first
+  // digit-containing token that isn't another field's label or the REF code.
+  const LOT_STOPWORDS = new Set([
+    "LOT", "SIZE", "SIDE", "REF", "GTIN", "HEIGHT", "CEMENTED", "CEMENTLESS",
+    "LEFT", "RIGHT", "COMPONENT", "FEMORAL", "TIBIAL", "INSERT",
+  ]);
+  let lot: string | null = null;
+  const lotKeywordIdx = upper.search(/\bLOT\b/);
+  if (lotKeywordIdx !== -1) {
+    const window = upper.slice(lotKeywordIdx, lotKeywordIdx + 60);
+    const tokens = window.match(/\b[A-Z0-9][A-Z0-9-]{3,10}\b/g) ?? [];
+    lot = tokens.find((t) => /\d/.test(t) && !LOT_STOPWORDS.has(t)) ?? null;
+  }
   if (lot) fieldsRead.push("lot");
 
   // Expiration: a 20xx-mm-dd date (the hourglass line on the label)
