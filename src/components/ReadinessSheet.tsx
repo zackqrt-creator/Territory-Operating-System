@@ -34,7 +34,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   loaner_kit: "Loaner kit",
   instrument_tray: "Instrument tray",
   implant: "Implant",
-  consumable: "Consumable",
+  consumable: "Efficiency",
 };
 
 const STATUS_ICON: Record<string, string> = {

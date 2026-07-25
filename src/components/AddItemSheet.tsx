@@ -18,7 +18,7 @@ const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "loaner_kit", label: "Loaner kit" },
   { value: "instrument_tray", label: "Instrument tray" },
   { value: "implant", label: "Implant" },
-  { value: "consumable", label: "Consumable" },
+  { value: "consumable", label: "Efficiency" },
 ];
 
 const JOINTS: { value: CatalogJoint; label: string }[] = [
@@ -56,7 +56,7 @@ const DEVICE_TYPES: Record<CatalogJoint, string[]> = {
     "Revision Acetabular",
     "Bone Cement",
   ],
-  NA: ["Consumable", "Hardware"],
+  NA: ["Efficiency General Kit", "Efficiency Tibial Tray", "Efficiency Femoral Component", "Hardware"],
 };
 
 const PRODUCT_LINES: Record<CatalogJoint, string[]> = {

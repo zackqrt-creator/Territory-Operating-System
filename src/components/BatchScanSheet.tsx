@@ -8,7 +8,7 @@ import type { CatalogItem, Facility, ItemCategory } from "../lib/types";
 const SCANNER_ID = "casetrack-batch-scanner";
 const CATEGORY_OPTIONS: { value: ItemCategory; label: string }[] = [
   { value: "implant", label: "Implant" },
-  { value: "consumable", label: "Consumable" },
+  { value: "consumable", label: "Efficiency" },
   { value: "instrument_tray", label: "Instrument tray" },
   { value: "loaner_kit", label: "Loaner kit" },
 ];
