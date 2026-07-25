@@ -54,6 +54,11 @@ export default function BatchScanSheet({
 
   const rowsRef = useRef<BatchRow[]>([]);
   rowsRef.current = rows;
+  // The scan callback is registered once with the camera, so it closes over the
+  // mount-time catalog ([]). Mirror it into a ref (like rows) so GTIN lookups
+  // see the loaded catalog instead of always missing.
+  const catalogRef = useRef<CatalogItem[]>([]);
+  catalogRef.current = catalog;
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
 
   useEffect(() => {
@@ -104,7 +109,7 @@ export default function BatchScanSheet({
       return;
     }
 
-    const match = gs1.gtin ? catalog.find((c) => c.gtin === gs1.gtin) : undefined;
+    const match = gs1.gtin ? catalogRef.current.find((c) => c.gtin === gs1.gtin) : undefined;
     const row: BatchRow = {
       id: crypto.randomUUID(),
       gtin: gs1.gtin,
@@ -231,7 +236,23 @@ export default function BatchScanSheet({
                       {row.picking ? (
                         <p className="text-sm font-medium text-amber-400">⚠ Unrecognized — pick the product</p>
                       ) : (
-                        <p className="truncate font-medium text-white">{row.name}</p>
+                        <>
+                          <p className="truncate font-medium text-white">{row.name}</p>
+                          {(() => {
+                            const cat = catalog.find((c) => c.id === row.catalogItemId);
+                            const bits: string[] = [];
+                            if (cat?.size_label) bits.push(`Size ${cat.size_label}`);
+                            if (cat?.side && cat.side !== "NA")
+                              bits.push(cat.side === "LEFT" ? "Left" : "Right");
+                            if (row.cementType)
+                              bits.push(row.cementType === "cemented" ? "Cemented" : "Cementless");
+                            return bits.length ? (
+                              <p className="mt-0.5 text-xs font-medium text-sky-300/90">
+                                {bits.join(" · ")}
+                              </p>
+                            ) : null;
+                          })()}
+                        </>
                       )}
                       <p className="mt-0.5 text-xs text-slate-500">
                         {row.lot ? `Lot ${row.lot}` : "Lot unread"}
