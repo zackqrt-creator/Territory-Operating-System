@@ -70,12 +70,12 @@ export default function WikiPageView() {
     const matches = await searchPages(title, 5);
     const exact = matches.find((m) => m.title.toLowerCase() === title.toLowerCase());
     if (exact) {
-      navigate(`/wiki/${exact.id}`);
+      navigate(`/pages/${exact.id}`);
       return;
     }
     if (!profile) return;
     const created = await createPage({ territory_id: profile.territory_id, title, created_by: profile.id });
-    navigate(`/wiki/${created.id}`);
+    navigate(`/pages/${created.id}`);
   }
 
   async function onSave() {
@@ -102,7 +102,7 @@ export default function WikiPageView() {
     if (!page) return;
     if (!confirm(`Delete "${page.title}"? This can't be undone.`)) return;
     await deletePage(page.id);
-    navigate("/wiki");
+    navigate("/pages");
   }
 
   if (loading) return <div className="min-h-screen px-4 pt-6 text-slate-400">Loading...</div>;
@@ -214,7 +214,7 @@ export default function WikiPageView() {
               {backlinks.map((l) => (
                 <button
                   key={l.id}
-                  onClick={() => navigate(`/wiki/${l.source_page_id}`)}
+                  onClick={() => navigate(`/pages/${l.source_page_id}`)}
                   className="block w-full rounded-lg bg-slate-800/60 px-3 py-2 text-left text-sm text-sky-300"
                 >
                   {l.source?.title ?? "Untitled"}

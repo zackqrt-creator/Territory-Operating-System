@@ -23,12 +23,12 @@ const ROUTE_TITLES: { test: (path: string) => boolean; title: string }[] = [
   { test: (p) => p === "/billing", title: "Billing" },
   { test: (p) => p === "/tasks", title: "Tasks" },
   { test: (p) => p === "/notes", title: "Notes" },
-  { test: (p) => p === "/notes/second-brain", title: "Second brain queue" },
+  { test: (p) => p === "/notes/review", title: "Review queue" },
   { test: (p) => p.startsWith("/notes/"), title: "Note" },
+  { test: (p) => p === "/pages", title: "Knowledge base" },
+  { test: (p) => p.startsWith("/pages/"), title: "Page" },
   { test: (p) => p === "/runsheet", title: "Run sheet" },
   { test: (p) => p === "/sets", title: "Sets & totes" },
-  { test: (p) => p === "/wiki", title: "Wiki" },
-  { test: (p) => p.startsWith("/wiki/"), title: "Wiki page" },
 ];
 
 function titleFor(pathname: string): string | null {

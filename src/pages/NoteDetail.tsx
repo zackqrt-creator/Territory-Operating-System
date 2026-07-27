@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Lock, Users, Pin, Sparkles } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
   deleteNote,
@@ -203,15 +204,17 @@ export default function NoteDetail() {
           onClick={() =>
             patch({ visibility: (note.visibility === "private" ? "team" : "private") as TerritoryNoteVisibility })
           }
-          className="rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-300"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-300"
         >
-          {note.visibility === "private" ? "🔒 Private" : "👥 Team"} — tap to change
+          {note.visibility === "private" ? <Lock className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+          {note.visibility === "private" ? "Private" : "Team"} — tap to change
         </button>
         <button
           onClick={() => patch({ pinned: !note.pinned })}
-          className="rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-300"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-300"
         >
-          {note.pinned ? "📌 Pinned" : "Pin note"}
+          <Pin className={`h-4 w-4 ${note.pinned ? "text-amber-400" : ""}`} />
+          {note.pinned ? "Pinned" : "Pin note"}
         </button>
         <button
           onClick={() => patch({ archived: !note.archived })}
@@ -223,7 +226,9 @@ export default function NoteDetail() {
 
       {note.ai_summary && (
         <div className="mt-4 rounded-xl border border-sky-800/60 bg-sky-950/20 p-3">
-          <p className="text-xs font-medium text-sky-300">🧠 AI summary</p>
+          <p className="flex items-center gap-1.5 text-xs font-medium text-sky-300">
+            <Sparkles className="h-3.5 w-3.5" /> AI summary
+          </p>
           <p className="mt-1 text-sm text-sky-100">{note.ai_summary}</p>
         </div>
       )}

@@ -393,6 +393,8 @@ export type TerritoryNoteType =
   | "hospital"
   | "inventory"
   | "replenishment"
+  | "logistics"
+  | "playbook"
   | "loaner"
   | "consignment"
   | "surgeon"

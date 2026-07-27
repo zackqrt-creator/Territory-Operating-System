@@ -1123,6 +1123,31 @@ export async function setSecondBrainStatus(id: string, status: SecondBrainStatus
   if (error) throw error;
 }
 
+/**
+ * Promote a raw capture note into a durable knowledge page. Creates a page
+ * from the note's title/body (+ AI summary if present), then marks the note
+ * synced and stashes the new page id in second_brain_path so the note links
+ * to the knowledge it became.
+ */
+export async function promoteNoteToPage(
+  note: TerritoryNote,
+  profileId: string,
+): Promise<WikiPage> {
+  const body = note.ai_summary ? `${note.ai_summary}\n\n---\n\n${note.body}` : note.body;
+  const page = await createPage({
+    territory_id: note.territory_id,
+    title: note.title,
+    body,
+    created_by: profileId,
+  });
+  const { error } = await supabase
+    .from("territory_notes")
+    .update({ second_brain_status: "synced", second_brain_path: page.id })
+    .eq("id", note.id);
+  if (error) throw error;
+  return page;
+}
+
 export async function listSecondBrainQueue(): Promise<TerritoryNote[]> {
   const { data, error } = await supabase
     .from("territory_second_brain_queue")

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
@@ -17,15 +17,21 @@ import QaWall from "./pages/QaWall";
 import Compliance from "./pages/Compliance";
 import Billing from "./pages/Billing";
 import Tasks from "./pages/Tasks";
+import RunSheet from "./pages/RunSheet";
+import Sets from "./pages/Sets";
 import Notes from "./pages/Notes";
 import NoteDetail from "./pages/NoteDetail";
 import SecondBrainQueue from "./pages/SecondBrainQueue";
-import RunSheet from "./pages/RunSheet";
-import Sets from "./pages/Sets";
-import Wiki from "./pages/Wiki";
-import WikiPage from "./pages/WikiPage";
+import Knowledge from "./pages/Wiki";
+import NotePage from "./pages/WikiPage";
 import BottomNav from "./components/BottomNav";
 import TopBar from "./components/TopBar";
+
+/** Legacy /wiki/:id bookmarks now live under /pages/:id. */
+function WikiRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/pages/${id}`} replace />;
+}
 
 function App() {
   const { session, profile, loading } = useAuth();
@@ -69,12 +75,14 @@ function App() {
         <Route path="/billing" element={<Billing />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/notes" element={<Notes />} />
-        <Route path="/notes/second-brain" element={<SecondBrainQueue />} />
+        <Route path="/notes/review" element={<SecondBrainQueue />} />
         <Route path="/notes/:id" element={<NoteDetail />} />
+        <Route path="/pages" element={<Knowledge />} />
+        <Route path="/pages/:id" element={<NotePage />} />
         <Route path="/runsheet" element={<RunSheet />} />
         <Route path="/sets" element={<Sets />} />
-        <Route path="/wiki" element={<Wiki />} />
-        <Route path="/wiki/:id" element={<WikiPage />} />
+        <Route path="/wiki" element={<Navigate to="/pages" replace />} />
+        <Route path="/wiki/:id" element={<WikiRedirect />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

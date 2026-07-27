@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { NotebookPen } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { ensureCanonicalPage } from "../lib/api";
 import type { PageEntityType } from "../lib/types";
@@ -13,7 +14,7 @@ export default function WikiLinkButton({
   entityType,
   entityId,
   title,
-  label = "Wiki page",
+  label = "Open note",
   className = "",
 }: {
   entityType: PageEntityType;
@@ -31,7 +32,7 @@ export default function WikiLinkButton({
     setOpening(true);
     try {
       const page = await ensureCanonicalPage(profile.territory_id, entityType, entityId, title, profile.id);
-      navigate(`/wiki/${page.id}`);
+      navigate(`/notes/${page.id}`);
     } finally {
       setOpening(false);
     }
@@ -43,7 +44,7 @@ export default function WikiLinkButton({
       disabled={opening}
       className={`flex items-center gap-1.5 rounded-lg bg-slate-800/60 px-3 py-2 text-xs font-medium text-sky-300 disabled:opacity-50 ${className}`}
     >
-      🧠 {opening ? "Opening…" : label}
+      <NotebookPen className="h-3.5 w-3.5" /> {opening ? "Opening…" : label}
     </button>
   );
 }

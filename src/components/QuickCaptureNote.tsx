@@ -1,20 +1,10 @@
 import { useState } from "react";
+import { Lock, Users, Link2 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { createNote, linkNoteToEntity, listFacilities, listUpcomingCases } from "../lib/api";
 import type { CaseRow, Facility, TerritoryNoteType, TerritoryNoteVisibility } from "../lib/types";
+import { NOTE_KINDS } from "../lib/noteKinds";
 import { formatDateShort } from "../utils/dates";
-
-const TYPE_OPTIONS: { value: TerritoryNoteType; label: string }[] = [
-  { value: "general", label: "General" },
-  { value: "case", label: "Case" },
-  { value: "hospital", label: "Hospital" },
-  { value: "inventory", label: "Inventory" },
-  { value: "replenishment", label: "Replenishment" },
-  { value: "loaner", label: "Loaner" },
-  { value: "surgeon", label: "Surgeon" },
-  { value: "meeting", label: "Meeting" },
-  { value: "idea", label: "Idea" },
-];
 
 /**
  * Mobile-first note capture: title + body + type, private by default. A rep
@@ -109,23 +99,36 @@ export default function QuickCaptureNote({
           className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-white placeholder:text-slate-500"
         />
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {TYPE_OPTIONS.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setNoteType(t.value)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${
-                noteType === t.value ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-400"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
+          {NOTE_KINDS.map((k) => {
+            const Icon = k.Icon;
+            const on = noteType === k.value;
+            return (
+              <button
+                key={k.value}
+                onClick={() => setNoteType(k.value)}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium ${
+                  on ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300"
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{k.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2.5">
-          <span className="text-sm text-slate-300">
-            {visibility === "private" ? "🔒 Private (only you)" : "👥 Team"}
+          <span className="flex items-center gap-1.5 text-sm text-slate-300">
+            {visibility === "private" ? (
+              <>
+                <Lock className="h-4 w-4" /> Private (only you)
+              </>
+            ) : (
+              <>
+                <Users className="h-4 w-4" /> Team
+              </>
+            )}
           </span>
           <button
             onClick={() => setVisibility(visibility === "private" ? "team" : "private")}
@@ -136,8 +139,8 @@ export default function QuickCaptureNote({
         </div>
 
         {!showLink ? (
-          <button onClick={openLinkPicker} className="mt-3 text-sm font-medium text-sky-400">
-            + Link to a case or facility
+          <button onClick={openLinkPicker} className="mt-3 flex items-center gap-1.5 text-sm font-medium text-sky-400">
+            <Link2 className="h-4 w-4" /> Link to a case or facility
           </button>
         ) : (
           <div className="mt-3 space-y-2">

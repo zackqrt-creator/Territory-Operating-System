@@ -1,5 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  Plus,
+  Stethoscope,
+  ShieldAlert,
+  AlertTriangle,
+  Clock,
+  Truck,
+  RotateCcw,
+  Package,
+  CheckSquare,
+  Activity as ActivityIcon,
+  CalendarDays,
+  ArrowRight,
+  MessageSquare,
+  ChevronRight,
+} from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
   listUpcomingCases,
@@ -14,8 +30,6 @@ import {
   listCatalogItems,
   listRepCertifications,
   listMyTasks,
-  listQaQuestions,
-  listQaAnswers,
 } from "../lib/api";
 import type {
   BoardPost,
@@ -49,7 +63,6 @@ export default function Home() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [certs, setCerts] = useState<RepCertification[]>([]);
   const [myTasks, setMyTasks] = useState<PersonalTask[]>([]);
-  const [openQuestions, setOpenQuestions] = useState(0);
   const [loading, setLoading] = useState(true);
 
   function refresh() {
@@ -64,9 +77,7 @@ export default function Home() {
       listCatalogItems(),
       listRepCertifications(),
       listMyTasks(),
-      listQaQuestions(),
-      listQaAnswers(),
-    ]).then(async ([c, i, f, t, m, p, b, cat, rc, mt, qq, qa]) => {
+    ]).then(async ([c, i, f, t, m, p, b, cat, rc, mt]) => {
       setCases(c);
       setItems(i);
       setFacilities(f);
@@ -77,8 +88,6 @@ export default function Home() {
       setCatalog(cat);
       setCerts(rc);
       setMyTasks(mt);
-      const answered = new Set(qa.map((a) => a.question_id));
-      setOpenQuestions(qq.filter((q) => !answered.has(q.id)).length);
       const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
       setActivityCases(await listCasesByIds(caseIds));
     });
@@ -89,8 +98,6 @@ export default function Home() {
   }, []);
 
   const today = new Date().toISOString().slice(0, 10);
-  const upcoming = cases.filter((c) => c.surgery_date >= today && c.status === "scheduled");
-  const nextSevenDays = upcoming.filter((c) => daysUntil(c.surgery_date) <= 7);
   const loanerReport = buildLoanerReport(items, cases, templates, facilities, daysUntil, toISODate(new Date()));
   const urgentLoaners = loanerReport.filter((s) => s.urgency === "overdue" || s.urgency === "urgent");
 
@@ -99,6 +106,8 @@ export default function Home() {
     [cases, templates, items, facilities],
   );
   const haulCount = staging.routes.reduce((sum, r) => sum + r.items.length, 0);
+
+  const todayCases = cases.filter((c) => c.surgery_date === today && c.status === "scheduled");
 
   // Case-day autopilot: everything tomorrow needs, scored, in one card.
   const tomorrowISO = tomorrow();
@@ -176,234 +185,280 @@ export default function Home() {
       {loading ? (
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : (
-        <div className="mt-6 space-y-4">
-          {reserveAlerts.length > 0 && (
-            <div className="rounded-xl border border-red-700 bg-red-950/50 p-4">
-              <h2 className="text-sm font-medium text-red-200">🚨 Reserve storage was used</h2>
+        <div className="mt-6 space-y-6">
+          <Link
+            to="/cases/new"
+            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-3.5 text-base font-semibold text-white shadow-lg shadow-sky-950/60 active:from-sky-600 active:to-sky-700"
+          >
+            <Plus className="h-5 w-5" /> Add case
+          </Link>
+
+          {/* ── Needs attention ─────────────────────────────── */}
+          {(reserveAlerts.length > 0 ||
+            expiryFlags.length > 0 ||
+            tomorrowScores.red > 0 ||
+            urgentLoaners.length > 0 ||
+            urgentTasks > 0) && (
+            <section>
+              <SectionHeader icon={ShieldAlert} title="Needs attention" tone="danger" />
               <div className="mt-2 space-y-2">
                 {reserveAlerts.map((entry) => (
-                  <div key={entry.id} className="rounded-lg bg-red-950/40 p-2">
-                    <p className="text-sm text-red-100">{entry.text}</p>
+                  <div key={entry.id} className="rounded-xl border border-red-700 bg-red-950/50 p-3">
+                    <p className="flex items-start gap-2 text-sm text-red-100">
+                      <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+                      {entry.text}
+                    </p>
                     <button
                       onClick={() => onAcknowledge(entry.movement.id)}
-                      className="mt-1 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-medium text-white active:bg-red-700"
+                      className="mt-2 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-medium text-white active:bg-red-700"
                     >
                       Mark replenished
                     </button>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
 
-          {expiryFlags.length > 0 && (
-            <Link
-              to="/inventory"
-              className={`block rounded-xl border p-4 ${
-                expiredCount > 0 ? "border-red-800 bg-red-950/40" : "border-amber-800 bg-amber-950/25"
-              }`}
-            >
-              <h2 className={`text-sm font-medium ${expiredCount > 0 ? "text-red-200" : "text-amber-200"}`}>
-                {expiredCount > 0
-                  ? `⚠️ ${expiredCount} expired item${expiredCount === 1 ? "" : "s"} in stock`
-                  : `⏳ ${expiryFlags.length} item${expiryFlags.length === 1 ? "" : "s"} expiring soon`}
-              </h2>
-              <p className="mt-1 text-sm text-slate-300">
-                {expiredCount > 0
-                  ? "Pull these before a case — don't let one reach the field."
-                  : "Within 30 days. Rotate or use first."}
-              </p>
-              <span className="mt-1 inline-block text-sm text-sky-300">Review in inventory &rarr;</span>
-            </Link>
-          )}
-
-          <Link
-            to="/cases/new"
-            className="block rounded-xl bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-center text-lg font-semibold text-white shadow-lg shadow-sky-950/60 active:from-sky-600 active:to-sky-700"
-          >
-            + Add case
-          </Link>
-
-          <Link
-            to="/readiness"
-            className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-4 active:bg-slate-800"
-          >
-            <div>
-              <h2 className="font-semibold text-white">Am I ready?</h2>
-              <p className="text-sm text-slate-400">Every size, every case — checked against your stock</p>
-            </div>
-            <span className="text-2xl">🩺</span>
-          </Link>
-
-          <Link
-            to="/team"
-            className={`flex items-center justify-between rounded-xl border px-4 py-4 active:bg-slate-800 ${
-              openTodos.length > 0
-                ? "border-sky-800 bg-sky-950/30"
-                : "border-slate-700 bg-slate-800/50"
-            }`}
-          >
-            <div>
-              <h2 className="font-semibold text-white">Team board</h2>
-              <p className="text-sm text-slate-400">
-                {openTodos.length > 0
-                  ? `${openTodos.length} to-do${openTodos.length === 1 ? "" : "s"} assigned to you`
-                  : newPosts > 0
-                    ? `${newPosts} new post${newPosts === 1 ? "" : "s"} since your last visit`
-                    : mentions.length > 0
-                      ? `${mentions.length} post${mentions.length === 1 ? "" : "s"} mention you`
-                      : "Notes, hand-offs & to-dos"}
-              </p>
-            </div>
-            <span className="text-2xl">💬</span>
-          </Link>
-
-          <div className="grid grid-cols-3 gap-1.5">
-            {[
-              { to: "/runsheet", icon: "📋", label: "Today", badge: 0 },
-              { to: "/sets", icon: "🧰", label: "Sets", badge: 0 },
-              { to: "/tasks", icon: "☑️", label: "Tasks", badge: urgentTasks },
-              { to: "/notes", icon: "🗒️", label: "Notes", badge: 0 },
-              { to: "/wiki", icon: "🧠", label: "Wiki", badge: 0 },
-              { to: "/qa", icon: "❓", label: "Q&A", badge: openQuestions },
-            ].map((l) => (
-              <Link
-                key={l.to}
-                to={l.to}
-                className="relative rounded-xl border border-slate-700 bg-slate-800/50 px-2 py-3 text-center active:bg-slate-800"
-              >
-                {l.badge > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-                    {l.badge}
-                  </span>
+                {expiryFlags.length > 0 && (
+                  <Link
+                    to="/inventory"
+                    className={`flex items-center justify-between rounded-xl border p-3 ${
+                      expiredCount > 0 ? "border-red-800 bg-red-950/40" : "border-amber-800 bg-amber-950/25"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm">
+                      <AlertTriangle className={`h-4 w-4 shrink-0 ${expiredCount > 0 ? "text-red-300" : "text-amber-300"}`} />
+                      <span className={expiredCount > 0 ? "text-red-100" : "text-amber-100"}>
+                        {expiredCount > 0
+                          ? `${expiredCount} expired item${expiredCount === 1 ? "" : "s"} in stock`
+                          : `${expiryFlags.length} item${expiryFlags.length === 1 ? "" : "s"} expiring soon`}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-500" />
+                  </Link>
                 )}
-                <span className="text-xl">{l.icon}</span>
-                <p className="mt-1 text-xs font-medium text-slate-300">{l.label}</p>
-              </Link>
-            ))}
-          </div>
 
-          {lotSuggestions.length > 0 && (
-            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-              <h2 className="text-sm font-medium text-slate-300">⏳ Use these lots first</h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Expiring within 60 days, matched to an upcoming case that could use them.
-              </p>
-              <div className="mt-2 space-y-1">
-                {lotSuggestions.slice(0, 4).map((sug) => (
-                  <p key={sug.item.id} className="text-sm text-slate-300">
-                    {sug.item.name}
-                    {sug.item.lot_number ? ` (lot ${sug.item.lot_number})` : ""} — {sug.daysLeft}d left ·
-                    fits the {formatDateShort(sug.candidateCase!.surgery_date)}
-                    {sug.candidateCase!.side ? ` ${sug.candidateCase!.side === "LEFT" ? "L" : "R"}` : ""} case
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {tomorrowCases.length > 0 && (
-            <div
-              className={`rounded-xl border p-4 ${
-                tomorrowScores.red > 0
-                  ? "border-red-800 bg-red-950/30"
-                  : haulCount > 0 || staging.loanerReturns.length > 0 || tomorrowScores.yellow > 0
-                    ? "border-amber-800 bg-amber-950/30"
-                    : "border-emerald-800 bg-emerald-950/30"
-              }`}
-            >
-              <h2 className="text-sm font-medium text-slate-200">
-                🌙 Tomorrow &mdash; {tomorrowCases.length} case{tomorrowCases.length === 1 ? "" : "s"}
-              </h2>
-              <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-                {tomorrowScores.green > 0 && (
-                  <span className="text-emerald-300">● {tomorrowScores.green} ready</span>
-                )}
-                {tomorrowScores.yellow > 0 && (
-                  <span className="text-amber-300">● {tomorrowScores.yellow} to check</span>
-                )}
                 {tomorrowScores.red > 0 && (
-                  <span className="font-medium text-red-300">● {tomorrowScores.red} at risk</span>
+                  <Link
+                    to={`/runsheet?date=${tomorrowISO}`}
+                    className="flex items-center justify-between rounded-xl border border-red-800 bg-red-950/30 p-3"
+                  >
+                    <span className="flex items-center gap-2 text-sm text-red-100">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-red-300" />
+                      {tomorrowScores.red} case{tomorrowScores.red === 1 ? "" : "s"} at risk tomorrow
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-500" />
+                  </Link>
                 )}
-              </p>
-              <p className="mt-1 text-sm text-slate-300">
-                {haulCount > 0 ? `${haulCount} item${haulCount === 1 ? "" : "s"} to haul` : "Everything staged"}
-                {staging.loanerReturns.length > 0
-                  ? ` · ${staging.loanerReturns.length} loaner${staging.loanerReturns.length === 1 ? "" : "s"} to ship`
-                  : ""}
-                {loanersInTransit > 0
-                  ? ` · ${loanersInTransit} loaner${loanersInTransit === 1 ? "" : "s"} still inbound`
-                  : ""}
-              </p>
-              <div className="mt-2.5 flex gap-2">
-                <Link
-                  to={`/runsheet?date=${tomorrowISO}`}
-                  className="flex-1 rounded-lg bg-sky-600 py-2 text-center text-sm font-medium text-white"
-                >
-                  Run sheet →
-                </Link>
-                <Link
-                  to={`/staging?date=${tomorrowISO}`}
-                  className="flex-1 rounded-lg bg-slate-800 py-2 text-center text-sm font-medium text-slate-200"
-                >
-                  Staging →
-                </Link>
+
+                {urgentLoaners.length > 0 && (
+                  <Link
+                    to="/loaners"
+                    className="rounded-xl border border-red-800 bg-red-950/40 p-3"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium text-red-200">
+                      <RotateCcw className="h-4 w-4 shrink-0" /> Loaners to ship soon
+                    </span>
+                    <ul className="mt-1.5 space-y-0.5 pl-6">
+                      {urgentLoaners.slice(0, 3).map((s) => (
+                        <li key={s.item.id} className="text-sm text-red-200/90">
+                          {s.item.name} — ship by {formatDateShort(s.effectiveDeadline)}
+                        </li>
+                      ))}
+                    </ul>
+                  </Link>
+                )}
+
+                {urgentTasks > 0 && (
+                  <Link
+                    to="/tasks"
+                    className="flex items-center justify-between rounded-xl border border-amber-800 bg-amber-950/25 p-3"
+                  >
+                    <span className="flex items-center gap-2 text-sm text-amber-100">
+                      <CheckSquare className="h-4 w-4 shrink-0 text-amber-300" />
+                      {urgentTasks} task{urgentTasks === 1 ? "" : "s"} due today or overdue
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-500" />
+                  </Link>
+                )}
               </div>
-            </div>
+            </section>
           )}
 
-          <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-            <h2 className="text-sm font-medium text-slate-300">Next 7 days</h2>
-            <p className="mt-1 text-3xl font-semibold text-white">{nextSevenDays.length}</p>
-            <p className="text-sm text-slate-400">scheduled cases</p>
-            <Link to="/cases" className="mt-2 inline-block text-sm text-sky-400">
-              Open calendar &rarr;
-            </Link>
-          </div>
-
-          {urgentLoaners.length > 0 && (
-            <Link to="/loaners" className="block rounded-xl border border-red-800 bg-red-950/40 p-4">
-              <h2 className="text-sm font-medium text-red-300">Loaners to ship soon</h2>
-              <ul className="mt-2 space-y-1">
-                {urgentLoaners.map((s) => (
-                  <li key={s.item.id} className="text-sm text-red-200">
-                    {s.item.name} &mdash; ship by {formatDateShort(s.effectiveDeadline)}
-                  </li>
-                ))}
-              </ul>
-              <span className="mt-2 inline-block text-sm text-red-300 underline">
-                Open loaner returns &rarr;
-              </span>
-            </Link>
-          )}
-
-          <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-            <h2 className="text-sm font-medium text-slate-300">Inventory tracked</h2>
-            <p className="mt-1 text-3xl font-semibold text-white">{items.length}</p>
-            <p className="text-sm text-slate-400">items across all locations</p>
-            <Link to="/inventory" className="mt-2 inline-block text-sm text-sky-400">
-              Open inventory &rarr;
-            </Link>
-          </div>
-
-          {activity.length > 0 && (
-            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-              <h2 className="text-sm font-medium text-slate-300">Recent activity</h2>
-              <ul className="mt-2 space-y-1.5">
-                {activity.slice(0, 3).map((entry) => (
-                  <li key={entry.id} className="text-sm text-slate-300">
-                    {entry.icon} {entry.text}
-                    <span className="text-slate-500"> · {formatTimeOfDay(entry.createdAt)}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link to="/activity" className="mt-2 inline-block text-sm text-sky-400">
-                View all activity &rarr;
+          {/* ── Today / Tomorrow ────────────────────────────── */}
+          <section>
+            <SectionHeader icon={CalendarDays} title="Schedule" />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Link to={`/runsheet?date=${today}`} className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Today</p>
+                <p className="mt-1 text-2xl font-bold text-white">{todayCases.length}</p>
+                <p className="text-xs text-slate-400">case{todayCases.length === 1 ? "" : "s"}</p>
+              </Link>
+              <Link to={`/runsheet?date=${tomorrowISO}`} className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tomorrow</p>
+                <p className="mt-1 text-2xl font-bold text-white">{tomorrowCases.length}</p>
+                <p className="flex flex-wrap gap-x-2 text-xs">
+                  {tomorrowScores.green > 0 && <span className="text-emerald-400">{tomorrowScores.green} ready</span>}
+                  {tomorrowScores.yellow > 0 && <span className="text-amber-400">{tomorrowScores.yellow} check</span>}
+                  {tomorrowScores.red > 0 && <span className="text-red-400">{tomorrowScores.red} risk</span>}
+                  {tomorrowCases.length === 0 && <span className="text-slate-400">nothing scheduled</span>}
+                </p>
               </Link>
             </div>
+            <Link to="/cases" className="mt-2 flex items-center gap-1 text-sm text-sky-400">
+              Open calendar <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </section>
+
+          {/* ── Staging ─────────────────────────────────────── */}
+          {tomorrowCases.length > 0 && (
+            <section>
+              <SectionHeader icon={Truck} title="Staging — tomorrow" />
+              <Link
+                to={`/staging?date=${tomorrowISO}`}
+                className="mt-2 flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/50 p-4 active:bg-slate-800"
+              >
+                <div>
+                  <p className="text-sm text-slate-200">
+                    {haulCount > 0 ? `${haulCount} item${haulCount === 1 ? "" : "s"} to haul` : "Everything staged"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {staging.loanerReturns.length > 0
+                      ? `${staging.loanerReturns.length} loaner${staging.loanerReturns.length === 1 ? "" : "s"} to ship`
+                      : "No loaner returns"}
+                    {loanersInTransit > 0 ? ` · ${loanersInTransit} inbound` : ""}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-500" />
+              </Link>
+            </section>
+          )}
+
+          {/* ── Inventory pulse ─────────────────────────────── */}
+          <section>
+            <SectionHeader icon={Package} title="Inventory pulse" />
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <Link to="/inventory" className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
+                <p className="text-2xl font-bold text-white">{items.length}</p>
+                <p className="text-xs text-slate-400">tracked</p>
+              </Link>
+              <Link to="/inventory" className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
+                <p className={`text-2xl font-bold ${expiryFlags.length > 0 ? "text-amber-300" : "text-white"}`}>
+                  {expiryFlags.length}
+                </p>
+                <p className="text-xs text-slate-400">expiring</p>
+              </Link>
+              <Link to="/loaners" className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
+                <p className="text-2xl font-bold text-white">{loanersInTransit}</p>
+                <p className="text-xs text-slate-400">inbound</p>
+              </Link>
+            </div>
+            {lotSuggestions.length > 0 && (
+              <div className="mt-2 rounded-xl border border-slate-700 bg-slate-800/50 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-slate-300">
+                  <Clock className="h-3.5 w-3.5" /> Use these lots first
+                </p>
+                <div className="mt-1.5 space-y-1">
+                  {lotSuggestions.slice(0, 3).map((sug) => (
+                    <p key={sug.item.id} className="text-sm text-slate-300">
+                      {sug.item.name}
+                      {sug.item.lot_number ? ` (lot ${sug.item.lot_number})` : ""} — {sug.daysLeft}d ·
+                      fits {formatDateShort(sug.candidateCase!.surgery_date)}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ── Tasks & team ────────────────────────────────── */}
+          <section>
+            <SectionHeader icon={CheckSquare} title="Tasks & team" />
+            <div className="mt-2 space-y-2">
+              <Link
+                to="/readiness"
+                className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 active:bg-slate-800"
+              >
+                <span className="flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-sky-300" />
+                  <span>
+                    <span className="block font-medium text-white">Am I ready?</span>
+                    <span className="block text-xs text-slate-400">Every size, checked against stock</span>
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-slate-500" />
+              </Link>
+              <Link
+                to="/team"
+                className={`flex items-center justify-between rounded-xl border px-4 py-3 active:bg-slate-800 ${
+                  openTodos.length > 0 ? "border-sky-800 bg-sky-950/30" : "border-slate-700 bg-slate-800/50"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-sky-300" />
+                  <span>
+                    <span className="block font-medium text-white">Team board</span>
+                    <span className="block text-xs text-slate-400">
+                      {openTodos.length > 0
+                        ? `${openTodos.length} to-do${openTodos.length === 1 ? "" : "s"} for you`
+                        : newPosts > 0
+                          ? `${newPosts} new post${newPosts === 1 ? "" : "s"}`
+                          : mentions.length > 0
+                            ? `${mentions.length} mention${mentions.length === 1 ? "" : "s"} you`
+                            : "Hand-offs & to-dos"}
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-slate-500" />
+              </Link>
+            </div>
+          </section>
+
+          {/* ── Recent activity ─────────────────────────────── */}
+          {activity.length > 0 && (
+            <section>
+              <SectionHeader icon={ActivityIcon} title="Recent activity" />
+              <div className="mt-2 rounded-xl border border-slate-700 bg-slate-800/50 p-3">
+                <ul className="space-y-2">
+                  {activity.slice(0, 4).map((entry) => (
+                    <li key={entry.id} className="flex items-start gap-2 text-sm text-slate-300">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-600" />
+                      <span>
+                        {entry.text}
+                        <span className="text-slate-500"> · {formatTimeOfDay(entry.createdAt)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/activity" className="mt-2 flex items-center gap-1 text-sm text-sky-400">
+                  View all <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </section>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  tone = "default",
+}: {
+  icon: typeof Package;
+  title: string;
+  tone?: "default" | "danger";
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className={`h-4 w-4 ${tone === "danger" ? "text-red-400" : "text-slate-400"}`} />
+      <h2
+        className={`text-xs font-semibold uppercase tracking-wide ${
+          tone === "danger" ? "text-red-300" : "text-slate-400"
+        }`}
+      >
+        {title}
+      </h2>
     </div>
   );
 }
