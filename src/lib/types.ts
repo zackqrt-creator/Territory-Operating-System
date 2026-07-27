@@ -360,6 +360,9 @@ export interface PersonalTask {
   assigned_to: string | null;
   /** Entity note this task was spawned from ("Follow up" on a note). */
   source_note_id: string | null;
+  /** Optional link to any record (e.g. a territory_notes note via "note"). */
+  entity_type: TerritoryNoteEntityType | "note" | null;
+  entity_id: string | null;
   done_at: string | null;
   created_at: string;
 }
@@ -381,6 +384,104 @@ export interface EntityNote {
 
 /** Canonical-page-eligible records — each gets at most one wiki page. */
 export type PageEntityType = "surgeon" | "facility" | "tote_template" | "catalog_item";
+
+// ---- Territory notes / second brain ---------------------------------------
+
+export type TerritoryNoteType =
+  | "general"
+  | "case"
+  | "hospital"
+  | "inventory"
+  | "replenishment"
+  | "loaner"
+  | "consignment"
+  | "surgeon"
+  | "task"
+  | "meeting"
+  | "idea"
+  | "ai_summary";
+
+export type TerritoryNoteVisibility = "private" | "team" | "territory_admin";
+
+export type TerritoryNoteSource =
+  | "manual"
+  | "mobile"
+  | "sticker_photo"
+  | "calendar_import"
+  | "catalog_import"
+  | "ai_generated"
+  | "system";
+
+export type SecondBrainStatus = "pending" | "ready" | "synced" | "ignored" | "needs_review";
+
+/** Records a note can link to. Mirrors entity_notes' set plus the catalog module. */
+export type TerritoryNoteEntityType =
+  | "case"
+  | "facility"
+  | "surgeon"
+  | "inventory_item"
+  | "catalog_item"
+  | "tote_template"
+  | "case_template";
+
+export type NoteLinkRelationship =
+  | "related"
+  | "about"
+  | "decision"
+  | "issue"
+  | "follow_up"
+  | "used_in"
+  | "needed_for"
+  | "source"
+  | "result";
+
+export interface TerritoryNote {
+  id: string;
+  territory_id: string;
+  created_by: string | null;
+  owner_id: string | null;
+  title: string;
+  body: string;
+  note_type: TerritoryNoteType;
+  visibility: TerritoryNoteVisibility;
+  source: TerritoryNoteSource;
+  occurred_at: string | null;
+  pinned: boolean;
+  archived: boolean;
+  ai_summary: string | null;
+  ai_action_items: unknown[];
+  ai_entities: Record<string, unknown>;
+  second_brain_status: SecondBrainStatus;
+  second_brain_path: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TerritoryNoteLink {
+  id: string;
+  territory_id: string;
+  note_id: string;
+  entity_type: TerritoryNoteEntityType;
+  entity_id: string;
+  relationship: NoteLinkRelationship;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface TerritoryNoteTag {
+  id: string;
+  territory_id: string;
+  name: string;
+  color: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** A note as returned by the territory_note_feed view: links/tags pre-aggregated. */
+export interface TerritoryNoteFeedItem extends TerritoryNote {
+  links: Array<{ entity_type: TerritoryNoteEntityType; entity_id: string; relationship: NoteLinkRelationship }>;
+  tags: Array<{ id: string; name: string; color: string | null }>;
+}
 
 export interface WikiPage {
   id: string;

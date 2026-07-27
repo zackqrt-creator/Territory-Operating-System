@@ -17,7 +17,9 @@ import QaWall from "./pages/QaWall";
 import Compliance from "./pages/Compliance";
 import Billing from "./pages/Billing";
 import Tasks from "./pages/Tasks";
-import NotesSearch from "./pages/NotesSearch";
+import Notes from "./pages/Notes";
+import NoteDetail from "./pages/NoteDetail";
+import SecondBrainQueue from "./pages/SecondBrainQueue";
 import RunSheet from "./pages/RunSheet";
 import Sets from "./pages/Sets";
 import Wiki from "./pages/Wiki";
@@ -66,7 +68,9 @@ function App() {
         <Route path="/compliance" element={<Compliance />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/tasks" element={<Tasks />} />
-        <Route path="/notes" element={<NotesSearch />} />
+        <Route path="/notes" element={<Notes />} />
+        <Route path="/notes/second-brain" element={<SecondBrainQueue />} />
+        <Route path="/notes/:id" element={<NoteDetail />} />
         <Route path="/runsheet" element={<RunSheet />} />
         <Route path="/sets" element={<Sets />} />
         <Route path="/wiki" element={<Wiki />} />

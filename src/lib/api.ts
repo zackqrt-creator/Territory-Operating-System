@@ -34,6 +34,14 @@ import type {
   WikiPage,
   PageLink,
   PageEntityType,
+  TerritoryNote,
+  TerritoryNoteFeedItem,
+  TerritoryNoteLink,
+  TerritoryNoteTag,
+  TerritoryNoteType,
+  TerritoryNoteEntityType,
+  NoteLinkRelationship,
+  SecondBrainStatus,
 } from "./types";
 import { extractLinkTitles, slugify } from "./wikilinks";
 
@@ -964,6 +972,8 @@ export async function createTask(input: {
   status?: TaskStatus;
   assigned_to?: string | null;
   source_note_id?: string | null;
+  entity_type?: TerritoryNoteEntityType | "note" | null;
+  entity_id?: string | null;
   territory_id: string;
   owner_id: string;
 }): Promise<PersonalTask> {
@@ -980,6 +990,18 @@ export async function updateTask(
 ): Promise<void> {
   const { error } = await supabase.from("tasks").update(patch).eq("id", id);
   if (error) throw error;
+}
+
+/** Tasks spawned from a specific territory note (entity_type="note"). */
+export async function listTasksForNote(noteId: string): Promise<PersonalTask[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("entity_type", "note")
+    .eq("entity_id", noteId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as PersonalTask[];
 }
 
 export async function deleteTask(id: string): Promise<void> {
@@ -1045,6 +1067,148 @@ export async function listAllEntityNotes(limit = 500): Promise<EntityNote[]> {
     .limit(limit);
   if (error) throw error;
   return data as EntityNote[];
+}
+
+// ---- Territory notes / second brain ---------------------------------------
+
+/** Pinned-first, newest-updated. This is the /notes feed's data source. */
+export async function listNoteFeed(limit = 500): Promise<TerritoryNoteFeedItem[]> {
+  const { data, error } = await supabase
+    .from("territory_note_feed")
+    .select("*")
+    .limit(limit);
+  if (error) throw error;
+  return data as TerritoryNoteFeedItem[];
+}
+
+export async function getNote(id: string): Promise<TerritoryNote | null> {
+  const { data, error } = await supabase.from("territory_notes").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as TerritoryNote | null;
+}
+
+export async function createNote(input: {
+  title?: string;
+  body?: string;
+  note_type?: TerritoryNoteType;
+  visibility?: "private" | "team" | "territory_admin";
+  source?: "manual" | "mobile" | "sticker_photo" | "calendar_import" | "catalog_import" | "ai_generated" | "system";
+  occurred_at?: string | null;
+  territory_id: string;
+  owner_id: string;
+  created_by: string;
+}): Promise<TerritoryNote> {
+  const { data, error } = await supabase.from("territory_notes").insert(input).select().single();
+  if (error) throw error;
+  return data as TerritoryNote;
+}
+
+export async function updateNote(
+  id: string,
+  patch: Partial<
+    Pick<TerritoryNote, "title" | "body" | "note_type" | "visibility" | "pinned" | "archived" | "second_brain_status">
+  >,
+): Promise<void> {
+  const { error } = await supabase.from("territory_notes").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  const { error } = await supabase.from("territory_notes").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function setSecondBrainStatus(id: string, status: SecondBrainStatus): Promise<void> {
+  const { error } = await supabase.from("territory_notes").update({ second_brain_status: status }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function listSecondBrainQueue(): Promise<TerritoryNote[]> {
+  const { data, error } = await supabase
+    .from("territory_second_brain_queue")
+    .select("*");
+  if (error) throw error;
+  return data as TerritoryNote[];
+}
+
+export async function listNoteLinks(noteId: string): Promise<TerritoryNoteLink[]> {
+  const { data, error } = await supabase
+    .from("territory_note_links")
+    .select("*")
+    .eq("note_id", noteId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as TerritoryNoteLink[];
+}
+
+export async function linkNoteToEntity(input: {
+  note_id: string;
+  entity_type: TerritoryNoteEntityType;
+  entity_id: string;
+  relationship?: NoteLinkRelationship;
+  territory_id: string;
+  created_by: string;
+}): Promise<void> {
+  const { error } = await supabase.from("territory_note_links").insert(input);
+  if (error) throw error;
+}
+
+export async function unlinkNote(linkId: string): Promise<void> {
+  const { error } = await supabase.from("territory_note_links").delete().eq("id", linkId);
+  if (error) throw error;
+}
+
+export async function listNoteTags(territoryId: string): Promise<TerritoryNoteTag[]> {
+  const { data, error } = await supabase
+    .from("territory_note_tags")
+    .select("*")
+    .eq("territory_id", territoryId)
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return data as TerritoryNoteTag[];
+}
+
+export async function createNoteTag(input: {
+  name: string;
+  color?: string | null;
+  territory_id: string;
+  created_by: string;
+}): Promise<TerritoryNoteTag> {
+  const { data, error } = await supabase.from("territory_note_tags").insert(input).select().single();
+  if (error) throw error;
+  return data as TerritoryNoteTag;
+}
+
+export async function assignNoteTag(noteId: string, tagId: string): Promise<void> {
+  const { error } = await supabase.from("territory_note_tag_assignments").insert({ note_id: noteId, tag_id: tagId });
+  if (error) throw error;
+}
+
+export async function unassignNoteTag(noteId: string, tagId: string): Promise<void> {
+  const { error } = await supabase
+    .from("territory_note_tag_assignments")
+    .delete()
+    .eq("note_id", noteId)
+    .eq("tag_id", tagId);
+  if (error) throw error;
+}
+
+/** Spawn a task from a note (reuses the tasks table, entity_type="note"). */
+export async function spawnTaskFromNote(input: {
+  note_id: string;
+  title: string;
+  due_date?: string | null;
+  territory_id: string;
+  owner_id: string;
+}): Promise<PersonalTask> {
+  return createTask({
+    title: input.title,
+    due_date: input.due_date ?? null,
+    entity_type: "note",
+    entity_id: input.note_id,
+    territory_id: input.territory_id,
+    owner_id: input.owner_id,
+  });
 }
 
 // ---- Wiki pages -------------------------------------------------------

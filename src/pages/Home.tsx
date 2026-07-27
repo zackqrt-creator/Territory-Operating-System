@@ -11,7 +11,6 @@ import {
   listCasesByIds,
   acknowledgeMovement,
   listBoardPosts,
-  listFacilityCredentials,
   listCatalogItems,
   listRepCertifications,
   listMyTasks,
@@ -22,7 +21,6 @@ import type {
   BoardPost,
   CaseRow,
   CatalogItem,
-  FacilityCredential,
   CaseTemplateWithItems,
   Facility,
   InventoryItem,
@@ -35,7 +33,7 @@ import { buildStagingReport } from "../lib/staging";
 import { buildLoanerReport } from "../lib/loaners";
 import { buildActivityFeed } from "../lib/activity";
 import { daysUntil, formatDateShort, formatTimeOfDay, toISODate, tomorrow } from "../utils/dates";
-import { credentialConflicts, expiringLotSuggestions, scoreCase } from "../lib/crm";
+import { expiringLotSuggestions, scoreCase } from "../lib/crm";
 import { computeReadiness } from "../lib/readiness";
 
 export default function Home() {
@@ -48,7 +46,6 @@ export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activityCases, setActivityCases] = useState<CaseRow[]>([]);
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>([]);
-  const [credentials, setCredentials] = useState<FacilityCredential[]>([]);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [certs, setCerts] = useState<RepCertification[]>([]);
   const [myTasks, setMyTasks] = useState<PersonalTask[]>([]);
@@ -64,13 +61,12 @@ export default function Home() {
       listRecentMovements(50),
       listProfiles(),
       listBoardPosts(),
-      listFacilityCredentials(),
       listCatalogItems(),
       listRepCertifications(),
       listMyTasks(),
       listQaQuestions(),
       listQaAnswers(),
-    ]).then(async ([c, i, f, t, m, p, b, fc, cat, rc, mt, qq, qa]) => {
+    ]).then(async ([c, i, f, t, m, p, b, cat, rc, mt, qq, qa]) => {
       setCases(c);
       setItems(i);
       setFacilities(f);
@@ -78,7 +74,6 @@ export default function Home() {
       setMovements(m);
       setProfiles(p);
       setBoardPosts(b);
-      setCredentials(fc);
       setCatalog(cat);
       setCerts(rc);
       setMyTasks(mt);
@@ -143,7 +138,6 @@ export default function Home() {
     (t) => t.status !== "done" && t.due_date && daysUntil(t.due_date) <= 0,
   ).length;
 
-  const doorChecks = credentialConflicts(credentials, cases, facilities, profiles, today);
   const lotSuggestions = expiringLotSuggestions(
     items,
     cases,
@@ -183,18 +177,6 @@ export default function Home() {
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : (
         <div className="mt-6 space-y-4">
-          {doorChecks.length > 0 && (
-            <Link to="/compliance" className="block rounded-xl border border-red-700 bg-red-950/50 p-4">
-              <h2 className="text-sm font-medium text-red-200">🚪 Credential expires before a case</h2>
-              {doorChecks.slice(0, 2).map((d) => (
-                <p key={d.credential.id} className="mt-1 text-sm text-red-100">
-                  {d.credential.vendor} at {d.facility.name} lapses {formatDateShort(d.credential.expires_on)} — case there {formatDateShort(d.firstAffectedCase.surgery_date)}.
-                </p>
-              ))}
-              <span className="mt-1 inline-block text-sm text-red-300 underline">Open compliance →</span>
-            </Link>
-          )}
-
           {reserveAlerts.length > 0 && (
             <div className="rounded-xl border border-red-700 bg-red-950/50 p-4">
               <h2 className="text-sm font-medium text-red-200">🚨 Reserve storage was used</h2>
@@ -276,7 +258,7 @@ export default function Home() {
             <span className="text-2xl">💬</span>
           </Link>
 
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             {[
               { to: "/runsheet", icon: "📋", label: "Today", badge: 0 },
               { to: "/sets", icon: "🧰", label: "Sets", badge: 0 },
@@ -284,8 +266,6 @@ export default function Home() {
               { to: "/notes", icon: "🗒️", label: "Notes", badge: 0 },
               { to: "/wiki", icon: "🧠", label: "Wiki", badge: 0 },
               { to: "/qa", icon: "❓", label: "Q&A", badge: openQuestions },
-              { to: "/billing", icon: "💵", label: "Billing", badge: 0 },
-              { to: "/compliance", icon: "🪪", label: "Creds", badge: 0 },
             ].map((l) => (
               <Link
                 key={l.to}
@@ -355,11 +335,6 @@ export default function Home() {
                   ? ` · ${loanersInTransit} loaner${loanersInTransit === 1 ? "" : "s"} still inbound`
                   : ""}
               </p>
-              {doorChecks.some((d) => d.firstAffectedCase.surgery_date === tomorrowISO) && (
-                <p className="mt-1 text-sm font-medium text-red-300">
-                  🚪 A credential lapses before tomorrow's case — check compliance.
-                </p>
-              )}
               <div className="mt-2.5 flex gap-2">
                 <Link
                   to={`/runsheet?date=${tomorrowISO}`}
