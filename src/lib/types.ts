@@ -509,3 +509,41 @@ export interface PageLink {
   target_title: string;
   created_at: string;
 }
+
+export type CaseAssigneeRole = "primary" | "covering" | "observing";
+
+/** A second (or third) rep attached to a case — coverage, backup, training. */
+export interface CaseAssignee {
+  id: string;
+  territory_id: string;
+  case_id: string;
+  profile_id: string;
+  role: CaseAssigneeRole;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type CalendarBlockKind =
+  | "hospital_visit"
+  | "in_service"
+  | "travel"
+  | "admin"
+  | "personal"
+  | "other";
+
+/** Anything on the calendar that isn't a surgical case: visits, travel, admin. */
+export interface CalendarBlock {
+  id: string;
+  territory_id: string;
+  rep_id: string;
+  block_date: string;
+  start_time: string;
+  end_time: string | null;
+  label: string;
+  kind: CalendarBlockKind;
+  facility_id: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}

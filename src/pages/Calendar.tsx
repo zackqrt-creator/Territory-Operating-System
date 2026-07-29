@@ -427,6 +427,7 @@ export default function Calendar() {
           facilities={facilities}
           profiles={profiles}
           currentProfileId={profile?.id}
+          territoryId={profile?.territory_id ?? undefined}
           onClose={() => setOpenDay(null)}
           onOpenCase={(c) => {
             setOpenDay(null);

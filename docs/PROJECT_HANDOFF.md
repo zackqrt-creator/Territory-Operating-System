@@ -6,7 +6,7 @@
 - **Repo:** `zackqrt-creator/Territory-Operating-System` (GitHub; formerly named `Claude-skills`)
 - **Working branch:** `claude/casetrack-inventory-pwa-9ngunk`
 - **Live deploy:** Vercel (project name still `claude-skills`)
-- **Codebase size:** ~14,800 lines of TS/TSX across `src/`, plus 44 SQL migrations
+- **Codebase size:** ~15,000 lines of TS/TSX across `src/`, plus 45 SQL migrations
 
 ---
 
@@ -210,7 +210,7 @@ Billing and credentials sections were **removed** from Home per explicit instruc
 > **Which migrations are actually applied to the live database is currently unconfirmed.**
 > A previous session reported that the catalog + notes schema exists in `Zack CaseTrack` (`tylytbjxizxukefpplcw`) and that 044 was applied. That claim has **not been independently verified**, and the migration file for 044 did not exist in the repo until it was reconstructed — so the repo and the database may have drifted. **Verify the live schema before relying on the Notes UI.**
 
-1. **Confirm live schema state**, migration by migration.
+1. **Confirm live schema state**, migration by migration. (044 is confirmed applied as of 2026-07-29; 045 is written but not yet run.)
 2. **The new UI has never been click-tested against live data.** It is verified only by `tsc` typecheck + `vite build` + dev-server transform.
 
 ### The environmental constraint that shaped everything

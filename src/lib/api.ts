@@ -1,47 +1,50 @@
 import { supabase } from "./supabase";
 import type {
+  AssetMovement,
+  AssetStatus,
   BillingStatus,
   BoardComment,
   BoardPost,
   BoardPostKind,
+  CalendarBlock,
+  CaseAssignee,
+  CaseAssigneeRole,
   CaseItemPlan,
-  FacilityCredential,
-  QaAnswer,
-  QaQuestion,
-  RepCertification,
-  PersonalTask,
-  EntityNote,
-  NoteEntityType,
-  TaskStatus,
-  TimeOff,
-  TrackedAsset,
-  AssetMovement,
-  AssetStatus,
   CaseRow,
   CaseTemplateWithItems,
   CatalogItem,
   CatalogJoint,
   CatalogSide,
   CementType,
+  EntityNote,
   Facility,
+  FacilityCredential,
   InventoryItem,
   ItemCategory,
   Movement,
+  NoteEntityType,
+  NoteLinkRelationship,
+  PageEntityType,
+  PageLink,
+  PersonalTask,
   Profile,
+  QaAnswer,
+  QaQuestion,
+  RepCertification,
+  SecondBrainStatus,
   Surgeon,
   SurgeonPreference,
-  ToteTemplateWithItems,
-  WikiPage,
-  PageLink,
-  PageEntityType,
+  TaskStatus,
   TerritoryNote,
+  TerritoryNoteEntityType,
   TerritoryNoteFeedItem,
   TerritoryNoteLink,
   TerritoryNoteTag,
   TerritoryNoteType,
-  TerritoryNoteEntityType,
-  NoteLinkRelationship,
-  SecondBrainStatus,
+  TimeOff,
+  ToteTemplateWithItems,
+  TrackedAsset,
+  WikiPage,
 } from "./types";
 import { extractLinkTitles, slugify } from "./wikilinks";
 
@@ -1418,4 +1421,83 @@ export async function searchPages(query: string, limit = 20): Promise<WikiPage[]
     .limit(limit);
   if (error) throw error;
   return data as WikiPage[];
+}
+
+// -- Calendar blocks (non-case time) ------------------------------------------
+
+export async function listCalendarBlocks(
+  startDate: string,
+  endDate: string,
+): Promise<CalendarBlock[]> {
+  const { data, error } = await supabase
+    .from("calendar_blocks")
+    .select("*")
+    .gte("block_date", startDate)
+    .lte("block_date", endDate)
+    .order("block_date")
+    .order("start_time");
+  if (error) throw error;
+  return data as CalendarBlock[];
+}
+
+export async function createCalendarBlock(
+  input: Omit<CalendarBlock, "id" | "created_at">,
+): Promise<CalendarBlock> {
+  const { data, error } = await supabase
+    .from("calendar_blocks")
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as CalendarBlock;
+}
+
+export async function deleteCalendarBlock(id: string): Promise<void> {
+  const { error } = await supabase.from("calendar_blocks").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// -- Case coverage ------------------------------------------------------------
+
+export async function listCaseAssignees(caseIds: string[]): Promise<CaseAssignee[]> {
+  if (caseIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("case_assignees")
+    .select("*")
+    .in("case_id", caseIds);
+  if (error) throw error;
+  return data as CaseAssignee[];
+}
+
+/** Attaches a rep to a case. Re-attaching the same rep just updates their role. */
+export async function assignRepToCase(input: {
+  territory_id: string;
+  case_id: string;
+  profile_id: string;
+  role?: CaseAssigneeRole;
+  note?: string | null;
+  created_by?: string | null;
+}): Promise<CaseAssignee> {
+  const { data, error } = await supabase
+    .from("case_assignees")
+    .upsert(
+      {
+        territory_id: input.territory_id,
+        case_id: input.case_id,
+        profile_id: input.profile_id,
+        role: input.role ?? "covering",
+        note: input.note ?? null,
+        created_by: input.created_by ?? null,
+      },
+      { onConflict: "case_id,profile_id" },
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data as CaseAssignee;
+}
+
+export async function unassignRepFromCase(id: string): Promise<void> {
+  const { error } = await supabase.from("case_assignees").delete().eq("id", id);
+  if (error) throw error;
 }

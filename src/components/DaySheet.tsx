@@ -1,6 +1,14 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, Plus, X } from "lucide-react";
-import type { CaseRow, Facility, Profile } from "../lib/types";
+import { CalendarPlus, Clock, Plus, Trash2, X } from "lucide-react";
+import { createCalendarBlock, deleteCalendarBlock, listCalendarBlocks } from "../lib/api";
+import type {
+  CalendarBlock,
+  CalendarBlockKind,
+  CaseRow,
+  Facility,
+  Profile,
+} from "../lib/types";
 import { caseRepId, repInitials } from "../lib/runsheet";
 import { formatDateShort, formatTime, isToday } from "../utils/dates";
 
@@ -20,6 +28,15 @@ function hourLabel(h: number): string {
   return formatTime(`${String(h).padStart(2, "0")}:00`);
 }
 
+const BLOCK_KINDS: { value: CalendarBlockKind; label: string }[] = [
+  { value: "hospital_visit", label: "Hospital visit" },
+  { value: "in_service", label: "In-service" },
+  { value: "travel", label: "Travel" },
+  { value: "admin", label: "Admin" },
+  { value: "personal", label: "Personal" },
+  { value: "other", label: "Other" },
+];
+
 /**
  * Tap a day, get the day. Cases sit in the hour they actually start, so the
  * shape of the day is visible at a glance -- back-to-backs, the gap you could
@@ -34,6 +51,7 @@ export default function DaySheet({
   facilities,
   profiles,
   currentProfileId,
+  territoryId,
   onClose,
   onOpenCase,
 }: {
@@ -42,10 +60,55 @@ export default function DaySheet({
   facilities: Facility[];
   profiles: Profile[];
   currentProfileId?: string;
+  territoryId?: string;
   onClose: () => void;
   onOpenCase: (c: CaseRow) => void;
 }) {
   const navigate = useNavigate();
+  const [blocks, setBlocks] = useState<CalendarBlock[]>([]);
+  const [drafting, setDrafting] = useState<number | null>(null);
+  const [draftLabel, setDraftLabel] = useState("");
+  const [draftKind, setDraftKind] = useState<CalendarBlockKind>("hospital_visit");
+  const [busy, setBusy] = useState(false);
+
+  function loadBlocks() {
+    listCalendarBlocks(date, date)
+      .then(setBlocks)
+      // The blocks table may not exist yet if migration 045 has not been run;
+      // the day sheet is still useful without it, so fail quiet.
+      .catch(() => setBlocks([]));
+  }
+
+  useEffect(loadBlocks, [date]);
+
+  async function saveBlock(hour: number) {
+    if (!draftLabel.trim() || !territoryId || !currentProfileId) return;
+    setBusy(true);
+    try {
+      await createCalendarBlock({
+        territory_id: territoryId,
+        rep_id: currentProfileId,
+        block_date: date,
+        start_time: `${String(hour).padStart(2, "0")}:00`,
+        end_time: null,
+        label: draftLabel.trim(),
+        kind: draftKind,
+        facility_id: null,
+        notes: null,
+        created_by: currentProfileId,
+      });
+      setDraftLabel("");
+      setDrafting(null);
+      loadBlocks();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeBlock(id: string) {
+    await deleteCalendarBlock(id).catch(() => {});
+    loadBlocks();
+  }
 
   const facilityName = (id: string | null) => facilities.find((f) => f.id === id)?.name ?? "—";
 
@@ -61,6 +124,14 @@ export default function DaySheet({
     // Anything outside the normal day clamps to the edges rather than disappearing.
     const slot = Math.min(Math.max(h, FIRST_HOUR), LAST_HOUR);
     byHour.set(slot, [...(byHour.get(slot) ?? []), c]);
+  }
+
+  const blocksByHour = new Map<number, CalendarBlock[]>();
+  for (const b of blocks) {
+    const h = hourOf(b.start_time);
+    if (h === null) continue;
+    const slot = Math.min(Math.max(h, FIRST_HOUR), LAST_HOUR);
+    blocksByHour.set(slot, [...(blocksByHour.get(slot) ?? []), b]);
   }
 
   function addAt(hour: number) {
@@ -145,26 +216,111 @@ export default function DaySheet({
         <div className="space-y-1">
           {HOURS.map((h) => {
             const slot = byHour.get(h) ?? [];
+            const hourBlocks = blocksByHour.get(h) ?? [];
             return (
               <div key={h} className="flex gap-2">
                 <span className="w-14 shrink-0 pt-2 text-right text-[11px] tabular-nums text-slate-500">
                   {hourLabel(h)}
                 </span>
                 <div className="min-w-0 flex-1 border-t border-slate-800/80 pb-1 pt-1">
-                  {slot.length > 0 ? (
+                  {(slot.length > 0 || hourBlocks.length > 0) && (
                     <div className="space-y-1.5">
                       {slot.map((c) => (
                         <CaseChip key={c.id} c={c} />
                       ))}
+                      {hourBlocks.map((b) => (
+                        <div
+                          key={b.id}
+                          className="flex items-center gap-2 rounded-lg border border-slate-700/70 bg-slate-900 px-2.5 py-2"
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-slate-200">{b.label}</span>
+                            <span className="text-[11px] text-slate-500">
+                              {BLOCK_KINDS.find((k) => k.value === b.kind)?.label ?? "Other"}
+                              {" · "}
+                              {formatTime(b.start_time)}
+                            </span>
+                          </span>
+                          {b.rep_id === currentProfileId && (
+                            <button
+                              onClick={() => removeBlock(b.id)}
+                              aria-label="Remove block"
+                              className="shrink-0 rounded p-1 text-slate-500 active:bg-slate-800"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {drafting === h ? (
+                    <div className="mt-1 rounded-lg border border-slate-700 bg-slate-900 p-2">
+                      <input
+                        autoFocus
+                        value={draftLabel}
+                        onChange={(e) => setDraftLabel(e.target.value)}
+                        placeholder={`What is ${hourLabel(h)} for?`}
+                        className="w-full rounded-md border border-slate-700 bg-slate-800 px-2.5 py-2 text-sm text-white placeholder:text-slate-500"
+                      />
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {BLOCK_KINDS.map((k) => (
+                          <button
+                            key={k.value}
+                            onClick={() => setDraftKind(k.value)}
+                            className={`rounded-full px-2 py-0.5 text-[11px] ${
+                              draftKind === k.value
+                                ? "bg-sky-600 text-white"
+                                : "bg-slate-800 text-slate-400"
+                            }`}
+                          >
+                            {k.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={() => saveBlock(h)}
+                          disabled={busy || !draftLabel.trim()}
+                          className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                        >
+                          {busy ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDrafting(null);
+                            setDraftLabel("");
+                          }}
+                          className="rounded-md bg-slate-800 px-3 py-1.5 text-xs text-slate-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => addAt(h)}
-                      className="flex w-full items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs text-slate-600 active:bg-slate-900"
-                    >
-                      <Plus size={13} />
-                      Add at {hourLabel(h)}
-                    </button>
+                    slot.length === 0 &&
+                    hourBlocks.length === 0 && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => addAt(h)}
+                          className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs text-slate-600 active:bg-slate-900"
+                        >
+                          <Plus size={13} />
+                          Case
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDrafting(h);
+                            setDraftLabel("");
+                          }}
+                          className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs text-slate-600 active:bg-slate-900"
+                        >
+                          <CalendarPlus size={13} />
+                          Block
+                        </button>
+                      </div>
+                    )
                   )}
                 </div>
               </div>

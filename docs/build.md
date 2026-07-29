@@ -56,7 +56,13 @@ All migrations are numbered files in `supabase/migrations/`. Earlier Claude sess
 |---|------|---------------|
 | 042 | `territory_notes_second_brain.sql` | Creates `territory_notes`, `territory_note_links`, `territory_note_tags`, `territory_note_tag_assignments`, the `territory_note_feed` + `territory_second_brain_queue` views, RLS, and extends `tasks.entity_type` to include `'note'` |
 | 043 | `note_kinds_logistics_playbook.sql` | Extends `territory_notes.note_type` check with `logistics` + `playbook` |
-| 044 | `notes_views_security_invoker.sql` | Sets `territory_note_feed` and `territory_second_brain_queue` to `security_invoker = true` so the views obey the querying user's RLS |
+| 044 | `notes_views_security_invoker.sql` | Sets `territory_note_feed` and `territory_second_brain_queue` to `security_invoker = true` so the views obey the querying user's RLS. **Applied 2026-07-29.** |
+
+### Calendar revamp
+
+| # | File | What it does |
+|---|------|---------------|
+| 045 | `case_coverage_and_calendar_blocks.sql` | `case_assignees` (attach a second rep to a case: primary / covering / observing) and `calendar_blocks` (non-case time: hospital visits, in-services, travel, admin, personal). RLS via `my_territory_id()`; blocks are editable only by their own rep. **Not yet run.** |
 
 **Run order for the notes system:** `032` → `042` → `043` → `044` (032 provides `pg_trgm`; 044 secures the views). 033 is a prerequisite of 042.
 
@@ -141,8 +147,9 @@ This session's git proxy is scoped to the literal repo name `zackqrt-creator/cla
 
 ## 6. What still needs review
 
-- [ ] **Confirm live schema state.** Whether migrations through 044 are actually applied to `Zack CaseTrack` (`tylytbjxizxukefpplcw`) has **not been verified from this session** — the Supabase connector dropped before the check could run. Verify before trusting the Notes UI.
-- [ ] **Apply / confirm 044.** `alter view ... set (security_invoker = true)` is idempotent, so running it again is harmless. Until confirmed, treat the notes views as potentially RLS-bypassing.
+- [x] **Apply 044** — run by Zack on 2026-07-29. The notes views now obey the querying user's RLS.
+- [ ] **Run 045** — the calendar day sheet degrades gracefully without it (block loading fails quiet), but "block time" will not save until it is applied.
+- [ ] **Confirm the rest of the live schema.** Which of 026–043 are actually applied has **not been verified** — the Supabase connector kept dropping. Worth one audit query.
 - [ ] **Live click-through** of the new UI once logged in: Home command center, Notes capture → review → promote-to-page, Inventory tabs (esp. Catalog/Sets showing the loaded myOPS data), the More nav sheet, `/wiki`→`/pages` redirects.
 - [ ] **Confirm remaining procedures** to load (TiN Right series for the 300 line, any others myOPS lists).
 - [ ] **Surgeon-specific pack customization** — currently `surgeon_preferences` can only swap whole Sets; it cannot add extra or non-catalog items to a surgeon's tray. Design deferred by instruction; revisit when ready.
