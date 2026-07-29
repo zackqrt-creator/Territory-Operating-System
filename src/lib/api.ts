@@ -34,6 +34,8 @@ import type {
   SecondBrainStatus,
   Surgeon,
   SurgeonPreference,
+  TaskPhoto,
+  TaskStage,
   TaskStatus,
   TerritoryNote,
   TerritoryNoteEntityType,
@@ -1499,5 +1501,49 @@ export async function assignRepToCase(input: {
 
 export async function unassignRepFromCase(id: string): Promise<void> {
   const { error } = await supabase.from("case_assignees").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// -- Task photos --------------------------------------------------------------
+
+export async function listTaskPhotos(taskIds: string[]): Promise<TaskPhoto[]> {
+  if (taskIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("task_photos")
+    .select("*")
+    .in("task_id", taskIds)
+    .order("created_at");
+  if (error) throw error;
+  return data as TaskPhoto[];
+}
+
+/** Uploads the file to storage, then records it against the task's stage. */
+export async function addTaskPhoto(input: {
+  file: File;
+  territory_id: string;
+  task_id: string;
+  stage: TaskStage;
+  caption?: string | null;
+  uploaded_by?: string | null;
+}): Promise<TaskPhoto> {
+  const url = await uploadItemPhoto(input.file, input.territory_id);
+  const { data, error } = await supabase
+    .from("task_photos")
+    .insert({
+      territory_id: input.territory_id,
+      task_id: input.task_id,
+      stage: input.stage,
+      url,
+      caption: input.caption ?? null,
+      uploaded_by: input.uploaded_by ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as TaskPhoto;
+}
+
+export async function deleteTaskPhoto(id: string): Promise<void> {
+  const { error } = await supabase.from("task_photos").delete().eq("id", id);
   if (error) throw error;
 }

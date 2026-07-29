@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { createTask, deleteTask, listMyTasks, listProfiles, updateTask } from "../lib/api";
 import type { PersonalTask, Profile, TaskStatus } from "../lib/types";
+import TaskPhotos from "../components/TaskPhotos";
 import { daysUntil, formatDateShort, tomorrow } from "../utils/dates";
 
 const COLUMNS: { value: TaskStatus; label: string }[] = [
@@ -222,6 +223,7 @@ function TaskCard({
 }) {
   const [busy, setBusy] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  const [showPhotos, setShowPhotos] = useState(false);
   const [dupDate, setDupDate] = useState(tomorrow());
   const [editing, setEditing] = useState(false);
   const [eTitle, setETitle] = useState(task.title);
@@ -351,6 +353,12 @@ function TaskCard({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowPhotos((v) => !v)}
+              className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300"
+            >
+              {showPhotos ? "Hide photos" : "Photos"}
+            </button>
             {task.status !== "todo" && (
               <button onClick={() => move(task.status === "done" ? "doing" : "todo")} disabled={busy} className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300">
                 ← Back
@@ -394,6 +402,10 @@ function TaskCard({
               </button>
             )}
           </div>
+
+          {showPhotos && (
+            <TaskPhotos taskId={task.id} territoryId={territoryId || null} currentStage={task.status} />
+          )}
         </>
       )}
     </div>

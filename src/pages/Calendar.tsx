@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   listCasesInRange,
   listCaseTemplatesWithItems,
@@ -22,6 +22,7 @@ import { computeReadiness } from "../lib/readiness";
 import { scoreCase, type ScoreColor } from "../lib/crm";
 import { caseRepId, dayLoadWarnings, repInitials } from "../lib/runsheet";
 import { useAuth } from "../hooks/useAuth";
+import { CheckCircle2, X } from "lucide-react";
 import DaySheet from "../components/DaySheet";
 import ReadinessSheet from "../components/ReadinessSheet";
 import TimeOffSheet from "../components/TimeOffSheet";
@@ -49,6 +50,8 @@ export default function Calendar() {
   const [repFilter, setRepFilter] = useState<"all" | "mine">("mine");
   const [wStart, setWStart] = useState(() => weekStart(toISODate(new Date())));
   const [mAnchor, setMAnchor] = useState(() => monthAnchor(toISODate(new Date())));
+  // Arriving from Add case: land on the day the case was scheduled for, so the
+  // confirmation and the case itself are on screen together.
   const [selectedDate, setSelectedDate] = useState(() => toISODate(new Date()));
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -61,6 +64,25 @@ export default function Calendar() {
   const [openCase, setOpenCase] = useState<CaseRow | null>(null);
   const [showTimeOff, setShowTimeOff] = useState(false);
   const [openDay, setOpenDay] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [flash, setFlash] = useState<string | null>(
+    () => (location.state as { flash?: string } | null)?.flash || null,
+  );
+
+  useEffect(() => {
+    // Consume the one-shot confirmation so a refresh does not replay it.
+    const st = location.state as { flash?: string; focusDate?: string } | null;
+    if (st?.focusDate) {
+      setSelectedDate(st.focusDate);
+      setMAnchor(monthAnchor(st.focusDate));
+      setWStart(weekStart(st.focusDate));
+    }
+    if (st?.flash) {
+      navigate(".", { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const days = useMemo(() => weekDays(wStart), [wStart]);
   const gridDays = useMemo(() => monthGridDays(mAnchor), [mAnchor]);
@@ -166,6 +188,20 @@ export default function Calendar() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
+      {flash && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-700 bg-emerald-950/40 px-3 py-3">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+          <p className="flex-1 text-sm text-emerald-200">{flash}</p>
+          <button
+            onClick={() => setFlash(null)}
+            aria-label="Dismiss"
+            className="shrink-0 rounded p-0.5 text-emerald-500/70 active:bg-emerald-900"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Calendar</h1>
         <div className="flex items-center gap-2">

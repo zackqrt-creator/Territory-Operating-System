@@ -547,3 +547,17 @@ export interface CalendarBlock {
   created_by: string | null;
   created_at: string;
 }
+
+export type TaskStage = "todo" | "doing" | "done";
+
+/** A photo attached to a task, filed under the stage it documents. */
+export interface TaskPhoto {
+  id: string;
+  territory_id: string;
+  task_id: string;
+  stage: TaskStage;
+  url: string;
+  caption: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+}

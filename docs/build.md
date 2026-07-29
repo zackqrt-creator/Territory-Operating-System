@@ -64,6 +64,12 @@ All migrations are numbered files in `supabase/migrations/`. Earlier Claude sess
 |---|------|---------------|
 | 045 | `case_coverage_and_calendar_blocks.sql` | `case_assignees` (attach a second rep to a case: primary / covering / observing) and `calendar_blocks` (non-case time: hospital visits, in-services, travel, admin, personal). RLS via `my_territory_id()`; blocks are editable only by their own rep. **Applied 2026-07-29.** |
 
+### Tasks
+
+| # | File | What it does |
+|---|------|---------------|
+| 046 | `task_photos.sql` | `task_photos` — photos attached to a task and tagged with the stage (`todo` / `doing` / `done`) they document. Reuses the public `item-photos` storage bucket from 008. Visibility follows the task's own share rules. **Not yet run.** |
+
 **Run order for the notes system:** `032` → `042` → `043` → `044` (032 provides `pg_trgm`; 044 secures the views). 033 is a prerequisite of 042.
 
 ### Procedures loaded so far (9)

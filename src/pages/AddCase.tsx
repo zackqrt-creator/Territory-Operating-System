@@ -76,7 +76,7 @@ export default function AddCase() {
           territoryId={profile?.territory_id ?? ""}
           profileId={profile?.id ?? ""}
           lastFacilityId={profile?.last_facility_id ?? null}
-          onDone={(flash) => navigate("/", { state: { flash } })}
+          onDone={(flash, forDate) => navigate("/cases", { state: { flash, focusDate: forDate } })}
         />
       ) : (
         <PasteImport
@@ -106,7 +106,7 @@ function QuickAddForm({
   territoryId: string;
   profileId: string;
   lastFacilityId: string | null;
-  onDone: (flash: string) => void;
+  onDone: (flash: string, forDate: string) => void;
 }) {
   const [params] = useSearchParams();
   // The calendar day sheet hands off ?date=&time= when you tap an empty slot,
@@ -262,6 +262,7 @@ function QuickAddForm({
         .join(" ");
       onDone(
         `${label} case saved — ${formatDateShort(date)} at ${formatTime(time)}, ${facName(facilityId)}`,
+        date,
       );
     } finally {
       setSaving(false);
@@ -531,7 +532,7 @@ function QuickAddForm({
       >
         {saving ? "Saving..." : "Add case"}
       </button>
-      <button onClick={() => onDone("")} className="w-full text-sm text-slate-500 underline">
+      <button onClick={() => onDone("", date)} className="w-full text-sm text-slate-500 underline">
         Cancel
       </button>
     </div>
