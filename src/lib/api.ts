@@ -213,7 +213,8 @@ export async function deleteInventoryItem(id: string): Promise<void> {
 
 /** One line of a loaner tote's contents: a catalog item and how many of it are inside. */
 export interface LoanerContentLine {
-  catalog_item_id: string;
+  /** Null when the item number is not in the catalog -- the name carries the REF. */
+  catalog_item_id: string | null;
   name: string;
   category: ItemCategory;
   quantity: number;
@@ -233,6 +234,7 @@ export async function createLoanerTote(params: {
   locationId: string;
   territoryId: string;
   returnDeadline?: string | null;
+  photoUrl?: string | null;
   contents: LoanerContentLine[];
 }): Promise<InventoryItem> {
   const { loanerCode, contentsLabel, locationId, territoryId, returnDeadline, contents } = params;
@@ -248,6 +250,7 @@ export async function createLoanerTote(params: {
       loaner_code: loanerCode,
       contents_label: contentsLabel,
       loaner_return_deadline: returnDeadline ?? null,
+      photo_url: params.photoUrl ?? null,
       quantity: 1,
     })
     .select()

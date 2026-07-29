@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createLoanerTote, type LoanerContentLine } from "../lib/api";
+import { Camera, FileText } from "lucide-react";
+import { uploadItemPhoto } from "../lib/api";
+import PackingSlipScan, { type SlipContentLine } from "./PackingSlipScan";
 import type { CatalogItem, Facility } from "../lib/types";
 
 interface Line extends LoanerContentLine {
@@ -41,6 +44,34 @@ export default function LoanerIntake({
   const [lines, setLines] = useState<Line[]>([]);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
+
+  function onPhotoSelected(file: File | null) {
+    setPhotoFile(file);
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  }
+
+  /** Slip lines replace whatever is staged -- rescanning should not double up. */
+  function applySlip(slipLines: SlipContentLine[], shipmentNo: string | null) {
+    setLines(
+      slipLines.map((l, i) => ({
+        key: `slip-${i}-${l.catalog_item_id ?? l.name}`,
+        catalog_item_id: l.catalog_item_id,
+        name: l.name,
+        category: l.category,
+        quantity: l.quantity,
+        lot_number: l.lot_number,
+      })),
+    );
+    if (shipmentNo && !loanerCode.trim()) setLoanerCode(shipmentNo);
+    setScanning(false);
+  }
 
   // Available "sets": each (device type + side) group of sized implants, so a
   // full same-side run can be dropped in with one tap.
@@ -101,11 +132,15 @@ export default function LoanerIntake({
         locationId,
         territoryId,
         returnDeadline: returnDeadline || null,
-        contents: lines.map(({ catalog_item_id, name, category, quantity }) => ({
+        photoUrl: photoFile ? await uploadItemPhoto(photoFile, territoryId) : null,
+        contents: lines.map(({ catalog_item_id, name, category, quantity, lot_number }) => ({
           catalog_item_id,
           name,
           category,
           quantity,
+          // Typed by hand this would not be worth the effort, but the packing
+          // slip hands it over for free, so it is kept when we have it.
+          lot_number: lot_number ?? null,
         })),
       });
       onCreated();
@@ -118,6 +153,42 @@ export default function LoanerIntake({
 
   return (
     <div className="mt-4 space-y-4">
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setScanning(true)}
+          className="flex items-center justify-center gap-2 rounded-lg border border-sky-800 bg-sky-950/40 px-3 py-3 text-sm font-medium text-sky-300"
+        >
+          <FileText size={15} /> Scan slip
+        </button>
+        <button
+          type="button"
+          onClick={() => photoRef.current?.click()}
+          className="flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-3 text-sm font-medium text-slate-300"
+        >
+          <Camera size={15} /> {photoFile ? "Retake photo" : "Photo of kit"}
+        </button>
+        <input
+          ref={photoRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            onPhotoSelected(e.target.files?.[0] ?? null);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      {photoPreview && (
+        <img
+          src={photoPreview}
+          alt="Kit"
+          className="h-28 w-full rounded-lg border border-slate-700 object-cover"
+        />
+      )}
+
       <div>
         <label className="mb-1 block text-sm text-slate-400">Loaner code (outside of the tote)</label>
         <input
@@ -251,6 +322,13 @@ export default function LoanerIntake({
       <button onClick={onCancel} className="w-full text-sm text-slate-500 underline">
         Cancel
       </button>
+      {scanning && (
+        <PackingSlipScan
+          catalog={catalog}
+          onClose={() => setScanning(false)}
+          onConfirm={applySlip}
+        />
+      )}
     </div>
   );
 }
