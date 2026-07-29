@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { createCatalogItem, createInventoryItem, listCatalogItems, uploadItemPhoto } from "../lib/api";
 import type {
-  AcquisitionType,
   CatalogItem,
   CatalogJoint,
   CatalogSide,
@@ -11,6 +10,7 @@ import type {
   ItemCategory,
 } from "../lib/types";
 import LoanerIntake from "./LoanerIntake";
+import RestockIntake from "./RestockIntake";
 import { ocrLabel } from "../lib/ocr";
 import { catalogLabel, parseGs1, parseLabelText } from "../lib/labelParse";
 
@@ -93,7 +93,7 @@ export default function AddItemSheet({
   onCreated: () => void;
 }) {
   const { profile } = useAuth();
-  const [acquisition, setAcquisition] = useState<AcquisitionType>("consignment");
+  const [mode, setMode] = useState<"consignment" | "loaner" | "restock">("consignment");
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [joint, setJoint] = useState<CatalogJoint>("KNEE");
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -284,20 +284,29 @@ export default function AddItemSheet({
         <h2 className="text-lg font-semibold text-white">Add inventory</h2>
 
         <div className="mt-4 flex rounded-lg border border-slate-700 bg-slate-800/50 p-1">
-          {(["consignment", "loaner"] as AcquisitionType[]).map((a) => (
+          {(["consignment", "loaner", "restock"] as const).map((a) => (
             <button
               key={a}
-              onClick={() => setAcquisition(a)}
-              className={`flex-1 rounded-md py-2 text-sm font-medium capitalize ${
-                acquisition === a ? "bg-sky-600 text-white" : "text-slate-400"
+              onClick={() => setMode(a)}
+              className={`flex-1 rounded-md py-2 text-xs font-medium ${
+                mode === a ? "bg-sky-600 text-white" : "text-slate-400"
               }`}
             >
-              {a === "consignment" ? "Consignment" : "Loaner tote"}
+              {a === "consignment" ? "Consignment" : a === "loaner" ? "Loaner tote" : "Restock"}
             </button>
           ))}
         </div>
 
-        {acquisition === "loaner" ? (
+        {mode === "restock" ? (
+          <RestockIntake
+            facilities={facilities}
+            catalog={catalog}
+            territoryId={profile?.territory_id ?? ""}
+            defaultLocationId={locationId}
+            onCreated={onCreated}
+            onCancel={onClose}
+          />
+        ) : mode === "loaner" ? (
           <LoanerIntake
             facilities={facilities}
             catalog={catalog}

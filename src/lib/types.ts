@@ -221,6 +221,10 @@ export interface ToteTemplate {
   id: string;
   territory_id: string;
   name: string;
+  /** myOPS Set code (GSKAIMPL, 500KATRL...). Added in migration 026. */
+  code?: string | null;
+  /** 'implant' | 'instrument' — which kind of tray this Set is. */
+  content_type?: string | null;
   /** true = instrument-type tote that gets resterilized/reused between cases (soft advisory). */
   reusable: boolean;
   advisory_cases_per_unit: number | null;

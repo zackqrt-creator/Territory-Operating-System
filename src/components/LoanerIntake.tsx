@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createLoanerTote, type LoanerContentLine } from "../lib/api";
 import { Camera, FileText } from "lucide-react";
-import { uploadItemPhoto } from "../lib/api";
+import { listToteTemplatesWithItems, uploadItemPhoto } from "../lib/api";
 import PackingSlipScan, { type SlipContentLine } from "./PackingSlipScan";
-import type { CatalogItem, Facility } from "../lib/types";
+import type { CatalogItem, Facility, ToteTemplateWithItems } from "../lib/types";
 
 interface Line extends LoanerContentLine {
   key: string;
@@ -48,6 +48,36 @@ export default function LoanerIntake({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
+  // The myOPS Sets already loaded into the catalog. A kit that arrives without
+  // paper can still be filled in from the Set it is supposed to be.
+  const [toteTemplates, setToteTemplates] = useState<ToteTemplateWithItems[]>([]);
+  const [templateSearch, setTemplateSearch] = useState("");
+
+  useEffect(() => {
+    listToteTemplatesWithItems().then(setToteTemplates).catch(() => {});
+  }, []);
+
+  /**
+   * Loads a Set's official item list. This is what the Set *should* contain --
+   * unlike a scanned slip, which is what was actually shipped -- so lines land
+   * without lot numbers and are expected to be edited down to what is really
+   * in the box.
+   */
+  function applyTemplate(t: ToteTemplateWithItems) {
+    setLines(
+      t.tote_template_items.map((ti) => ({
+        key: `tpl-${ti.id}`,
+        catalog_item_id: ti.catalog_item_id,
+        name: ti.catalog_item?.name ?? "Item",
+        category: ti.catalog_item?.category ?? "implant",
+        quantity: ti.quantity_per_tote ?? 1,
+        lot_number: null,
+      })),
+    );
+    if (!contentsLabel.trim()) setContentsLabel(t.name);
+    if (!loanerCode.trim() && t.code) setLoanerCode(t.code);
+    setTemplateSearch("");
+  }
 
   function onPhotoSelected(file: File | null) {
     setPhotoFile(file);
@@ -187,6 +217,51 @@ export default function LoanerIntake({
           alt="Kit"
           className="h-28 w-full rounded-lg border border-slate-700 object-cover"
         />
+      )}
+
+      {toteTemplates.length > 0 && (
+        <div>
+          <label className="mb-1 block text-sm text-slate-400">
+            Or start from a Set{" "}
+            <span className="text-slate-500">(what it should contain)</span>
+          </label>
+          <input
+            value={templateSearch}
+            onChange={(e) => setTemplateSearch(e.target.value)}
+            placeholder="GSKAIMPL, 500KATRL, Revision..."
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+          />
+          {templateSearch.trim().length > 0 && (
+            <div className="mt-1 max-h-44 space-y-1 overflow-y-auto">
+              {toteTemplates
+                .filter((t) => {
+                  const q = templateSearch.trim().toLowerCase();
+                  return (
+                    t.name.toLowerCase().includes(q) ||
+                    (t.code ?? "").toLowerCase().includes(q)
+                  );
+                })
+                .slice(0, 12)
+                .map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => applyTemplate(t)}
+                    className="flex w-full items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-2 text-left active:bg-slate-700"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-white">{t.name}</span>
+                      {t.code && (
+                        <span className="font-mono text-[11px] text-slate-500">{t.code}</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-slate-400">
+                      {t.tote_template_items.length} items
+                    </span>
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
       )}
 
       <div>

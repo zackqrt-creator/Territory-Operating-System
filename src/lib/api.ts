@@ -1550,3 +1550,41 @@ export async function deleteTaskPhoto(id: string): Promise<void> {
   const { error } = await supabase.from("task_photos").delete().eq("id", id);
   if (error) throw error;
 }
+
+/**
+ * Consignment restock from a shipment slip.
+ *
+ * The same paper slip that ships inside a loaner kit also arrives with
+ * consignment replenishment -- stock sent to refill what earlier surgeries
+ * consumed. The document looks identical; only the destination differs. A
+ * loaner slip builds one tote with contents hanging off it, while a restock
+ * slip becomes plain consignment rows that roll straight into on-hand totals.
+ */
+export async function createConsignmentRestock(params: {
+  territoryId: string;
+  locationId: string;
+  photoUrl?: string | null;
+  shipmentNo?: string | null;
+  lines: LoanerContentLine[];
+}): Promise<number> {
+  const rows = params.lines
+    .filter((l) => l.quantity > 0)
+    .map((l) => ({
+      name: l.name,
+      category: l.category,
+      catalog_item_id: l.catalog_item_id,
+      lot_number: l.lot_number ?? null,
+      location_id: params.locationId,
+      territory_id: params.territoryId,
+      acquisition_type: "consignment" as const,
+      // The shipment number is the paper trail back to this delivery.
+      loaner_code: params.shipmentNo ?? null,
+      photo_url: params.photoUrl ?? null,
+      quantity: l.quantity,
+    }));
+
+  if (rows.length === 0) return 0;
+  const { error } = await supabase.from("inventory_items").insert(rows);
+  if (error) throw error;
+  return rows.length;
+}
