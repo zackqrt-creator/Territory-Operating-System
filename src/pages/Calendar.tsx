@@ -32,7 +32,7 @@ import {
   monthAnchor,
   monthGridDays,
   monthLabel,
-  nextWednesday,
+  toISODate,
   weekDays,
   weekStart,
 } from "../utils/dates";
@@ -41,11 +41,14 @@ const DAY_LABEL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function Calendar() {
   const { profile } = useAuth();
-  const [view, setView] = useState<"week" | "month">("week");
-  const [repFilter, setRepFilter] = useState<"all" | "mine">("all");
-  const [wStart, setWStart] = useState(() => weekStart(nextWednesday()));
-  const [mAnchor, setMAnchor] = useState(() => monthAnchor(nextWednesday()));
-  const [selectedDate, setSelectedDate] = useState(() => nextWednesday());
+  // Opens on the month, on your own cases, anchored on today -- the rep's
+  // default question is "what does my month look like", not "what is everyone
+  // doing the week of the next Wednesday".
+  const [view, setView] = useState<"week" | "month">("month");
+  const [repFilter, setRepFilter] = useState<"all" | "mine">("mine");
+  const [wStart, setWStart] = useState(() => weekStart(toISODate(new Date())));
+  const [mAnchor, setMAnchor] = useState(() => monthAnchor(toISODate(new Date())));
+  const [selectedDate, setSelectedDate] = useState(() => toISODate(new Date()));
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [templates, setTemplates] = useState<CaseTemplateWithItems[]>([]);
