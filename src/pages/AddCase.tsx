@@ -29,7 +29,7 @@ import type {
 } from "../lib/types";
 import { buildPreferenceCard, type SuggestedItem, type SuggestionMode } from "../lib/crm";
 import { dayLoadWarnings } from "../lib/runsheet";
-import { formatTime, nextWednesday } from "../utils/dates";
+import { formatDateShort, formatTime, nextWednesday } from "../utils/dates";
 import { dedupeByCaseId, parsePasteText } from "../utils/parsePaste";
 import { dedupeMyopsRows, parseMyopsCsv } from "../utils/parseMyopsCsv";
 
@@ -76,7 +76,7 @@ export default function AddCase() {
           territoryId={profile?.territory_id ?? ""}
           profileId={profile?.id ?? ""}
           lastFacilityId={profile?.last_facility_id ?? null}
-          onDone={() => navigate("/cases")}
+          onDone={(flash) => navigate("/", { state: { flash } })}
         />
       ) : (
         <PasteImport
@@ -106,7 +106,7 @@ function QuickAddForm({
   territoryId: string;
   profileId: string;
   lastFacilityId: string | null;
-  onDone: () => void;
+  onDone: (flash: string) => void;
 }) {
   const [params] = useSearchParams();
   // The calendar day sheet hands off ?date=&time= when you tap an empty slot,
@@ -115,13 +115,15 @@ function QuickAddForm({
   const initialTime = params.get("time") || "";
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime);
+  // A required field should not shout at you before you have had a chance to
+  // fill it in. Only complain once it has been touched or submit was tried.
+  const [timeTouched, setTimeTouched] = useState(false);
   const [type, setType] = useState<SurgeryType>("KNEE");
   const [variant, setVariant] = useState<CaseVariant>("total");
   const [side, setSide] = useState<Side | null>("LEFT");
   const [facilityId, setFacilityId] = useState(lastFacilityId ?? "");
   const [surgeon, setSurgeon] = useState("");
   const [saving, setSaving] = useState(false);
-  const [justAdded, setJustAdded] = useState(false);
 
   // Preference card: history for auto-suggesting this surgeon's usual items.
   const [history, setHistory] = useState<{
@@ -205,7 +207,13 @@ function QuickAddForm({
   }
 
   async function onSubmit() {
-    if (!facilityId || !territoryId || !profileId || !time) return;
+    if (!time) {
+      // The button is disabled without a time, but guard anyway and make the
+      // reason visible rather than having the tap do nothing.
+      setTimeTouched(true);
+      return;
+    }
+    if (!facilityId || !territoryId || !profileId) return;
     setSaving(true);
     try {
       const resolved = await resolveSurgeon();
@@ -243,18 +251,18 @@ function QuickAddForm({
         setManualItems([]);
       }
       await updateLastFacility(profileId, facilityId);
-      // Reset back to a blank case. Facility and date stay -- you almost always
-      // add several cases for the same day at the same hospital in one sitting.
-      setSurgeon("");
-      setSide("LEFT");
-      setType("KNEE");
-      setVariant("total");
-      setTime("");
-      setManualItems([]);
-      setManualName("");
-      setEnabled({});
-      setJustAdded(true);
-      setTimeout(() => setJustAdded(false), 1500);
+      // Leave the page on success. A form that silently clears itself looks
+      // identical to a form that failed -- going home with a confirmation is
+      // the only unambiguous signal that the case actually saved.
+      const label = [
+        type === "KNEE" ? "Knee" : type === "HIP" ? "Hip" : "Instrument",
+        side ? (side === "LEFT" ? "Left" : "Right") : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      onDone(
+        `${label} case saved — ${formatDateShort(date)} at ${formatTime(time)}, ${facName(facilityId)}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -279,14 +287,37 @@ function QuickAddForm({
         <input
           type="time"
           value={time}
-          onChange={(e) => setTime(e.target.value)}
+          onChange={(e) => {
+            setTime(e.target.value);
+            setTimeTouched(true);
+          }}
+          onBlur={() => setTimeTouched(true)}
           className={`w-full rounded-lg border bg-slate-800 px-4 py-3 text-white ${
-            time ? "border-slate-700" : "border-red-800"
+            !time && timeTouched ? "border-red-800" : "border-slate-700"
           }`}
         />
-        {!time && (
+        {/* Typing into a native time input is fiddly on a phone and clears
+            itself while half-entered. Common start times are one tap. */}
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {["07:00", "07:30", "08:00", "09:00", "10:00", "11:00", "13:00"].map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => {
+                setTime(t);
+                setTimeTouched(true);
+              }}
+              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                time === t ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300"
+              }`}
+            >
+              {formatTime(t)}
+            </button>
+          ))}
+        </div>
+        {!time && timeTouched && (
           <p className="mt-1 text-xs text-red-400">
-            A case without a time can't be sequenced or staged. Set one.
+            A case without a time can't be sequenced or staged. Pick one above.
           </p>
         )}
       </div>
@@ -498,10 +529,10 @@ function QuickAddForm({
         disabled={saving || !facilityId || !time}
         className="w-full rounded-lg bg-sky-600 px-4 py-4 text-lg font-medium text-white active:bg-sky-700 disabled:opacity-50"
       >
-        {justAdded ? "Added ✓" : saving ? "Saving..." : "Add case"}
+        {saving ? "Saving..." : "Add case"}
       </button>
-      <button onClick={onDone} className="w-full text-sm text-slate-500 underline">
-        Done adding cases
+      <button onClick={() => onDone("")} className="w-full text-sm text-slate-500 underline">
+        Cancel
       </button>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Plus,
   Stethoscope,
@@ -15,6 +15,8 @@ import {
   ArrowRight,
   MessageSquare,
   ChevronRight,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -64,6 +66,19 @@ export default function Home() {
   const [certs, setCerts] = useState<RepCertification[]>([]);
   const [myTasks, setMyTasks] = useState<PersonalTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [flash, setFlash] = useState<string | null>(
+    () => (location.state as { flash?: string } | null)?.flash || null,
+  );
+
+  useEffect(() => {
+    // Consume the one-shot message so refreshing Home does not show it again.
+    if ((location.state as { flash?: string } | null)?.flash) {
+      navigate(".", { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function refresh() {
     return Promise.all([
@@ -165,6 +180,20 @@ export default function Home() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
+      {flash && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-700 bg-emerald-950/40 px-3 py-3">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+          <p className="flex-1 text-sm text-emerald-200">{flash}</p>
+          <button
+            onClick={() => setFlash(null)}
+            aria-label="Dismiss"
+            className="shrink-0 rounded p-0.5 text-emerald-500/70 active:bg-emerald-900"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 text-lg font-bold text-white shadow-lg shadow-sky-900/50">
