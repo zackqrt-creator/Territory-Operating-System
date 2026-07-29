@@ -55,7 +55,7 @@ All migrations are numbered files in `supabase/migrations/`. Earlier Claude sess
 | # | File | What it does |
 |---|------|---------------|
 | 042 | `territory_notes_second_brain.sql` | Creates `territory_notes`, `territory_note_links`, `territory_note_tags`, `territory_note_tag_assignments`, the `territory_note_feed` + `territory_second_brain_queue` views, RLS, and extends `tasks.entity_type` to include `'note'` |
-| 043 | `note_kinds_logistics_playbook.sql` | Extends `territory_notes.note_type` check with `logistics` + `playbook` |
+| 043 | `note_kinds_logistics_playbook.sql` | Widens the `territory_notes.note_type` check to 14 values. Eight have UI (`general`, `case`, `surgeon`, `hospital`, `inventory`, `replenishment`, `logistics`, `playbook`); the other six (`loaner`, `consignment`, `task`, `meeting`, `idea`, `ai_summary`) are accepted by the DB and render with a fallback icon. **Applied.** |
 | 044 | `notes_views_security_invoker.sql` | Sets `territory_note_feed` and `territory_second_brain_queue` to `security_invoker = true` so the views obey the querying user's RLS. **Applied 2026-07-29.** |
 
 ### Calendar revamp
@@ -68,7 +68,14 @@ All migrations are numbered files in `supabase/migrations/`. Earlier Claude sess
 
 | # | File | What it does |
 |---|------|---------------|
-| 046 | `task_photos.sql` | `task_photos` — photos attached to a task and tagged with the stage (`todo` / `doing` / `done`) they document. Reuses the public `item-photos` storage bucket from 008. Visibility follows the task's own share rules. **Not yet run.** |
+| 046 | `task_photos.sql` | `task_photos` — photos attached to a task and tagged with the stage (`todo` / `doing` / `done`) they document. Reuses the public `item-photos` storage bucket from 008. Visibility follows the task's own share rules. **Applied 2026-07-29.** |
+
+> **On migration numbering.** Migrations are run by pasting into the Supabase
+> SQL editor, whose saved snippets are just labelled queries — there is no
+> migration ledger, no ordering, and no record of what actually ran. Snippet
+> titles have drifted from these filenames (046 was pasted as a snippet named
+> "049", and 044/045 were left untitled). **The filenames here are the ledger**;
+> snippet names carry no meaning and should not be matched.
 
 **Run order for the notes system:** `032` → `042` → `043` → `044` (032 provides `pg_trgm`; 044 secures the views). 033 is a prerequisite of 042.
 
