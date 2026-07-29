@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, Clock, Plus, Trash2, X } from "lucide-react";
-import { createCalendarBlock, deleteCalendarBlock, listCalendarBlocks } from "../lib/api";
+import {
+  createCalendarBlock,
+  deleteCalendarBlock,
+  listCalendarBlocks,
+  listCaseAssignees,
+} from "../lib/api";
 import type {
   CalendarBlock,
   CalendarBlockKind,
+  CaseAssignee,
   CaseRow,
   Facility,
   Profile,
@@ -70,6 +76,18 @@ export default function DaySheet({
   const [draftLabel, setDraftLabel] = useState("");
   const [draftKind, setDraftKind] = useState<CalendarBlockKind>("hospital_visit");
   const [busy, setBusy] = useState(false);
+  const [assignees, setAssignees] = useState<CaseAssignee[]>([]);
+
+  // Coverage shows on the chip so a shared case is obvious from the day view
+  // rather than only after opening it. Fails quiet before migration 045.
+  useEffect(() => {
+    const ids = cases.map((c) => c.id);
+    if (ids.length === 0) {
+      setAssignees([]);
+      return;
+    }
+    listCaseAssignees(ids).then(setAssignees).catch(() => setAssignees([]));
+  }, [cases]);
 
   function loadBlocks() {
     listCalendarBlocks(date, date)
@@ -156,6 +174,17 @@ export default function DaySheet({
           >
             {repInitials(profiles.find((p) => p.id === caseRepId(c)))}
           </span>
+          {assignees
+            .filter((a) => a.case_id === c.id)
+            .map((a) => (
+              <span
+                key={a.id}
+                title={a.role}
+                className="shrink-0 rounded-full bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-violet-300"
+              >
+                {repInitials(profiles.find((p) => p.id === a.profile_id))}
+              </span>
+            ))}
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">
             {c.surgery_type === "KNEE" ? "Knee" : c.surgery_type === "HIP" ? "Hip" : "Instrument"}
             {c.variant === "partial" ? " · Partial" : ""}

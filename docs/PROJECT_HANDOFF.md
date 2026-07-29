@@ -69,6 +69,8 @@ All tables are territory-scoped and protected by RLS. The canonical RLS pattern 
 - `entity_notes` — **inline comments on a specific record** (a case, an inventory item, a surgeon, a facility, a catalog item, a Set, a Procedure)
 - `pages` + `page_links` — durable wiki-style knowledge pages with `[[wikilink]]` graph edges
 - `territory_notes` + `territory_note_links` + `territory_note_tags` + `territory_note_tag_assignments` — the field-capture note system (see §5)
+- `case_assignees` — a second/third rep on a case (primary, covering, observing)
+- `calendar_blocks` — non-case calendar time (hospital visits, in-services, travel, admin, personal)
 - `board_posts` + `board_comments` — team board
 - `qa_questions` + `qa_answers` — Q&A wall
 
@@ -210,7 +212,7 @@ Billing and credentials sections were **removed** from Home per explicit instruc
 > **Which migrations are actually applied to the live database is currently unconfirmed.**
 > A previous session reported that the catalog + notes schema exists in `Zack CaseTrack` (`tylytbjxizxukefpplcw`) and that 044 was applied. That claim has **not been independently verified**, and the migration file for 044 did not exist in the repo until it was reconstructed — so the repo and the database may have drifted. **Verify the live schema before relying on the Notes UI.**
 
-1. **Confirm live schema state**, migration by migration. (044 is confirmed applied as of 2026-07-29; 045 is written but not yet run.)
+1. **Confirm live schema state**, migration by migration. (044 and 045 are confirmed applied as of 2026-07-29; 026-043 remain unaudited.)
 2. **The new UI has never been click-tested against live data.** It is verified only by `tsc` typecheck + `vite build` + dev-server transform.
 
 ### The environmental constraint that shaped everything

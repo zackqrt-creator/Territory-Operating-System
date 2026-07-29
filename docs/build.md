@@ -62,7 +62,7 @@ All migrations are numbered files in `supabase/migrations/`. Earlier Claude sess
 
 | # | File | What it does |
 |---|------|---------------|
-| 045 | `case_coverage_and_calendar_blocks.sql` | `case_assignees` (attach a second rep to a case: primary / covering / observing) and `calendar_blocks` (non-case time: hospital visits, in-services, travel, admin, personal). RLS via `my_territory_id()`; blocks are editable only by their own rep. **Not yet run.** |
+| 045 | `case_coverage_and_calendar_blocks.sql` | `case_assignees` (attach a second rep to a case: primary / covering / observing) and `calendar_blocks` (non-case time: hospital visits, in-services, travel, admin, personal). RLS via `my_territory_id()`; blocks are editable only by their own rep. **Applied 2026-07-29.** |
 
 **Run order for the notes system:** `032` → `042` → `043` → `044` (032 provides `pg_trgm`; 044 secures the views). 033 is a prerequisite of 042.
 
@@ -148,7 +148,7 @@ This session's git proxy is scoped to the literal repo name `zackqrt-creator/cla
 ## 6. What still needs review
 
 - [x] **Apply 044** — run by Zack on 2026-07-29. The notes views now obey the querying user's RLS.
-- [ ] **Run 045** — the calendar day sheet degrades gracefully without it (block loading fails quiet), but "block time" will not save until it is applied.
+- [x] **Run 045** — applied by Zack on 2026-07-29. Calendar blocks and case coverage are live.
 - [ ] **Confirm the rest of the live schema.** Which of 026–043 are actually applied has **not been verified** — the Supabase connector kept dropping. Worth one audit query.
 - [ ] **Live click-through** of the new UI once logged in: Home command center, Notes capture → review → promote-to-page, Inventory tabs (esp. Catalog/Sets showing the loaded myOPS data), the More nav sheet, `/wiki`→`/pages` redirects.
 - [ ] **Confirm remaining procedures** to load (TiN Right series for the 300 line, any others myOPS lists).

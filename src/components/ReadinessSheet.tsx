@@ -17,6 +17,7 @@ import {
   listRepCertifications,
 } from "../lib/api";
 import { scoreCase, type CheckStatus } from "../lib/crm";
+import CaseCoverage from "./CaseCoverage";
 import MoveItemSheet from "./MoveItemSheet";
 import NotesSection from "./NotesSection";
 import QuickLogSheet from "./QuickLogSheet";
@@ -141,6 +142,8 @@ export default function ReadinessSheet({
             </div>
           </div>
         )}
+
+        <CaseCoverage caseId={caseRow.id} territoryId={caseRow.territory_id ?? null} />
 
         <NotesSection entityType="case" entityId={caseRow.id} />
 
