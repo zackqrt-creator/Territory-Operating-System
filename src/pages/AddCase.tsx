@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
   bulkCreateCases,
@@ -108,7 +108,13 @@ function QuickAddForm({
   lastFacilityId: string | null;
   onDone: () => void;
 }) {
-  const [date, setDate] = useState(nextWednesday());
+  const [params] = useSearchParams();
+  // The calendar day sheet hands off ?date=&time= when you tap an empty slot,
+  // so scheduling from the calendar lands here already filled in.
+  const initialDate = params.get("date") || nextWednesday();
+  const initialTime = params.get("time") || "";
+  const [date, setDate] = useState(initialDate);
+  const [time, setTime] = useState(initialTime);
   const [type, setType] = useState<SurgeryType>("KNEE");
   const [variant, setVariant] = useState<CaseVariant>("total");
   const [side, setSide] = useState<Side | null>("LEFT");
@@ -171,8 +177,8 @@ function QuickAddForm({
   const prospective = {
     id: "draft",
     surgery_date: date,
-    surgery_time: null,
-    time_tba: true,
+    surgery_time: time || null,
+    time_tba: !time,
     facility_id: facilityId || null,
   } as CaseRow;
   const loadWarnings =
@@ -199,7 +205,7 @@ function QuickAddForm({
   }
 
   async function onSubmit() {
-    if (!facilityId || !territoryId || !profileId) return;
+    if (!facilityId || !territoryId || !profileId || !time) return;
     setSaving(true);
     try {
       const resolved = await resolveSurgeon();
@@ -208,6 +214,8 @@ function QuickAddForm({
         side,
         variant: type === "INSTRUMENT" ? null : variant,
         surgery_date: date,
+        surgery_time: time,
+        time_tba: false,
         facility_id: facilityId,
         surgeon: resolved.name,
         surgeon_id: resolved.id,
@@ -235,6 +243,16 @@ function QuickAddForm({
         setManualItems([]);
       }
       await updateLastFacility(profileId, facilityId);
+      // Reset back to a blank case. Facility and date stay -- you almost always
+      // add several cases for the same day at the same hospital in one sitting.
+      setSurgeon("");
+      setSide("LEFT");
+      setType("KNEE");
+      setVariant("total");
+      setTime("");
+      setManualItems([]);
+      setManualName("");
+      setEnabled({});
       setJustAdded(true);
       setTimeout(() => setJustAdded(false), 1500);
     } finally {
@@ -252,6 +270,25 @@ function QuickAddForm({
           onChange={(e) => setDate(e.target.value)}
           className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
         />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm text-slate-400">
+          Start time <span className="text-red-400">*</span>
+        </label>
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className={`w-full rounded-lg border bg-slate-800 px-4 py-3 text-white ${
+            time ? "border-slate-700" : "border-red-800"
+          }`}
+        />
+        {!time && (
+          <p className="mt-1 text-xs text-red-400">
+            A case without a time can't be sequenced or staged. Set one.
+          </p>
+        )}
       </div>
 
       {outThatDay.length > 0 && (
@@ -458,7 +495,7 @@ function QuickAddForm({
 
       <button
         onClick={onSubmit}
-        disabled={saving || !facilityId}
+        disabled={saving || !facilityId || !time}
         className="w-full rounded-lg bg-sky-600 px-4 py-4 text-lg font-medium text-white active:bg-sky-700 disabled:opacity-50"
       >
         {justAdded ? "Added ✓" : saving ? "Saving..." : "Add case"}
@@ -550,6 +587,8 @@ function PasteImport({
   }
 
   async function onImport() {
+    // Bulk paste comes off the myOPS schedule without times, so imported cases
+    // land as TBA and show up in the day sheet's "Needs a time" bucket.
     if (!facilityId || !territoryId || !profileId) return;
     const rows = parsed.filter((_, i) => included[i]);
     if (rows.length === 0) return;

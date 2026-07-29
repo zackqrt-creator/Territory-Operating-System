@@ -22,6 +22,7 @@ import { computeReadiness } from "../lib/readiness";
 import { scoreCase, type ScoreColor } from "../lib/crm";
 import { caseRepId, dayLoadWarnings, repInitials } from "../lib/runsheet";
 import { useAuth } from "../hooks/useAuth";
+import DaySheet from "../components/DaySheet";
 import ReadinessSheet from "../components/ReadinessSheet";
 import TimeOffSheet from "../components/TimeOffSheet";
 import {
@@ -59,6 +60,7 @@ export default function Calendar() {
   const [loading, setLoading] = useState(true);
   const [openCase, setOpenCase] = useState<CaseRow | null>(null);
   const [showTimeOff, setShowTimeOff] = useState(false);
+  const [openDay, setOpenDay] = useState<string | null>(null);
 
   const days = useMemo(() => weekDays(wStart), [wStart]);
   const gridDays = useMemo(() => monthGridDays(mAnchor), [mAnchor]);
@@ -114,6 +116,13 @@ export default function Calendar() {
   }
 
   function pickDay(date: string) {
+    // First tap selects, second tap opens the day. On a day you are already
+    // looking at, one tap is enough -- otherwise moving around the month would
+    // keep throwing the full-screen day sheet in your face.
+    if (date === selectedDate) {
+      setOpenDay(date);
+      return;
+    }
     setSelectedDate(date);
     if (view === "month" && date.slice(0, 7) !== mAnchor.slice(0, 7)) {
       setMAnchor(monthAnchor(date));
@@ -330,7 +339,15 @@ export default function Calendar() {
       {loading ? (
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : selectedCases.length === 0 ? (
-        <p className="mt-8 text-slate-400">No cases on this day.</p>
+        <div className="mt-8 text-center">
+          <p className="text-slate-400">No cases on this day.</p>
+          <button
+            onClick={() => setOpenDay(selectedDate)}
+            className="mt-2 text-sm font-medium text-sky-400"
+          >
+            Open day to schedule →
+          </button>
+        </div>
       ) : (
         <div className="mt-5 space-y-2">
           <div className="flex items-center justify-between">
@@ -339,9 +356,17 @@ export default function Calendar() {
             ) : (
               <span />
             )}
-            <Link to={`/runsheet?date=${selectedDate}`} className="text-xs font-medium text-sky-400">
-              Run sheet →
-            </Link>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setOpenDay(selectedDate)}
+                className="text-xs font-medium text-sky-400"
+              >
+                Open day →
+              </button>
+              <Link to={`/runsheet?date=${selectedDate}`} className="text-xs font-medium text-sky-400">
+                Run sheet →
+              </Link>
+            </div>
           </div>
           {selectedCases.map((c) => {
             const readiness = computeReadiness(c, templates, inventory, facilities);
@@ -393,6 +418,21 @@ export default function Calendar() {
             );
           })}
         </div>
+      )}
+
+      {openDay && (
+        <DaySheet
+          date={openDay}
+          cases={casesByDay.get(openDay) ?? []}
+          facilities={facilities}
+          profiles={profiles}
+          currentProfileId={profile?.id}
+          onClose={() => setOpenDay(null)}
+          onOpenCase={(c) => {
+            setOpenDay(null);
+            setOpenCase(c);
+          }}
+        />
       )}
 
       {showTimeOff && <TimeOffSheet onClose={() => setShowTimeOff(false)} onChanged={refresh} />}
