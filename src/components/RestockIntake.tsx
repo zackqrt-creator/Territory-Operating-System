@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Camera, FileText, Trash2 } from "lucide-react";
 import { createConsignmentRestock, uploadItemPhoto } from "../lib/api";
+import { useAuth } from "../hooks/useAuth";
 import PackingSlipScan, { type SlipContentLine } from "./PackingSlipScan";
 import type { CatalogItem, Facility } from "../lib/types";
 
@@ -28,6 +29,7 @@ export default function RestockIntake({
   onCreated: () => void;
   onCancel: () => void;
 }) {
+  const { profile } = useAuth();
   const [locationId, setLocationId] = useState(defaultLocationId || facilities[0]?.id || "");
   const [lines, setLines] = useState<SlipContentLine[]>([]);
   const [shipmentNo, setShipmentNo] = useState<string | null>(null);
@@ -53,6 +55,7 @@ export default function RestockIntake({
         territoryId,
         locationId,
         shipmentNo,
+        movedBy: profile?.id ?? null,
         photoUrl: photoFile ? await uploadItemPhoto(photoFile, territoryId) : null,
         lines: lines.map((l) => ({
           catalog_item_id: l.catalog_item_id,
@@ -130,9 +133,15 @@ export default function RestockIntake({
       )}
 
       {lines.length === 0 ? (
-        <p className="rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-4 text-center text-sm text-slate-400">
-          Scan the slip that came with the shipment to load what was sent.
-        </p>
+        <div className="rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-4 text-center">
+          <p className="text-sm text-slate-400">
+            Scan the slip that came with the shipment to load what was sent.
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            These go in as ordinary consignment stock — scanning them just records
+            that today's shipment replaced what earlier cases used.
+          </p>
+        </div>
       ) : (
         <div className="space-y-1.5">
           <p className="text-xs text-slate-500">

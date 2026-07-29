@@ -40,7 +40,15 @@ export function buildActivityFeed(
     let text: string;
     const reserveAlert = m.from_location !== m.to_location && Boolean(fromFacility?.alert_on_withdrawal);
 
-    if (m.from_location !== m.to_location) {
+    if (!m.from_location) {
+      // No origin means it arrived from Medacta rather than moving between our
+      // own locations -- a restock or an intake, not a transfer.
+      icon = "📥";
+      const shipment = m.note?.match(/Restocked\s+(\S+)/)?.[1];
+      text = `${moverName} restocked ${itemName} at ${toFacility?.name ?? "a location"}${
+        shipment ? ` — ${shipment}` : ""
+      }`;
+    } else if (m.from_location !== m.to_location) {
       icon = reserveAlert ? "🚨" : "📦";
       text = `${moverName} moved ${itemName} from ${fromFacility?.name ?? "somewhere"} to ${toFacility?.name ?? "somewhere"}`;
     } else if (m.note?.startsWith("Extended")) {

@@ -1565,6 +1565,7 @@ export async function createConsignmentRestock(params: {
   locationId: string;
   photoUrl?: string | null;
   shipmentNo?: string | null;
+  movedBy?: string | null;
   lines: LoanerContentLine[];
 }): Promise<number> {
   const rows = params.lines
@@ -1584,7 +1585,30 @@ export async function createConsignmentRestock(params: {
     }));
 
   if (rows.length === 0) return 0;
-  const { error } = await supabase.from("inventory_items").insert(rows);
+  const { data, error } = await supabase.from("inventory_items").insert(rows).select();
   if (error) throw error;
-  return rows.length;
+
+  // Log the restock as movements so it shows up in today's activity. Without
+  // this the stock silently appears on hand and there is no record that this
+  // is the shipment replacing what last week's cases used.
+  const created = (data ?? []) as InventoryItem[];
+  if (created.length > 0) {
+    const note = params.shipmentNo ? `Restocked ${params.shipmentNo}` : "Restocked";
+    const { error: moveError } = await supabase.from("movements").insert(
+      created.map((item) => ({
+        territory_id: params.territoryId,
+        item_id: item.id,
+        // Null origin = arrived from Medacta rather than moved between our own
+        // locations. The activity feed reads this as "received".
+        from_location: null,
+        to_location: params.locationId,
+        moved_by: params.movedBy ?? null,
+        note,
+      })),
+    );
+    // The stock is already in; a missing log line should not fail the intake.
+    if (moveError) console.warn("Restock logged to inventory but not to movements", moveError);
+  }
+
+  return created.length;
 }
