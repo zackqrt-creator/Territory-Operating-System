@@ -3,13 +3,26 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+const BUILD_ID = [
+  (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7),
+  new Date().toISOString().slice(0, 16).replace("T", " ") + "Z",
+].join(" · ");
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    // So "is my change actually on your phone?" is a question the app answers
+    // rather than one we guess at.
+    __BUILD_ID__: JSON.stringify(BUILD_ID),
+  },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
+      // Registered by hand in src/lib/pwa.ts, which actually checks for and
+      // applies updates. The injected one-liner does not.
+      injectRegister: false,
       includeAssets: ["icons/icon-180.png"],
       manifest: {
         name: "CaseTrack",

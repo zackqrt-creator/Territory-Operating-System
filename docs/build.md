@@ -148,6 +148,19 @@ The **Notes** + **UI cleanup** sprints touched app code:
 **GitHub write scope.**
 This session's git proxy is scoped to the literal repo name `zackqrt-creator/claude-skills`. The renamed `Territory-Operating-System` URL is **readable** (`git ls-remote` works) but **not writable** (push returns 403) — GitHub's rename redirect does not carry write permission through the proxy allowlist. Pushes therefore still use the old remote URL, which lands correctly via the redirect.
 
+**THE BIG ONE: the production bundle contained no application code.**
+
+Found 2026-07-30 after three rounds of *"your changes aren't there."* Two independent faults stacked, and each one hid the other:
+
+1. **`vite build` emitted every dependency and none of `src/`.** A 395 KiB bundle of React, Supabase, react-router and lucide — and not one line of this app. Reproduced with a minimal config and with the React plugin removed, and on a commit from days earlier, so it was neither our config nor a recent regression: `vite@8.1.4` (rolldown 1.1.5) paired with `@vitejs/plugin-react@6` silently emitted every local module as empty while keeping its imports. `tsc -b` was clean, `vite build` reported success, and Vercel deployed it green. **Fixed by pinning `vite@^7.3.6` + `@vitejs/plugin-react@^5.2.0`** (plugin-react 6 requires `vite/internal`, which is Vite-8-only, so the two must move together). Precache went from 395 KiB to 1173 KiB — the ~780 KiB that had been missing.
+2. **The service worker never updated, which is why nobody saw a blank screen.** `vite-plugin-pwa`'s injected `registerSW.js` is one line — `register('/sw.js')` — with no update check and no reload. The worker precaches `index.html`, so an installed PWA keeps serving whichever build it cached; on a phone there is no hard refresh. `registerType: "autoUpdate"` only covers half of it (workbox `skipWaiting()`s the new worker, but the page already running the old JavaScript keeps running it). So the phone kept serving a build from *before* the bundler broke — a working app, permanently frozen. **Fixed with `src/lib/pwa.ts`**: `injectRegister: false`, manual registration, update checks on load / every 5 min / on return to foreground, and a single reload when a new worker takes control.
+
+Guards added so this cannot recur silently:
+- **`scripts/verify-build.mjs`**, wired into `npm run build`: greps the emitted bundle for markers only this app's source can produce (`Territory`, `surgery_date`, `tote_template_items`) and **fails the build** if they are absent. Verified it fails when it should.
+- **A build stamp in the More sheet** (`__BUILD_ID__`: commit SHA + build time, tap to reload), so "is my change on your phone?" is answered by the app instead of guessed at.
+
+Lesson for this log: for days, "typecheck clean, production build clean" was reported as verification. It verified nothing — the build was succeeding while producing an empty app. Output should be checked for content, not just for exit code 0.
+
 **Fixed during the session**
 - RLS draft referenced a non-existent `territory_members` table → rewritten to `my_territory_id()` before running.
 - Left→Right mirror script initially missed `t3i4L`/`t4i3L` descriptions (only swapped the word "Left") → fixed with regex; later confirmed against real export.

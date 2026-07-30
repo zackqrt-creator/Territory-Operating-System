@@ -132,6 +132,18 @@ export default function BottomNav() {
                 );
               })}
             </div>
+
+            {/*
+              Which build is actually running. An installed PWA can sit on a
+              cached build indefinitely, and without this the only way to know
+              was to guess from whether a feature appeared.
+            */}
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-5 w-full text-center text-[11px] text-slate-600 active:text-slate-400"
+            >
+              Build {__BUILD_ID__} · tap to reload
+            </button>
           </div>
         </div>
       )}

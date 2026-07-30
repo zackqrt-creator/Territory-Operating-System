@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   deleteMovement,
+  updateMovementNote,
   listCatalogItems,
   listFacilities,
   listInventory,
@@ -396,19 +397,19 @@ export default function Inventory() {
           }}
         />
       )}
-      {editingSet && profile && (
+      {editingSet && (
         <SetEditor
           set={editingSet.set}
           catalog={catalog}
-          territoryId={profile.territory_id}
+          territoryId={profile?.territory_id ?? null}
           onClose={() => setEditingSet(null)}
           onChanged={refreshSets}
         />
       )}
-      {editingCatalog && profile && (
+      {editingCatalog && (
         <CatalogItemEditor
           item={editingCatalog.item}
-          territoryId={profile.territory_id}
+          territoryId={profile?.territory_id ?? null}
           onClose={() => setEditingCatalog(null)}
           onChanged={() => {
             refreshCatalog();
@@ -625,11 +626,28 @@ function MovementsList({
   itemName: (id: string) => string;
   facilityName: (id: string | null) => string;
   personName: (id: string | null) => string;
+  /** Refresh after a delete or a note edit. */
   onDeleted: () => void;
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function saveNote(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await updateMovementNote(id, draft.trim() || null);
+      setEditingNote(null);
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save that note.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function remove(id: string) {
     setBusy(true);
@@ -669,13 +687,55 @@ function MovementsList({
               </p>
             </div>
             <button
-              onClick={() => setConfirming(confirming === m.id ? null : m.id)}
+              onClick={() => {
+                setConfirming(null);
+                setEditingNote(editingNote === m.id ? null : m.id);
+                setDraft(m.note ?? "");
+              }}
+              aria-label="Edit the note on this entry"
+              className="min-h-0 shrink-0 rounded p-1.5 text-slate-600 active:bg-slate-700"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setEditingNote(null);
+                setConfirming(confirming === m.id ? null : m.id);
+              }}
               aria-label="Delete this entry"
               className="min-h-0 shrink-0 rounded p-1.5 text-slate-600 active:bg-slate-700"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>
+
+          {editingNote === m.id && (
+            <div className="mt-2">
+              <textarea
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={2}
+                placeholder="Why this moved, who asked, what to remember"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+              />
+              <div className="mt-1.5 flex gap-2">
+                <button
+                  onClick={() => setEditingNote(null)}
+                  className="min-h-0 rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => saveNote(m.id)}
+                  disabled={busy}
+                  className="min-h-0 flex-1 rounded-lg bg-sky-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {busy ? "Saving…" : "Save note"}
+                </button>
+              </div>
+            </div>
+          )}
           {confirming === m.id && (
             <div className="mt-2 rounded-lg border border-red-900/70 bg-red-950/30 p-2.5">
               <p className="text-xs text-red-200">

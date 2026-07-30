@@ -47,7 +47,8 @@ export default function CatalogItemEditor({
 }: {
   /** null = creating a new product. */
   item: CatalogItem | null;
-  territoryId: string;
+  /** Null while the signed-in profile is still loading, or missing. */
+  territoryId: string | null;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -92,8 +93,12 @@ export default function CatalogItemEditor({
         product_line: productLine.trim() || null,
         cement_type: cement,
       };
-      if (item) await updateCatalogItem(item.id, patch);
-      else await createCatalogItem({ ...patch, territory_id: territoryId });
+      if (item) {
+        await updateCatalogItem(item.id, patch);
+      } else {
+        if (!territoryId) throw new Error("Still signing you in — give it a second and try again.");
+        await createCatalogItem({ ...patch, territory_id: territoryId });
+      }
       onChanged();
       onClose();
     });

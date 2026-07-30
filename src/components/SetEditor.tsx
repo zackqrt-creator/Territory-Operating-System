@@ -42,7 +42,8 @@ export default function SetEditor({
   /** null = creating a new Set. */
   set: ToteTemplateWithItems | null;
   catalog: CatalogItem[];
-  territoryId: string;
+  /** Null while the signed-in profile is still loading, or missing. */
+  territoryId: string | null;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -99,8 +100,12 @@ export default function SetEditor({
         notes: notes.trim() || null,
         reusable,
       };
-      if (setId) await updateToteTemplate(setId, patch);
-      else await createToteTemplate({ ...patch, territory_id: territoryId });
+      if (setId) {
+        await updateToteTemplate(setId, patch);
+      } else {
+        if (!territoryId) throw new Error("Still signing you in — give it a second and try again.");
+        await createToteTemplate({ ...patch, territory_id: territoryId });
+      }
       setDirtyHeader(false);
       onChanged();
       // A brand-new Set has no id here, so reopen it from the refreshed list
