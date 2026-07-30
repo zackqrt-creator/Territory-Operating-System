@@ -219,6 +219,8 @@ export interface LoanerContentLine {
   category: ItemCategory;
   quantity: number;
   lot_number?: string | null;
+  /** Box labels print an expiry; slips do not. Feeds the expiring-lot warnings. */
+  expiration_date?: string | null;
 }
 
 /**
@@ -265,6 +267,7 @@ export async function createLoanerTote(params: {
       category: c.category,
       catalog_item_id: c.catalog_item_id,
       lot_number: c.lot_number ?? null,
+      expiration_date: c.expiration_date ?? null,
       location_id: locationId,
       territory_id: territoryId,
       acquisition_type: "loaner" as const,
@@ -1575,6 +1578,7 @@ export async function createConsignmentRestock(params: {
       category: l.category,
       catalog_item_id: l.catalog_item_id,
       lot_number: l.lot_number ?? null,
+      expiration_date: l.expiration_date ?? null,
       location_id: params.locationId,
       territory_id: params.territoryId,
       acquisition_type: "consignment" as const,

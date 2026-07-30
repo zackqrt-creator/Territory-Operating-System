@@ -68,9 +68,10 @@ export async function ocrPage(
       const text = data.text ?? "";
       const s = score(text);
       if (s > best.score) best = { text, degrees: angles[i], score: s };
-      // A pass this good is the right way up; the remaining turns cannot beat
-      // it and each one costs several seconds on a phone.
-      if (s >= 50) break;
+      // One real catalog match already proves the orientation, and a single
+      // box label only ever scores ~11. Anything at or above that is the right
+      // way up, so stop rather than paying for three more slow rotations.
+      if (s >= 10) break;
     } catch {
       // A single failed orientation should not lose the whole scan.
     }

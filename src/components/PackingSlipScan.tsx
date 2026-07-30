@@ -9,6 +9,8 @@ export interface SlipContentLine {
   name: string;
   category: CatalogItem["category"];
   lot_number: string | null;
+  /** From a box label's hourglass date, when one was printed. */
+  expiration_date: string | null;
   quantity: number;
 }
 
@@ -28,7 +30,7 @@ export default function PackingSlipScan({
 }: {
   catalog: CatalogItem[];
   onClose: () => void;
-  onConfirm: (lines: SlipContentLine[], shipmentNo: string | null) => void;
+  onConfirm: (lines: SlipContentLine[], shipmentNo: string | null, photo: File | null) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -36,9 +38,13 @@ export default function PackingSlipScan({
   const [lines, setLines] = useState<PackingSlipLine[] | null>(null);
   const [shipmentNo, setShipmentNo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Kept so a scan both reads the label and attaches the photo -- two separate
+  // buttons for that was the single most confusing thing in this flow.
+  const [photo, setPhoto] = useState<File | null>(null);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
+    setPhoto(file);
     setBusy(true);
     setError(null);
     setProgress("Reading the slip...");
@@ -84,9 +90,11 @@ export default function PackingSlipScan({
         name: l.match?.name ?? l.description ?? `REF ${l.itemNumber}`,
         category: l.match?.category ?? "implant",
         lot_number: l.lot,
+        expiration_date: l.expiry,
         quantity: l.quantity,
       })),
       shipmentNo,
+      photo,
     );
   }
 
@@ -97,7 +105,7 @@ export default function PackingSlipScan({
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
-            <FileText size={18} /> Scan packing slip
+            <FileText size={18} /> Scan label or slip
           </h2>
           {lines && (
             <p className="text-xs text-slate-400">
@@ -119,12 +127,12 @@ export default function PackingSlipScan({
         {!lines && (
           <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
             <p className="text-sm text-slate-300">
-              Photograph the paper slip inside the kit. Lay it flat, fill the frame, and keep the
-              item-number column in shot.
+              Photograph the paper slip inside the kit, or a box label. Fill the frame and keep the
+              REF and LOT lines in shot.
             </p>
             <p className="mt-2 text-xs text-slate-500">
-              The page can be sideways — each rotation is tried automatically. Reading a full page
-              takes a few seconds.
+              The photo can be sideways — each rotation is tried automatically. A full page takes a
+              few seconds; a single label is quicker.
             </p>
             <button
               onClick={() => fileRef.current?.click()}
@@ -132,15 +140,23 @@ export default function PackingSlipScan({
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-3 font-medium text-white disabled:opacity-50"
             >
               <Camera size={16} />
-              {busy ? (progress ?? "Reading...") : "Take photo of slip"}
+              {busy ? (progress ?? "Reading...") : "Take photo"}
             </button>
           </div>
         )}
 
         {error && (
-          <p className="mt-3 rounded-lg border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300">
-            {error}
-          </p>
+          <div className="mt-3 rounded-lg border border-red-900 bg-red-950/40 px-3 py-2">
+            <p className="text-sm text-red-300">{error}</p>
+            {photo && (
+              <button
+                onClick={() => onConfirm([], null, photo)}
+                className="mt-2 text-xs font-medium text-sky-300 underline"
+              >
+                Keep the photo and add items by hand
+              </button>
+            )}
+          </div>
         )}
 
         {lines && (

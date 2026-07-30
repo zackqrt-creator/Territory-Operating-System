@@ -63,6 +63,7 @@ export default function RestockIntake({
           category: l.category,
           quantity: l.quantity,
           lot_number: l.lot_number,
+          expiration_date: l.expiration_date,
         })),
       });
       onCreated();
@@ -75,20 +76,25 @@ export default function RestockIntake({
 
   return (
     <div className="mt-4 space-y-4">
+      <p className="text-xs text-slate-500">
+        Scan reads the REF and lot off a slip or a box label and fills the list
+        below. Photo only attaches an image without reading it.
+      </p>
+
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={() => setScanning(true)}
           className="flex items-center justify-center gap-2 rounded-lg border border-sky-800 bg-sky-950/40 px-3 py-3 text-sm font-medium text-sky-300"
         >
-          <FileText size={15} /> Scan slip
+          <FileText size={15} /> Scan label or slip
         </button>
         <button
           type="button"
           onClick={() => photoRef.current?.click()}
           className="flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-3 text-sm font-medium text-slate-300"
         >
-          <Camera size={15} /> {photoFile ? "Retake photo" : "Photo"}
+          <Camera size={15} /> {photoFile ? "Replace photo" : "Photo only"}
         </button>
         <input
           ref={photoRef}
@@ -192,9 +198,12 @@ export default function RestockIntake({
         <PackingSlipScan
           catalog={catalog}
           onClose={() => setScanning(false)}
-          onConfirm={(slipLines, shipment) => {
-            setLines(slipLines);
-            setShipmentNo(shipment);
+          onConfirm={(slipLines, shipment, photo) => {
+            if (slipLines.length > 0) setLines(slipLines);
+            if (shipment) setShipmentNo(shipment);
+            // The scan photo doubles as the shipment photo -- no reason to make
+            // them take a second one.
+            if (photo && !photoFile) onPhotoSelected(photo);
             setScanning(false);
           }}
         />

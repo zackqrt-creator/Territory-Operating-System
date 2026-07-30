@@ -29,7 +29,20 @@ import type { CatalogItem } from "./types";
  */
 const ITEM_NO = /\b(\d{2})\.(\d{2})\.([A-Z0-9]{3,8})\b/gi;
 
-/** "Lot No. 2412611", "LotNo 2412611", "Lot. 2412611". */
+/**
+ * `GTIN 07630345710819` on a box label. A second way into the catalog when the
+ * REF is the part OCR mangles.
+ */
+const GTIN = /\bGTIN\s*[:\-]?\s*([0-9OIlSB]{12,14})\b/gi;
+
+/**
+ * Expiry on a box label -- `2031-04-19`, sometimes only to the month. Slips
+ * carry no dates, so this only ever fires on labels, which is where it matters:
+ * an expiring lot is something Home warns about.
+ */
+const EXPIRY = /\b(20\d{2})[-/](0[1-9]|1[0-2])(?:[-/](0[1-9]|[12]\d|3[01]))?\b/g;
+
+/** "Lot No. 2412611", "LotNo 2412611", "Lot. 2412611", "LOT 2605303". */
 const LOT = /\bLot\s*\.?\s*(?:No\.?)?\s*[:\-]?\s*([0-9OIlSB]{5,12})\b/gi;
 
 /** Header fields worth keeping so the kit can be traced back to the shipment. */
@@ -47,6 +60,8 @@ export interface PackingSlipLine {
   /** Raw OCR description text for this line, if one was found nearby. */
   description: string | null;
   lot: string | null;
+  /** ISO date from a box label, when one was printed. */
+  expiry: string | null;
   quantity: number;
   /** Catalog row this item number matched, when the catalog knows it. */
   match: CatalogItem | null;
@@ -111,15 +126,30 @@ function parseHeader(text: string): PackingSlipHeader {
  * forgiving pass that ignores punctuation, since the dots are the glyphs OCR
  * most often drops.
  */
-function findInCatalog(itemNumber: string, catalog: CatalogItem[]): CatalogItem | null {
+function findInCatalog(
+  itemNumber: string,
+  gtin: string | null,
+  catalog: CatalogItem[],
+): CatalogItem | null {
   const exact = catalog.find((c) => c.item_number?.toUpperCase() === itemNumber);
   if (exact) return exact;
 
   const bare = itemNumber.replace(/[^A-Z0-9]/g, "");
-  return (
-    catalog.find((c) => (c.item_number ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === bare) ??
-    null
+  const loose = catalog.find(
+    (c) => (c.item_number ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === bare,
   );
+  if (loose) return loose;
+
+  // GTIN is pure digits, so it survives OCR better than a REF full of letters.
+  // Compared unpadded because a 13-digit GTIN is a 14-digit one without its
+  // leading zero.
+  if (gtin) {
+    const g = gtin.replace(/^0+/, "");
+    const byGtin = catalog.find((c) => (c.gtin ?? "").replace(/^0+/, "") === g);
+    if (byGtin) return byGtin;
+  }
+
+  return null;
 }
 
 /**
@@ -156,6 +186,18 @@ export function parsePackingSlip(text: string, catalog: CatalogItem[]): PackingS
     lots.push({ lot: digitsOnly(m[1]), index: m.index ?? 0 });
   }
 
+  const gtins: { gtin: string; index: number }[] = [];
+  for (const m of text.matchAll(GTIN)) {
+    gtins.push({ gtin: digitsOnly(m[1]), index: m.index ?? 0 });
+  }
+
+  const expiries: { expiry: string; index: number }[] = [];
+  for (const m of text.matchAll(EXPIRY)) {
+    // Undated months mean "end of month" in device labelling; day 01 is close
+    // enough and never overstates remaining shelf life.
+    expiries.push({ expiry: `${m[1]}-${m[2]}-${m[3] ?? "01"}`, index: m.index ?? 0 });
+  }
+
   const lines: PackingSlipLine[] = [];
   const seen = new Set<string>();
 
@@ -164,6 +206,15 @@ export function parsePackingSlip(text: string, catalog: CatalogItem[]): PackingS
     // dedupe on item number + lot rather than item number alone.
     const next = hits[i + 1]?.index ?? text.length;
     const lot = lots.find((l) => l.index > hit.index && l.index < next)?.lot ?? null;
+
+    // A box label prints its GTIN above the REF, so look either side of the
+    // item rather than only after it.
+    const gtin =
+      gtins.find((g) => g.index > hit.index && g.index < next)?.gtin ??
+      (hits.length === 1 ? (gtins[0]?.gtin ?? null) : null);
+    const expiry =
+      expiries.find((e) => e.index > hit.index && e.index < next)?.expiry ??
+      (hits.length === 1 ? (expiries[0]?.expiry ?? null) : null);
 
     const key = `${hit.itemNumber}|${lot ?? ""}`;
     if (seen.has(key)) return;
@@ -174,8 +225,9 @@ export function parsePackingSlip(text: string, catalog: CatalogItem[]): PackingS
       itemNumber: hit.itemNumber,
       description: descriptionNear(text, hit.end, next),
       lot,
+      expiry,
       quantity: 1,
-      match: findInCatalog(hit.itemNumber, catalog),
+      match: findInCatalog(hit.itemNumber, gtin, catalog),
     });
   });
 
