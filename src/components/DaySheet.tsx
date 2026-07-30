@@ -7,6 +7,7 @@ import {
   listCalendarBlocks,
   listCaseAssignees,
 } from "../lib/api";
+import NotesSection from "./NotesSection";
 import type {
   CalendarBlock,
   CalendarBlockKind,
@@ -72,6 +73,7 @@ export default function DaySheet({
 }) {
   const navigate = useNavigate();
   const [blocks, setBlocks] = useState<CalendarBlock[]>([]);
+  const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [drafting, setDrafting] = useState<number | null>(null);
   const [draftLabel, setDraftLabel] = useState("");
   const [draftKind, setDraftKind] = useState<CalendarBlockKind>("hospital_visit");
@@ -260,24 +262,41 @@ export default function DaySheet({
                       {hourBlocks.map((b) => (
                         <div
                           key={b.id}
-                          className="flex items-center gap-2 rounded-lg border border-slate-700/70 bg-slate-900 px-2.5 py-2"
+                          className="rounded-lg border border-slate-700/70 bg-slate-900 px-2.5 py-2"
                         >
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm text-slate-200">{b.label}</span>
-                            <span className="text-[11px] text-slate-500">
-                              {BLOCK_KINDS.find((k) => k.value === b.kind)?.label ?? "Other"}
-                              {" · "}
-                              {formatTime(b.start_time)}
-                            </span>
-                          </span>
-                          {b.rep_id === currentProfileId && (
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => removeBlock(b.id)}
-                              aria-label="Remove block"
-                              className="shrink-0 rounded p-1 text-slate-500 active:bg-slate-800"
+                              onClick={() => setOpenBlock(openBlock === b.id ? null : b.id)}
+                              className="min-w-0 flex-1 text-left"
                             >
-                              <Trash2 size={14} />
+                              <span className="block truncate text-sm text-slate-200">{b.label}</span>
+                              <span className="text-[11px] text-slate-500">
+                                {BLOCK_KINDS.find((k) => k.value === b.kind)?.label ?? "Other"}
+                                {" · "}
+                                {formatTime(b.start_time)}
+                              </span>
                             </button>
+                            {b.rep_id === currentProfileId && (
+                              <button
+                                onClick={() => removeBlock(b.id)}
+                                aria-label="Remove block"
+                                className="shrink-0 rounded p-1 text-slate-500 active:bg-slate-800"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                          {/*
+                            A blocked-out hour is where the day's loose ends
+                            live -- what the visit was for, what came out of it,
+                            what it created. Tapping it opens that.
+                          */}
+                          {openBlock === b.id && (
+                            <NotesSection
+                              entityType="calendar_block"
+                              entityId={b.id}
+                              title="Notes on this block"
+                            />
                           )}
                         </div>
                       ))}

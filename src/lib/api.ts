@@ -1165,7 +1165,7 @@ export async function createTask(input: {
   status?: TaskStatus;
   assigned_to?: string | null;
   source_note_id?: string | null;
-  entity_type?: TerritoryNoteEntityType | "note" | null;
+  entity_type?: NoteEntityType | null;
   entity_id?: string | null;
   territory_id: string;
   owner_id: string;
@@ -1186,6 +1186,21 @@ export async function updateTask(
 }
 
 /** Tasks spawned from a specific territory note (entity_type="note"). */
+/** Every task filed against one record, newest first. */
+export async function listTasksForEntity(
+  entityType: NoteEntityType,
+  entityId: string,
+): Promise<PersonalTask[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as PersonalTask[];
+}
+
 export async function listTasksForNote(noteId: string): Promise<PersonalTask[]> {
   const { data, error } = await supabase
     .from("tasks")

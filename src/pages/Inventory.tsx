@@ -36,6 +36,7 @@ import LoanerDetailSheet from "../components/LoanerDetailSheet";
 import EditItemSheet from "../components/EditItemSheet";
 import SetEditor from "../components/SetEditor";
 import CatalogItemEditor from "../components/CatalogItemEditor";
+import NotesSection from "../components/NotesSection";
 import { useAuth } from "../hooks/useAuth";
 import { daysUntil, formatRelativeDay } from "../utils/dates";
 
@@ -731,9 +732,20 @@ function MovementsList({
                   disabled={busy}
                   className="min-h-0 flex-1 rounded-lg bg-sky-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
                 >
-                  {busy ? "Saving…" : "Save note"}
+                  {busy ? "Saving…" : "Save one-liner"}
                 </button>
               </div>
+
+              {/*
+                The movement's own `note` column is the one-line "why" that
+                shows in the activity feed. Anything longer -- a conversation
+                about a transfer, or a task it created -- belongs on the record.
+              */}
+              <NotesSection
+                entityType="movement"
+                entityId={m.id}
+                title="Notes on this movement"
+              />
             </div>
           )}
           {confirming === m.id && (

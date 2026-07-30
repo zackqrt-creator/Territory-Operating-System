@@ -8,6 +8,7 @@ import {
   updateToteTemplate,
   updateToteTemplateItem,
 } from "../lib/api";
+import NotesSection from "./NotesSection";
 import type { CatalogItem, ToteTemplateWithItems } from "../lib/types";
 
 function itemLabel(c: CatalogItem): string {
@@ -377,6 +378,12 @@ export default function SetEditor({
                   ))}
               </div>
             )}
+
+            {/*
+              A tray accumulates knowledge no column holds -- "the 4 insert is
+              always missing", "this one goes back to Lodi after Thursday".
+            */}
+            <NotesSection entityType="tote_template" entityId={setId} title="Notes on this set" />
 
             <div className="mt-8 border-t border-slate-800 pt-4">
               {confirmingDelete ? (

@@ -148,6 +148,16 @@ The **Notes** + **UI cleanup** sprints touched app code:
 **GitHub write scope.**
 This session's git proxy is scoped to the literal repo name `zackqrt-creator/claude-skills`. The renamed `Territory-Operating-System` URL is **readable** (`git ls-remote` works) but **not writable** (push returns 403) — GitHub's rename redirect does not carry write permission through the proxy allowlist. Pushes therefore still use the old remote URL, which lands correctly via the redirect.
 
+**Notes and tasks now attach to every record.**
+
+`NotesSection` has always done the right things — add, edit, delete, pin, dictate, spawn a follow-up task — but it was mounted on only four surfaces, and `NoteEntityType` was narrower than the database. Migration 032 had already widened `entity_notes` to accept `catalog_item` / `tote_template` / `case_template`; the TypeScript union never followed, so those were unreachable from the app. Classic schema/type drift, and it silently removed the ability to annotate half the product.
+
+- **Migration 048** sets the `entity_notes` and `tasks` check constraints from one shared list, adding `movement`, `calendar_block`, `task` and `territory`, plus `(entity_type, entity_id)` indexes on both. The two constraints had drifted apart before; keeping them identical means a note and a task can always hang off the same thing.
+- **`EntityTasks`** — a record's own task list: add with a due date, tick off, delete, with done ones collapsed but kept, since what was already handled is exactly the context you want next time. Hides itself if 048 has not run.
+- **`NotesSection` now renders `EntityTasks` beneath the notes** (`withTasks`, default on), so all existing mounts gained a task list for free and new ones are a single line.
+- Mounted on **Sets** (`SetEditor`), **Catalog products** (`CatalogItemEditor`), **movements** (expand a log entry), and **calendar blocks** (tap a blocked hour in the day sheet) — joining cases, facilities, surgeons, inventory items and loaner totes. That is every record type in the app.
+- The movement's own `note` column stays the one-line "why" that shows in the activity feed; the note thread is for anything longer. The button is relabelled "Save one-liner" to make that distinction visible.
+
 **THE BIG ONE: the production bundle contained no application code.**
 
 Found 2026-07-30 after three rounds of *"your changes aren't there."* Two independent faults stacked, and each one hid the other:
@@ -194,5 +204,6 @@ Lesson for this log: for days, "typecheck clean, production build clean" was rep
 - [ ] **Second-brain AI pipeline** — `ai_summary`/`ai_action_items`/`ai_entities` columns + status flow exist and are shown in the UI, but nothing populates them yet (manual triage only for now).
 - [ ] **Calendar revamp** — 6 of 7 parts built (month/personal default, day-tap day sheet with an hour rail, labelled time blocks, case coverage via `case_assignees`, required add-case time with quick-pick chips, navigate-to-calendar on save). **Remaining: subscribing to the myOPS calendar** — needs an ICS feed URL (env var, not chat) and a policy for subscribed-vs-local edits.
 - [ ] **Field-test the live barcode scanner.** The GS1 parsing is verified against real Medacta codes (data-matrix, GS1-128 with separators, the printed UDI line, bare EAN-13/GTIN-14) and the box-label OCR path is verified against Zack's `02.12.3D03L` tibial-tray label both clean and glyph-damaged. What is **not** verified is the camera itself — the sandbox has no camera, so autofocus, capture resolution and real data-matrix decode range are untested on an actual phone.
-- [ ] **Run migration 047** (`047_movements_editable.sql`) — adds the update/delete policies `movements` never had, so the log can be corrected. Until it runs, the delete button fails with a message naming the migration rather than a raw RLS error.
+- [ ] **Run migrations 047 and 048.** 047 lets the movement log be corrected; 048 lets notes and tasks attach to Sets, catalog products, movements and calendar blocks. Both fail visibly rather than silently: the movement delete names 047, and the task list hides itself without 048.
+- [x] ~~Run migration 047~~ (`047_movements_editable.sql`) — adds the update/delete policies `movements` never had, so the log can be corrected. Until it runs, the delete button fails with a message naming the migration rather than a raw RLS error.
 - [ ] **Whether the catalog migrations ever ran.** The scanner reports "N in catalog"; if a known REF or GTIN scans as *not in catalog*, 026–041 did not apply. This is the cheapest available probe of live schema state.

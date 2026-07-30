@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, X } from "lucide-react";
 import { createCatalogItem, deleteCatalogItem, updateCatalogItem } from "../lib/api";
+import NotesSection from "./NotesSection";
 import type { CatalogItem, CatalogJoint, CatalogSide, CementType, ItemCategory } from "../lib/types";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
@@ -243,6 +244,10 @@ export default function CatalogItemEditor({
             className={field}
           />
         </div>
+
+        {item && (
+          <NotesSection entityType="catalog_item" entityId={item.id} title="Notes on this product" />
+        )}
 
         {item && (
           <div className="mt-6 border-t border-slate-800 pt-4">

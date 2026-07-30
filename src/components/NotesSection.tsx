@@ -10,23 +10,33 @@ import {
   updateEntityNote,
 } from "../lib/api";
 import type { EntityNote, NoteEntityType, Profile } from "../lib/types";
+import EntityTasks from "./EntityTasks";
 import { formatRelativeDay, formatTimeOfDay, tomorrow } from "../utils/dates";
 
 /**
- * Universal note thread — drop onto any record (case, item, tote, surgeon).
- * Timestamped, authored, team-visible; authors can edit or delete their own
- * notes any time. This is the "add a note to anything" layer of the CRM.
+ * Universal notes + tasks block -- drop onto any record at all.
+ *
+ * Notes are timestamped, authored and team-visible, and their authors can edit
+ * or delete them at any time. Below them sits the same record's task list,
+ * because a rep's two questions about anything in front of them are "what do I
+ * know about this" and "what still has to happen to it", and splitting those
+ * across two screens means the second one gets forgotten.
+ *
+ * `withTasks={false}` for places where a task list would be noise (a note about
+ * a note, say).
  */
 export default function NotesSection({
   entityType,
   entityId,
   title = "Notes",
   placeholder = "Write a note…",
+  withTasks = true,
 }: {
   entityType: NoteEntityType;
   entityId: string;
   title?: string;
   placeholder?: string;
+  withTasks?: boolean;
 }) {
   const { profile } = useAuth();
   const [notes, setNotes] = useState<EntityNote[]>([]);
@@ -338,6 +348,8 @@ export default function NotesSection({
           ),
         )}
       </div>
+
+      {withTasks && <EntityTasks entityType={entityType} entityId={entityId} />}
     </div>
   );
 }

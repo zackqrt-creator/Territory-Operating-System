@@ -364,14 +364,32 @@ export interface PersonalTask {
   assigned_to: string | null;
   /** Entity note this task was spawned from ("Follow up" on a note). */
   source_note_id: string | null;
-  /** Optional link to any record (e.g. a territory_notes note via "note"). */
-  entity_type: TerritoryNoteEntityType | "note" | null;
+  /** Optional link to any record this task is about. */
+  entity_type: NoteEntityType | null;
   entity_id: string | null;
   done_at: string | null;
   created_at: string;
 }
 
-export type NoteEntityType = "case" | "inventory_item" | "surgeon" | "facility";
+/**
+ * Anything a note or a task can hang off. Kept identical to the check
+ * constraints in migration 048 -- when this list and the database's list drift,
+ * whole sections of the app silently lose the ability to be annotated, which is
+ * exactly what happened to catalog items and Sets.
+ */
+export type NoteEntityType =
+  | "case"
+  | "inventory_item"
+  | "surgeon"
+  | "facility"
+  | "catalog_item"
+  | "tote_template"
+  | "case_template"
+  | "movement"
+  | "calendar_block"
+  | "task"
+  | "note"
+  | "territory";
 
 export interface EntityNote {
   id: string;
