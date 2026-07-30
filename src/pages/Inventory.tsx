@@ -79,6 +79,7 @@ export default function Inventory() {
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [viewingTote, setViewingTote] = useState<InventoryItem | null>(null);
   const [adding, setAdding] = useState(false);
+  const [showUsedUp, setShowUsedUp] = useState(false);
   // `null` inside a "creating" wrapper distinguishes "make a new one" from
   // "nothing open", which a bare null cannot.
   const [editingSet, setEditingSet] = useState<{ set: ToteTemplateWithItems | null } | null>(null);
@@ -149,8 +150,16 @@ export default function Inventory() {
   const itemName = (id: string) => items.find((i) => i.id === id)?.name ?? "Item";
   const personName = (id: string | null) => profiles.find((p) => p.id === id)?.display_name ?? "Someone";
 
+  // Consumed down to zero. A sticker sheet deducts to 0 rather than deleting
+  // the row (the audit trail hangs off it), but leaving those in the on-hand
+  // list showed them as if they were still on the shelf -- the display only
+  // prints a quantity when it is above 1, so "0" and "1" looked identical.
+  // They are what the next restock is replacing, so they get their own list.
+  const usedUp = items.filter((i) => !i.loaner_tote_id && i.quantity <= 0);
+
   const onHand = items.filter((i) => {
     if (i.loaner_tote_id) return false;
+    if (i.quantity <= 0) return false;
     if (locationFilter !== "all" && i.location_id !== locationFilter) return false;
     if (categoryFilter !== "all" && i.category !== categoryFilter) return false;
     const q = search.trim().toLowerCase();
@@ -271,12 +280,51 @@ export default function Inventory() {
       {loading && !loaded[tab] ? (
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : tab === "onhand" ? (
-        <OnHandList
-          items={onHand}
-          facilityName={facilityName}
-          onTote={(it) => setViewingTote(it)}
-          onMove={(it) => setMoving(it)}
-        />
+        <>
+          <OnHandList
+            items={onHand}
+            facilityName={facilityName}
+            onTote={(it) => setViewingTote(it)}
+            onMove={(it) => setMoving(it)}
+          />
+          {usedUp.length > 0 && (
+            <div className="mt-6 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+              <button
+                onClick={() => setShowUsedUp((v) => !v)}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <span className="text-sm font-medium text-slate-300">
+                  Used up — awaiting restock ({usedUp.length})
+                </span>
+                <span className="text-xs text-slate-500">{showUsedUp ? "Hide" : "Show"}</span>
+              </button>
+              {showUsedUp && (
+                <div className="mt-2 space-y-1">
+                  {usedUp.map((i) => (
+                    <button
+                      key={i.id}
+                      onClick={() => setEditing(i)}
+                      className="flex w-full items-center gap-2 rounded px-1 py-1 text-left active:bg-slate-800"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm text-slate-400">
+                        {i.name}
+                      </span>
+                      {i.lot_number && (
+                        <span className="shrink-0 font-mono text-[11px] text-slate-600">
+                          {i.lot_number}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                  <p className="pt-1 text-[11px] text-slate-600">
+                    Scanning the replacement in under Restock adds a fresh row with its own lot —
+                    these stay as the record of what was used.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       ) : tab === "catalog" ? (
         <CatalogList
           items={catalogFiltered}

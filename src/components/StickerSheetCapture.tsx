@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Camera, ImageUp } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
   completeCase,
@@ -15,7 +16,7 @@ import {
   type SheetSticker,
   type StickerMatch,
 } from "../lib/stickerSheet";
-import { ocrLabel } from "../lib/ocr";
+import { DENSE_PAGE_EDGE, ocrPage } from "../lib/ocr";
 import { formatDateShort, tomorrow } from "../utils/dates";
 
 const QUALITY_BADGE: Record<string, { label: string; cls: string }> = {
@@ -56,8 +57,10 @@ export default function StickerSheetCapture({
   const [reading, setReading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
   const [result, setResult] = useState<{ deducted: number; flagged: number } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     listCatalogItems().then(setCatalog).catch(() => {});
@@ -71,37 +74,76 @@ export default function StickerSheetCapture({
 
   const matches: StickerMatch[] = matchSheet(stickers, inventory, caseRow.facility_id);
 
-  async function onPhoto(file: File | undefined) {
-    if (!file) return;
+  /**
+   * Reads one or more sheet photos.
+   *
+   * Accepts a whole selection at once because a case's stickers routinely run
+   * to two or three pages, and because a sheet the rep did not photograph
+   * themselves arrives as a batch from whoever did.
+   *
+   * Uses `ocrPage` rather than `ocrLabel`: a photo taken by someone else, of a
+   * sheet lying on a counter, is very often sideways, and tesseract does not
+   * recover from that on its own -- it returns confident nonsense. Each
+   * quarter-turn is scored by how many REF codes it yields and the best wins.
+   */
+  async function onPhotos(files: FileList | null) {
+    const list = files ? Array.from(files) : [];
+    if (list.length === 0) return;
     setReading(true);
     setError(null);
+
+    let added = 0;
+    let readCount = 0;
     try {
-      const text = await ocrLabel(file);
-      const found = parseStickerSheet(text, catalog);
-      if (found.length === 0) {
-        setError("No REF codes found on that photo. Try closer, flatter, better light.");
-        return;
-      }
-      setStickers((prev) => {
-        const merged = [...prev];
-        for (const s of found) {
-          const dup = merged.find(
-            (x) => x.scan.refText === s.scan.refText && x.scan.lot === s.scan.lot,
+      for (let n = 0; n < list.length; n++) {
+        const label = list.length > 1 ? ` (page ${n + 1} of ${list.length})` : "";
+        setProgress(`Reading…${label}`);
+        const { text } = await ocrPage(
+          list[n],
+          (t) => parseStickerSheet(t, catalog).length,
+          (message) => setProgress(message + label),
+          // Stickers are small print, so this page needs more resolution than
+          // a packing slip. Two readable REF codes already prove the sheet is
+          // the right way up -- upside-down text does not yield valid ones --
+          // and four passes over a 3200px page is a long time to stand there.
+          { maxEdge: DENSE_PAGE_EDGE, goodEnough: 2 },
+        );
+        const found = parseStickerSheet(text, catalog);
+        if (found.length === 0) continue;
+        readCount++;
+        added += found.length;
+
+        setStickers((prev) => {
+          const merged = [...prev];
+          for (const s of found) {
+            const dup = merged.find(
+              (x) => x.scan.refText === s.scan.refText && x.scan.lot === s.scan.lot,
+            );
+            if (dup) dup.quantity += s.quantity;
+            else merged.push(s);
+          }
+          // Newly matched lines start checked; unmatched can't be.
+          const m = matchSheet(merged, inventory, caseRow.facility_id);
+          setChecked(
+            new Set(m.map((x, i) => (x.allocations.length > 0 ? i : -1)).filter((i) => i >= 0)),
           );
-          if (dup) dup.quantity += s.quantity;
-          else merged.push(s);
-        }
-        // Newly matched lines start checked; unmatched can't be.
-        const m = matchSheet(merged, inventory, caseRow.facility_id);
-        setChecked(new Set(m.map((x, i) => (x.allocations.length > 0 ? i : -1)).filter((i) => i >= 0)));
-        return merged;
-      });
-      setPages((p) => p + 1);
+          return merged;
+        });
+      }
+
+      setPages((p) => p + readCount);
+      if (added === 0) {
+        setError(
+          list.length > 1
+            ? "No REF codes found on any of those. They need to be sharp enough to read the printing — a screenshot of a text thread usually is not."
+            : "No REF codes found on that photo. Try closer, flatter, better light.",
+        );
+      }
     } catch {
       setError("Couldn't read that photo — check your connection for the first scan, or try again.");
     } finally {
       setReading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      setProgress(null);
     }
   }
 
@@ -195,25 +237,61 @@ export default function StickerSheetCapture({
               created for you. Nothing is deducted without your OK.
             </p>
 
+            {/*
+              Two inputs, because `capture` is not a hint -- on a phone it
+              removes the photo library as an option entirely. A rep who was
+              not in the room has nothing to photograph and needs the picture
+              someone else sent them.
+            */}
             <input
-              ref={fileRef}
+              ref={cameraRef}
               type="file"
               accept="image/*"
               capture="environment"
               className="hidden"
-              onChange={(e) => onPhoto(e.target.files?.[0])}
+              onChange={(e) => {
+                onPhotos(e.target.files);
+                e.target.value = "";
+              }}
             />
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={reading}
-              className="mt-3 w-full rounded-lg border border-sky-700 bg-sky-950/40 py-3 font-medium text-sky-300 disabled:opacity-50"
-            >
-              {reading
-                ? "Reading stickers…"
-                : pages === 0
-                  ? "📷 Photograph the sticker sheet"
-                  : "📷 Scan another page"}
-            </button>
+            <input
+              ref={uploadRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                onPhotos(e.target.files);
+                e.target.value = "";
+              }}
+            />
+
+            {reading ? (
+              <p className="mt-3 w-full rounded-lg border border-sky-800 bg-sky-950/40 py-3 text-center font-medium text-sky-300">
+                {progress ?? "Reading stickers…"}
+              </p>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => cameraRef.current?.click()}
+                  className="rounded-lg border border-sky-700 bg-sky-950/40 py-3 font-medium text-sky-300"
+                >
+                  <Camera size={15} className="mr-1.5 inline" />
+                  {pages === 0 ? "Take photo" : "Another page"}
+                </button>
+                <button
+                  onClick={() => uploadRef.current?.click()}
+                  className="rounded-lg border border-slate-700 bg-slate-800/60 py-3 font-medium text-slate-300"
+                >
+                  <ImageUp size={15} className="mr-1.5 inline" />
+                  Upload photo
+                </button>
+              </div>
+            )}
+            <p className="mt-1.5 text-center text-[11px] text-slate-600">
+              Upload takes several pages at once, and reads a sideways photo — for sheets someone
+              else shot and sent you.
+            </p>
 
             {error && (
               <p className="mt-2 rounded-lg border border-red-800 bg-red-950/30 p-2.5 text-sm text-red-300">

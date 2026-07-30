@@ -23,6 +23,14 @@
  */
 const MAX_EDGE = 2000;
 
+/**
+ * Sheets of small stickers are the exception: twenty implant labels on one
+ * page means text a third the size of a packing slip's, and at 2000px the
+ * REF codes fall below what the recognizer can resolve. Still well under a
+ * raw 12-megapixel frame.
+ */
+export const DENSE_PAGE_EDGE = 3200;
+
 /** Give up on the first-use download rather than spinning forever on bad signal. */
 const INIT_TIMEOUT_MS = 45_000;
 
@@ -97,9 +105,13 @@ function phrase(status: string, progress: number): string {
  * Rotates and downscales an image into something worth handing to the
  * recognizer. Returns the original untouched if the canvas is unavailable.
  */
-async function prepare(source: Blob, degrees: 0 | 90 | 180 | 270): Promise<Blob> {
+async function prepare(
+  source: Blob,
+  degrees: 0 | 90 | 180 | 270,
+  maxEdge: number,
+): Promise<Blob> {
   const bitmap = await createImageBitmap(source);
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * scale);
   const h = Math.round(bitmap.height * scale);
   const swap = degrees === 90 || degrees === 270;
@@ -122,18 +134,22 @@ async function prepare(source: Blob, degrees: 0 | 90 | 180 | 270): Promise<Blob>
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b ?? source), "image/jpeg", 0.9));
 }
 
-async function recognise(source: Blob, degrees: 0 | 90 | 180 | 270): Promise<string> {
+async function recognise(
+  source: Blob,
+  degrees: 0 | 90 | 180 | 270,
+  maxEdge: number,
+): Promise<string> {
   const worker = await getWorker();
-  const { data } = await worker.recognize(await prepare(source, degrees));
+  const { data } = await worker.recognize(await prepare(source, degrees, maxEdge));
   return data.text ?? "";
 }
 
-/** Single label, upright. Used by the add-item and sticker-sheet flows. */
+/** Single label, upright. Used by the add-item flow. */
 export async function ocrLabel(file: Blob, onProgress?: OcrProgress): Promise<string> {
   activeProgress = onProgress ?? null;
   activeAttempt = "";
   try {
-    return await recognise(file, 0);
+    return await recognise(file, 0, MAX_EDGE);
   } finally {
     activeProgress = null;
   }
@@ -149,10 +165,24 @@ export async function ocrLabel(file: Blob, onProgress?: OcrProgress): Promise<st
  * first and short-circuits as soon as it clearly worked, so the common case
  * still costs a single pass.
  */
+export interface OcrPageOptions {
+  /** Long-edge cap handed to the recognizer. See MAX_EDGE / DENSE_PAGE_EDGE. */
+  maxEdge?: number;
+  /**
+   * Score at or above which the orientation is settled and the remaining
+   * quarter-turns are skipped. Defaults to 10, which is one real catalog match
+   * under the packing-slip scorer. Callers scoring on a different scale (a
+   * count of stickers, say) must say what "clearly worked" means for them,
+   * because paying for four passes over a dense page is expensive.
+   */
+  goodEnough?: number;
+}
+
 export async function ocrPage(
   source: Blob,
   score: (text: string) => number,
   onProgress?: OcrProgress,
+  { maxEdge = MAX_EDGE, goodEnough = 10 }: OcrPageOptions = {},
 ): Promise<{ text: string; degrees: number; score: number }> {
   const angles: (0 | 90 | 180 | 270)[] = [0, 90, 270, 180];
   let best = { text: "", degrees: 0, score: -1 };
@@ -164,13 +194,12 @@ export async function ocrPage(
       activeAttempt = i === 0 ? "" : ` (turn ${i + 1} of ${angles.length})`;
       onProgress?.(i === 0 ? "Reading…" : `Trying it sideways…${activeAttempt}`);
       try {
-        const text = await recognise(source, angles[i]);
+        const text = await recognise(source, angles[i], maxEdge);
         const s = score(text);
         if (s > best.score) best = { text, degrees: angles[i], score: s };
-        // One real catalog match already proves the orientation, and a single
-        // box label only ever scores ~11. Anything at or above that is the
-        // right way up, so stop rather than paying for three more passes.
-        if (s >= 10) break;
+        // Once the score says the text is really being read, the orientation
+        // is settled -- stop rather than paying for three more passes.
+        if (s >= goodEnough) break;
       } catch (err) {
         // A single failed orientation should not lose the whole scan.
         lastError = err;
