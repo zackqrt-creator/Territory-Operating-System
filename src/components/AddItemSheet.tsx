@@ -11,7 +11,7 @@ import type {
 } from "../lib/types";
 import LoanerIntake from "./LoanerIntake";
 import RestockIntake from "./RestockIntake";
-import { ocrLabel } from "../lib/ocr";
+import { ocrPage } from "../lib/ocr";
 import { catalogLabel, parseGs1, parseLabelText } from "../lib/labelParse";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
@@ -190,31 +190,85 @@ export default function AddItemSheet({
     setScanning(true);
     setScanNote(null);
     try {
-      const text = await ocrLabel(file);
-      const scan = parseLabelText(text, catalog);
+      // The scorer lets OCR retry other orientations when the upright pass
+      // reads nothing usable off a sideways photo. goodEnough: 1 stops at the
+      // first orientation that reads anything at all, rather than packing-slip's
+      // higher bar for a "clearly worked" dense page.
+      const result = await ocrPage(file, (t) => parseLabelText(t, catalog).fieldsRead.length, undefined, {
+        goodEnough: 1,
+      });
+      const scan = parseLabelText(result.text, catalog);
       if (scan.fieldsRead.length === 0) {
         setScanNote("Couldn't read the label clearly — fill it in by hand, the photo is attached.");
         return;
       }
+
+      // Only claim a field in the note if it actually landed somewhere — the rep
+      // reads this list to know what still needs typing.
+      const filled: string[] = [];
+
       if (scan.match) {
-        // Exact catalog hit: take identity from the catalog (authoritative).
+        // Exact catalog hit: take identity from the catalog (authoritative),
+        // including side/size, which the catalog states precisely where OCR only
+        // guesses.
         setCatalogItemId(scan.match.id);
         setName(scan.match.name);
         setCategory(scan.match.category);
         if (scan.match.joint) setJoint(scan.match.joint);
         setCatalogSearch(catalogLabel(scan.match));
-      } else if (scan.refText) {
-        setName((prev) => prev || `REF ${scan.refText}`);
+        setShowNewCatalogForm(false);
+        filled.push("product");
+      } else if (scan.refText || scan.gtin) {
+        // No exact hit, so the rep confirms or creates. Seed the new-catalog
+        // form with what the label says instead of reading those values off and
+        // then discarding them.
+        if (scan.refText) {
+          setName((prev) => prev || `REF ${scan.refText}`);
+          // The create-catalog action keys off this box, so seed it too —
+          // otherwise the form opens with its create button disabled.
+          setCatalogSearch((prev) => prev || `REF ${scan.refText}`);
+        }
+        const sizeLabel = scan.size ?? (scan.height ? `${scan.height}mm` : null);
+        if (scan.side) {
+          setNewSide(scan.side);
+          filled.push("side");
+        }
+        if (sizeLabel) {
+          setNewSizeLabel(sizeLabel);
+          filled.push(scan.size ? "size" : "height");
+        }
+        if (scan.cement) setNewCementType(scan.cement);
+        if (scan.side || sizeLabel || scan.cement) setShowNewCatalogForm(true);
       }
-      if (scan.cement) setCementType(scan.cement);
-      if (scan.lot) setLot(scan.lot);
-      if (scan.expiration) setExpiration(scan.expiration);
+
+      // Unit-level facts — true for this box whether or not it linked to catalog.
+      if (scan.gtin) {
+        setBarcode((prev) => prev || scan.gtin!);
+        filled.push("barcode");
+      }
+      if (scan.cement) {
+        setCementType(scan.cement);
+        filled.push("cement");
+      }
+      if (scan.lot) {
+        setLot(scan.lot);
+        filled.push("lot");
+      }
+      if (scan.expiration) {
+        setExpiration(scan.expiration);
+        filled.push("expiration");
+      }
+
       const matchMsg = scan.match
         ? `Matched ${scan.match.name}${scan.match.size_label ? ` · ${scan.match.size_label}` : ""}. `
         : scan.refText
           ? `Read REF ${scan.refText} (no catalog match — confirm or add it). `
           : "";
-      setScanNote(`${matchMsg}Filled: ${scan.fieldsRead.join(", ")}. Verify before saving.`);
+      setScanNote(
+        filled.length > 0
+          ? `${matchMsg}Filled: ${filled.join(", ")}. Verify before saving.`
+          : `${matchMsg}Nothing could be filled automatically — enter the details by hand.`,
+      );
     } catch {
       setScanNote("Label scan unavailable right now — photo attached, fill it in by hand.");
     } finally {
