@@ -44,6 +44,8 @@ import type {
   TerritoryNoteTag,
   TerritoryNoteType,
   TimeOff,
+  ToteTemplate,
+  ToteTemplateItem,
   ToteTemplateWithItems,
   TrackedAsset,
   WikiPage,
@@ -716,6 +718,186 @@ export async function updateToteTemplateName(id: string, name: string): Promise<
 
 export async function updateCatalogItemName(id: string, name: string): Promise<void> {
   const { error } = await supabase.from("catalog_items").update({ name }).eq("id", id);
+  if (error) throw error;
+}
+
+// ---- Sets (tote templates) -------------------------------------------------
+// A Set is the myOPS packing list for one tray or tote. They arrive from
+// imported packing lists, but a territory's real trays drift from the
+// catalogue -- a tote gets split, an extra travelling tray appears, a revision
+// set is built locally -- so every part of a Set has to be editable by hand.
+
+export interface ToteTemplatePatch {
+  name?: string;
+  code?: string | null;
+  content_type?: string | null;
+  reusable?: boolean;
+  advisory_cases_per_unit?: number | null;
+  notes?: string | null;
+}
+
+export async function createToteTemplate(
+  input: ToteTemplatePatch & { name: string; territory_id: string },
+): Promise<ToteTemplate> {
+  const { data, error } = await supabase.from("tote_templates").insert(input).select().single();
+  if (error) throw error;
+  return data as ToteTemplate;
+}
+
+export async function updateToteTemplate(id: string, patch: ToteTemplatePatch): Promise<void> {
+  const { error } = await supabase.from("tote_templates").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * `tote_template_items` cascades, so the contents go with it. Surgeon
+ * preferences point at totes *without* a cascade, so a Set that a surgeon's
+ * preference still references will refuse to delete -- surfaced as plain
+ * English rather than a Postgres foreign-key code.
+ */
+export async function deleteToteTemplate(id: string): Promise<void> {
+  const { error } = await supabase.from("tote_templates").delete().eq("id", id);
+  if (error) {
+    if (error.code === "23503") {
+      throw new Error(
+        "A surgeon's preferences still use this set. Point that preference at a different set first.",
+      );
+    }
+    throw error;
+  }
+}
+
+export async function addToteTemplateItem(input: {
+  tote_template_id: string;
+  catalog_item_id: string;
+  quantity_per_tote?: number;
+  pack_layer?: number | null;
+}): Promise<ToteTemplateItem> {
+  const { data, error } = await supabase
+    .from("tote_template_items")
+    .insert({ quantity_per_tote: 1, ...input })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ToteTemplateItem;
+}
+
+export async function updateToteTemplateItem(
+  id: string,
+  patch: { quantity_per_tote?: number; pack_layer?: number | null },
+): Promise<void> {
+  const { error } = await supabase.from("tote_template_items").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteToteTemplateItem(id: string): Promise<void> {
+  const { error } = await supabase.from("tote_template_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---- Catalog editing -------------------------------------------------------
+
+export type CatalogItemPatch = Partial<
+  Pick<
+    CatalogItem,
+    | "name"
+    | "item_number"
+    | "gtin"
+    | "category"
+    | "joint"
+    | "device_type"
+    | "product_line"
+    | "side"
+    | "size_label"
+    | "cement_type"
+    | "equivalent_loaner_code"
+  >
+>;
+
+export async function updateCatalogItem(id: string, patch: CatalogItemPatch): Promise<void> {
+  const { error } = await supabase.from("catalog_items").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Catalog rows are referenced by on-hand stock and by Set contents, neither of
+ * which cascades -- deliberately, because silently deleting a rep's inventory
+ * to tidy the catalog would be far worse than refusing. The caller gets told
+ * what is holding it.
+ */
+export async function deleteCatalogItem(id: string): Promise<void> {
+  const [{ count: stockCount }, { count: setCount }] = await Promise.all([
+    supabase
+      .from("inventory_items")
+      .select("id", { count: "exact", head: true })
+      .eq("catalog_item_id", id),
+    supabase
+      .from("tote_template_items")
+      .select("id", { count: "exact", head: true })
+      .eq("catalog_item_id", id),
+  ]);
+
+  const blockers: string[] = [];
+  if (stockCount) blockers.push(`${stockCount} on-hand item${stockCount === 1 ? "" : "s"}`);
+  if (setCount) blockers.push(`${setCount} set line${setCount === 1 ? "" : "s"}`);
+  if (blockers.length) {
+    throw new Error(`Still used by ${blockers.join(" and ")}. Remove those first.`);
+  }
+
+  const { error } = await supabase.from("catalog_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---- Movement corrections --------------------------------------------------
+// A movement is a log entry, so editing one is rewriting history -- but the
+// history is only useful if it is true, and a mis-scan or a wrong location
+// otherwise sits in the feed forever. Requires migration 047, which adds the
+// update/delete policies; before that, both of these fail with a clear error.
+
+export async function updateMovementNote(id: string, note: string | null): Promise<void> {
+  const { error } = await supabase.from("movements").update({ note }).eq("id", id);
+  if (error) throw movementWriteError(error);
+}
+
+/** Deletes a logged move. Does not put the item back where it was -- move it. */
+export async function deleteMovement(id: string): Promise<void> {
+  const { error } = await supabase.from("movements").delete().eq("id", id);
+  if (error) throw movementWriteError(error);
+}
+
+function movementWriteError(error: { code?: string; message: string }): Error {
+  // RLS refusals surface as an empty result or a policy violation rather than
+  // anything a rep could interpret.
+  if (error.code === "42501" || /policy/i.test(error.message)) {
+    return new Error("Editing movements needs migration 047. Run it, then try again.");
+  }
+  return new Error(error.message);
+}
+
+// ---- Case editing ----------------------------------------------------------
+
+export type CasePatch = Partial<
+  Pick<
+    CaseRow,
+    | "surgery_date"
+    | "surgery_time"
+    | "facility_id"
+    | "surgeon_id"
+    | "surgeon"
+    | "surgery_type"
+    | "variant"
+    | "notes"
+    | "status"
+  >
+>;
+
+export async function updateCase(id: string, patch: CasePatch): Promise<void> {
+  const { error } = await supabase.from("cases").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCase(id: string): Promise<void> {
+  const { error } = await supabase.from("cases").delete().eq("id", id);
   if (error) throw error;
 }
 

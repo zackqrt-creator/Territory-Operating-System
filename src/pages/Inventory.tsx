@@ -8,8 +8,11 @@ import {
   ArrowLeftRight,
   AlertTriangle,
   Clock,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
+  deleteMovement,
   listCatalogItems,
   listFacilities,
   listInventory,
@@ -30,6 +33,9 @@ import MoveItemSheet from "../components/MoveItemSheet";
 import AddItemSheet from "../components/AddItemSheet";
 import LoanerDetailSheet from "../components/LoanerDetailSheet";
 import EditItemSheet from "../components/EditItemSheet";
+import SetEditor from "../components/SetEditor";
+import CatalogItemEditor from "../components/CatalogItemEditor";
+import { useAuth } from "../hooks/useAuth";
 import { daysUntil, formatRelativeDay } from "../utils/dates";
 
 const CATEGORY_LABEL: Record<ItemCategory, string> = {
@@ -49,6 +55,7 @@ const TABS: { key: Tab; label: string; icon: typeof Package }[] = [
 ];
 
 export default function Inventory() {
+  const { profile } = useAuth();
   const [tab, setTab] = useState<Tab>("onhand");
 
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -72,6 +79,22 @@ export default function Inventory() {
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [viewingTote, setViewingTote] = useState<InventoryItem | null>(null);
   const [adding, setAdding] = useState(false);
+  // `null` inside a "creating" wrapper distinguishes "make a new one" from
+  // "nothing open", which a bare null cannot.
+  const [editingSet, setEditingSet] = useState<{ set: ToteTemplateWithItems | null } | null>(null);
+  const [editingCatalog, setEditingCatalog] = useState<{ item: CatalogItem | null } | null>(null);
+
+  function refreshCatalog() {
+    return listCatalogItems().then(setCatalog);
+  }
+
+  function refreshSets() {
+    return listToteTemplatesWithItems().then(setSets);
+  }
+
+  function refreshMovements() {
+    return listRecentMovements(100).then(setMovements);
+  }
 
   function refreshOnHand() {
     return Promise.all([listInventory(), listFacilities()]).then(([i, f]) => {
@@ -93,7 +116,18 @@ export default function Inventory() {
       tab === "catalog"
         ? listCatalogItems().then((c) => setCatalog(c))
         : tab === "sets"
-          ? listToteTemplatesWithItems().then((s) => setSets(s))
+          ? // The Set editor searches the catalog to add products, so it needs
+            // both lists whichever tab was opened first.
+            Promise.all([
+              listToteTemplatesWithItems(),
+              catalog.length ? Promise.resolve(catalog) : listCatalogItems(),
+            ]).then(([s, c]) => {
+              setSets(s);
+              if (!catalog.length) {
+                setCatalog(c);
+                setLoaded((l) => ({ ...l, catalog: true }));
+              }
+            })
           : tab === "movements"
             ? Promise.all([
                 listRecentMovements(100),
@@ -152,12 +186,19 @@ export default function Inventory() {
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Inventory</h1>
-        {tab === "onhand" && (
+        {tab !== "movements" && (
           <button
-            onClick={() => setAdding(true)}
+            onClick={() =>
+              tab === "onhand"
+                ? setAdding(true)
+                : tab === "catalog"
+                  ? setEditingCatalog({ item: null })
+                  : setEditingSet({ set: null })
+            }
             className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white"
           >
-            <Plus className="h-4 w-4" /> Add
+            <Plus className="h-4 w-4" />
+            {tab === "onhand" ? "Add" : tab === "catalog" ? "New product" : "New set"}
           </button>
         )}
       </div>
@@ -237,15 +278,24 @@ export default function Inventory() {
           onMove={(it) => setMoving(it)}
         />
       ) : tab === "catalog" ? (
-        <CatalogList items={catalogFiltered} total={catalog.length} />
+        <CatalogList
+          items={catalogFiltered}
+          total={catalog.length}
+          onEdit={(c) => setEditingCatalog({ item: c })}
+        />
       ) : tab === "sets" ? (
-        <SetsList sets={setsFiltered} total={sets.length} />
+        <SetsList
+          sets={setsFiltered}
+          total={sets.length}
+          onEdit={(st) => setEditingSet({ set: st })}
+        />
       ) : (
         <MovementsList
           movements={movements}
           itemName={itemName}
           facilityName={facilityName}
           personName={personName}
+          onDeleted={refreshMovements}
         />
       )}
 
@@ -295,6 +345,26 @@ export default function Inventory() {
           onCreated={() => {
             setAdding(false);
             refreshOnHand();
+          }}
+        />
+      )}
+      {editingSet && profile && (
+        <SetEditor
+          set={editingSet.set}
+          catalog={catalog}
+          territoryId={profile.territory_id}
+          onClose={() => setEditingSet(null)}
+          onChanged={refreshSets}
+        />
+      )}
+      {editingCatalog && profile && (
+        <CatalogItemEditor
+          item={editingCatalog.item}
+          territoryId={profile.territory_id}
+          onClose={() => setEditingCatalog(null)}
+          onChanged={() => {
+            refreshCatalog();
+            refreshSets();
           }}
         />
       )}
@@ -382,7 +452,15 @@ function OnHandList({
   );
 }
 
-function CatalogList({ items, total }: { items: CatalogItem[]; total: number }) {
+function CatalogList({
+  items,
+  total,
+  onEdit,
+}: {
+  items: CatalogItem[];
+  total: number;
+  onEdit: (c: CatalogItem) => void;
+}) {
   if (total === 0)
     return (
       <p className="mt-8 text-slate-400">
@@ -394,7 +472,11 @@ function CatalogList({ items, total }: { items: CatalogItem[]; total: number }) 
     <div className="mt-4 space-y-2">
       <p className="text-xs text-slate-500">{items.length} of {total} items</p>
       {items.map((c) => (
-        <div key={c.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+        <button
+          key={c.id}
+          onClick={() => onEdit(c)}
+          className="block w-full rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-left active:bg-slate-800"
+        >
           <div className="flex items-start justify-between gap-2">
             <span className="min-w-0 flex-1 font-medium text-white">{c.name}</span>
             {c.side && c.side !== "NA" && (
@@ -402,6 +484,7 @@ function CatalogList({ items, total }: { items: CatalogItem[]; total: number }) 
                 {c.side === "LEFT" ? "L" : "R"}
               </span>
             )}
+            <Pencil className="h-3.5 w-3.5 shrink-0 text-slate-600" />
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
             {c.item_number && <span className="font-mono text-slate-400">{c.item_number}</span>}
@@ -409,70 +492,165 @@ function CatalogList({ items, total }: { items: CatalogItem[]; total: number }) 
             {c.device_type && <span>· {c.device_type}</span>}
             {c.size_label && <span>· size {c.size_label}</span>}
             {c.cement_type && c.cement_type !== "NA" && <span>· {c.cement_type}</span>}
+            {c.gtin && <span className="font-mono">· {c.gtin}</span>}
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
 }
 
-function SetsList({ sets, total }: { sets: ToteTemplateWithItems[]; total: number }) {
+function SetsList({
+  sets,
+  total,
+  onEdit,
+}: {
+  sets: ToteTemplateWithItems[];
+  total: number;
+  onEdit: (s: ToteTemplateWithItems) => void;
+}) {
   if (total === 0)
     return (
       <p className="mt-8 text-slate-400">
-        No sets yet. Sets (trays/totes) come from myOPS packing lists.
+        No sets yet. Build one with "New set", or load a myOPS packing list.
       </p>
     );
   if (sets.length === 0) return <p className="mt-8 text-slate-400">No sets match.</p>;
   return (
     <div className="mt-4 space-y-2">
-      {sets.map((s) => (
-        <div key={s.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 flex-1 font-medium text-white">{s.name}</span>
-            <span className="shrink-0 text-xs text-slate-500">
-              {s.tote_template_items.length} item{s.tote_template_items.length === 1 ? "" : "s"}
-            </span>
-          </div>
-          <span
-            className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              s.reusable ? "bg-sky-900/50 text-sky-200" : "bg-amber-900/50 text-amber-200"
-            }`}
+      {sets.map((s) => {
+        // "74 items" was ambiguous: 74 distinct products, or 74 boxes in the
+        // tray? For a complete tote those numbers are very different, and a
+        // rep checking a tray needs the second one.
+        const products = s.tote_template_items.length;
+        const pieces = s.tote_template_items.reduce(
+          (sum, i) => sum + (i.quantity_per_tote ?? 1),
+          0,
+        );
+        return (
+          <button
+            key={s.id}
+            onClick={() => onEdit(s)}
+            className="block w-full rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-left active:bg-slate-800"
           >
-            {s.reusable ? "Instruments (reusable)" : "Implants (per-case)"}
-          </span>
-        </div>
-      ))}
+            <div className="flex items-center justify-between gap-2">
+              <span className="min-w-0 flex-1 font-medium text-white">{s.name}</span>
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {products} product{products === 1 ? "" : "s"}
+              {pieces !== products && ` · ${pieces} pieces`}
+              {s.code && ` · ${s.code}`}
+            </p>
+            <span
+              className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                s.reusable ? "bg-sky-900/50 text-sky-200" : "bg-amber-900/50 text-amber-200"
+              }`}
+            >
+              {s.reusable ? "Instruments (reusable)" : "Implants (per-case)"}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
+/**
+ * The movement log, with the ability to strike a bad entry.
+ *
+ * A movement is history, so this is deliberately a two-tap delete rather than
+ * an inline edit: the common case is a mis-scan or a move logged against the
+ * wrong item, and the fix is to remove the false record and log the real one.
+ * Deleting the record does NOT move the item back -- that is a separate,
+ * deliberate action, and pretending otherwise would be worse than doing
+ * nothing.
+ */
 function MovementsList({
   movements,
   itemName,
   facilityName,
   personName,
+  onDeleted,
 }: {
   movements: Movement[];
   itemName: (id: string) => string;
   facilityName: (id: string | null) => string;
   personName: (id: string | null) => string;
+  onDeleted: () => void;
 }) {
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function remove(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteMovement(id);
+      setConfirming(null);
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete that entry.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (movements.length === 0) return <p className="mt-8 text-slate-400">No movements yet.</p>;
   return (
     <div className="mt-4 space-y-2">
+      {error && (
+        <p className="rounded-lg border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+          {error}
+        </p>
+      )}
       {movements.map((m) => (
         <div key={m.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
-          <p className="text-sm font-medium text-white">{itemName(m.item_id)}</p>
-          <p className="mt-0.5 flex items-center gap-1 text-sm text-slate-400">
-            {facilityName(m.from_location)}
-            <ArrowLeftRight className="h-3 w-3 text-slate-500" />
-            {facilityName(m.to_location)}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {personName(m.moved_by)} · {formatRelativeDay(m.created_at)}
-            {m.note ? ` · ${m.note}` : ""}
-          </p>
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white">{itemName(m.item_id)}</p>
+              <p className="mt-0.5 flex items-center gap-1 text-sm text-slate-400">
+                {m.from_location ? facilityName(m.from_location) : "Medacta"}
+                <ArrowLeftRight className="h-3 w-3 text-slate-500" />
+                {facilityName(m.to_location)}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {personName(m.moved_by)} · {formatRelativeDay(m.created_at)}
+                {m.note ? ` · ${m.note}` : ""}
+              </p>
+            </div>
+            <button
+              onClick={() => setConfirming(confirming === m.id ? null : m.id)}
+              aria-label="Delete this entry"
+              className="min-h-0 shrink-0 rounded p-1.5 text-slate-600 active:bg-slate-700"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {confirming === m.id && (
+            <div className="mt-2 rounded-lg border border-red-900/70 bg-red-950/30 p-2.5">
+              <p className="text-xs text-red-200">
+                Remove this log entry? The item stays where it is now — move it separately if it
+                is in the wrong place.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => setConfirming(null)}
+                  className="min-h-0 flex-1 rounded-lg bg-slate-800 py-2 text-xs font-medium text-slate-300"
+                >
+                  Keep it
+                </button>
+                <button
+                  onClick={() => remove(m.id)}
+                  disabled={busy}
+                  className="min-h-0 flex-1 rounded-lg bg-red-700 py-2 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  Delete entry
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
