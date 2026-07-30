@@ -148,6 +148,18 @@ The **Notes** + **UI cleanup** sprints touched app code:
 **GitHub write scope.**
 This session's git proxy is scoped to the literal repo name `zackqrt-creator/claude-skills`. The renamed `Territory-Operating-System` URL is **readable** (`git ls-remote` works) but **not writable** (push returns 403) — GitHub's rename redirect does not carry write permission through the proxy allowlist. Pushes therefore still use the old remote URL, which lands correctly via the redirect.
 
+**Magic-link-only sign-in was a field trap.** Reported 2026-07-30: locked out mid-day, with the app asking for an email link and the mailer allowing only a couple of sends a day. Supabase's built-in SMTP is rate-limited, so one cleared cache or expired session costs a rep access to their own inventory until tomorrow — with cases on the calendar. Fixed: **password sign-in is now the default** on the login screen, with the emailed link kept as the secondary path (it is still the better route on a new device, and for anyone who has not set a password). `PasswordSetting` in the More sheet sets or changes it. Rate-limit and "invalid credentials" errors are rewritten to say what to actually do rather than repeating Supabase's wording.
+
+Session options in `supabase.ts` are now explicit (`persistSession`, `autoRefreshToken`, `detectSessionInUrl`) with a note on why. `storageKey` is deliberately **not** set — changing it orphans every session already in localStorage and signs everyone out, which is the exact failure the block exists to prevent.
+
+Emergency unlock with no email at all, run from the Supabase SQL editor:
+
+```sql
+update auth.users
+set encrypted_password = extensions.crypt('a-password-you-choose', extensions.gen_salt('bf'))
+where email = 'you@example.com';
+```
+
 **Notes and tasks now attach to every record.**
 
 `NotesSection` has always done the right things — add, edit, delete, pin, dictate, spawn a follow-up task — but it was mounted on only four surfaces, and `NoteEntityType` was narrower than the database. Migration 032 had already widened `entity_notes` to accept `catalog_item` / `tote_template` / `case_template`; the TypeScript union never followed, so those were unreachable from the app. Classic schema/type drift, and it silently removed the ability to annotate half the product.

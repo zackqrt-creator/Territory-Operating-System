@@ -1,9 +1,24 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../hooks/useAuth";
 
+/**
+ * Password first, magic link second.
+ *
+ * This app was magic-link only, which read as friendly and turned out to be a
+ * trap: the built-in mailer allows a couple of sends a day, so one cleared
+ * cache or expired session locked a rep out of their own inventory until
+ * tomorrow -- in the middle of a workday, with cases on the calendar. A
+ * password has no send limit, needs no inbox, and works on hospital wifi that
+ * cannot reach mail.
+ *
+ * The link stays available, because it is genuinely the better path on a new
+ * device and for anyone who has not set a password yet.
+ */
 export default function Login() {
-  const { signInWithEmail } = useAuth();
+  const { signInWithEmail, signInWithPassword } = useAuth();
+  const [mode, setMode] = useState<"password" | "link">("password");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -12,11 +27,37 @@ export default function Login() {
     e.preventDefault();
     setError(null);
     setBusy(true);
+
+    if (mode === "password") {
+      const { error } = await signInWithPassword(email.trim(), password);
+      setBusy(false);
+      if (error) {
+        // Supabase says "Invalid login credentials" whether the password is
+        // wrong or none was ever set. The second is likely here, so say so.
+        setError(
+          /invalid login/i.test(error)
+            ? "That didn't match. If you've never set a password, use the email link below and set one from More once you're in."
+            : error,
+        );
+      }
+      return;
+    }
+
     const { error } = await signInWithEmail(email.trim());
     setBusy(false);
-    if (error) setError(error);
-    else setSent(true);
+    if (error) {
+      setError(
+        /rate|limit|too many/i.test(error)
+          ? "Too many sign-in emails for today. Use a password instead — you can set one from More once you're signed in."
+          : error,
+      );
+    } else {
+      setSent(true);
+    }
   }
+
+  const field =
+    "mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 font-normal text-white placeholder:text-slate-500";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 px-6">
@@ -33,6 +74,15 @@ export default function Login() {
           <p className="text-lg">📬</p>
           <p className="mt-2 font-medium text-slate-100">Check your email for a sign-in link.</p>
           <p className="mt-1 text-sm text-slate-400">Sent to {email}</p>
+          <button
+            onClick={() => {
+              setSent(false);
+              setMode("password");
+            }}
+            className="mt-4 text-sm text-sky-400 underline"
+          >
+            Use a password instead
+          </button>
         </div>
       ) : (
         <form
@@ -45,23 +95,62 @@ export default function Login() {
               type="email"
               required
               autoFocus
+              autoComplete="username"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 font-normal text-white placeholder:text-slate-500"
+              className={field}
             />
           </label>
+
+          {mode === "password" && (
+            <label className="block text-sm font-medium text-slate-300">
+              Password
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={field}
+              />
+            </label>
+          )}
+
           {error && <p className="text-sm text-red-400">{error}</p>}
+
           <button
             type="submit"
             disabled={busy}
             className="w-full rounded-xl bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-3 font-semibold text-white shadow-lg shadow-sky-950/60 disabled:opacity-50"
           >
-            {busy ? "Sending..." : "Send magic link"}
+            {busy
+              ? mode === "password"
+                ? "Signing in…"
+                : "Sending…"
+              : mode === "password"
+                ? "Sign in"
+                : "Email me a link"}
           </button>
-          <p className="text-center text-xs text-slate-500">
-            No password needed — we'll email you a one-tap sign-in link.
-          </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === "password" ? "link" : "password");
+              setError(null);
+            }}
+            className="w-full text-center text-xs text-slate-400 underline"
+          >
+            {mode === "password" ? "Email me a sign-in link instead" : "Use a password instead"}
+          </button>
+
+          {mode === "link" && (
+            <p className="text-center text-[11px] text-slate-600">
+              Sign-in emails are rate-limited to a couple a day. A password has no limit — set one
+              from More once you're in.
+            </p>
+          )}
         </form>
       )}
     </div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
+import PasswordSetting from "./PasswordSetting";
 import {
   Home,
   Calendar,
@@ -132,6 +133,8 @@ export default function BottomNav() {
                 );
               })}
             </div>
+
+            <PasswordSetting />
 
             {/*
               Which build is actually running. An installed PWA can sit on a

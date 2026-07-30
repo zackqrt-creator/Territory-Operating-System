@@ -14,6 +14,8 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   signInWithEmail: (email: string) => Promise<{ error: string | null }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
+  setPassword: (password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -56,6 +58,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session]);
 
+  /**
+   * Password sign-in. Magic links alone were a real trap in the field: the
+   * built-in mailer allows only a couple of sends a day, so one cleared cache
+   * or expired session locked the rep out of their own inventory until
+   * tomorrow. A password has no send limit and works with no signal to the
+   * inbox.
+   */
+  async function signInWithPassword(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    return { error: error?.message ?? null };
+  }
+
+  /** Sets or changes the signed-in user's password. */
+  async function setPassword(password: string) {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error?.message ?? null };
+  }
+
   async function signInWithEmail(email: string) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -69,7 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signInWithEmail, signOut }}>
+    <AuthContext.Provider
+      value={{ session, profile, loading, signInWithEmail, signInWithPassword, setPassword, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
