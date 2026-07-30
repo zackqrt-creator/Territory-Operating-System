@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Camera, FileText, Trash2 } from "lucide-react";
+import { Camera, ScanLine, Trash2 } from "lucide-react";
 import { createConsignmentRestock, uploadItemPhoto } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import PackingSlipScan, { type SlipContentLine } from "./PackingSlipScan";
@@ -77,8 +77,9 @@ export default function RestockIntake({
   return (
     <div className="mt-4 space-y-4">
       <p className="text-xs text-slate-500">
-        Scan reads the REF and lot off a slip or a box label and fills the list
-        below. Photo only attaches an image without reading it.
+        Scanning opens the camera and reads box barcodes as you point at them — one
+        after another, with the lot and expiry exactly as printed. Photo only
+        attaches an image without reading it.
       </p>
 
       <div className="grid grid-cols-2 gap-2">
@@ -87,7 +88,7 @@ export default function RestockIntake({
           onClick={() => setScanning(true)}
           className="flex items-center justify-center gap-2 rounded-lg border border-sky-800 bg-sky-950/40 px-3 py-3 text-sm font-medium text-sky-300"
         >
-          <FileText size={15} /> Scan label or slip
+          <ScanLine size={15} /> Scan boxes
         </button>
         <button
           type="button"
@@ -141,7 +142,7 @@ export default function RestockIntake({
       {lines.length === 0 ? (
         <div className="rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-4 text-center">
           <p className="text-sm text-slate-400">
-            Scan the slip that came with the shipment to load what was sent.
+            Scan the boxes you just received, or the slip that came with them.
           </p>
           <p className="mt-1 text-xs text-slate-500">
             These go in as ordinary consignment stock — scanning them just records
@@ -199,7 +200,20 @@ export default function RestockIntake({
           catalog={catalog}
           onClose={() => setScanning(false)}
           onConfirm={(slipLines, shipment, photo) => {
-            if (slipLines.length > 0) setLines(slipLines);
+            // Appended, not replaced: a rep who closes the scanner and reopens
+            // it to catch three boxes they missed should not lose the first
+            // twelve. Same product and lot merges into one line.
+            setLines((prev) => {
+              const merged = [...prev];
+              for (const line of slipLines) {
+                const at = merged.findIndex(
+                  (l) => l.name === line.name && l.lot_number === line.lot_number,
+                );
+                if (at === -1) merged.push(line);
+                else merged[at] = { ...merged[at], quantity: merged[at].quantity + line.quantity };
+              }
+              return merged;
+            });
             if (shipment) setShipmentNo(shipment);
             // The scan photo doubles as the shipment photo -- no reason to make
             // them take a second one.

@@ -122,6 +122,18 @@ function parseHeader(text: string): PackingSlipHeader {
 }
 
 /**
+ * Looks a GTIN up in the catalog. Compared with leading zeros stripped because
+ * a 13-digit GTIN is a 14-digit one without its leading zero, and labels print
+ * whichever the packaging level uses.
+ */
+export function matchGtin(gtin: string | null, catalog: CatalogItem[]): CatalogItem | null {
+  if (!gtin) return null;
+  const g = gtin.replace(/^0+/, "");
+  if (!g) return null;
+  return catalog.find((c) => (c.gtin ?? "").replace(/^0+/, "") === g) ?? null;
+}
+
+/**
  * Matches an OCR'd item number against the catalog. Exact first; then a
  * forgiving pass that ignores punctuation, since the dots are the glyphs OCR
  * most often drops.
@@ -141,15 +153,7 @@ function findInCatalog(
   if (loose) return loose;
 
   // GTIN is pure digits, so it survives OCR better than a REF full of letters.
-  // Compared unpadded because a 13-digit GTIN is a 14-digit one without its
-  // leading zero.
-  if (gtin) {
-    const g = gtin.replace(/^0+/, "");
-    const byGtin = catalog.find((c) => (c.gtin ?? "").replace(/^0+/, "") === g);
-    if (byGtin) return byGtin;
-  }
-
-  return null;
+  return matchGtin(gtin, catalog);
 }
 
 /**

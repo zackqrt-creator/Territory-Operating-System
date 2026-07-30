@@ -101,6 +101,10 @@ export function parseGs1(raw: string): Gs1Fields | null {
   let i = 0;
   let steps = 0;
   while (i + 2 <= s.length && steps++ < 20) {
+    // Some scanners emit a separator after a fixed-length field too. Reading it
+    // as the first digit of the next AI turns the rest of the code into noise,
+    // so skip any run of them.
+    while (s[i] === GS) i++;
     const ai = s.slice(i, i + 2);
     i += 2;
     const fixed = GS1_FIXED_LEN[ai];

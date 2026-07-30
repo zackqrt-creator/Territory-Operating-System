@@ -1,81 +1,188 @@
 /**
- * On-device OCR for implant labels, using tesseract.js. Runs entirely in the
- * browser (no server, no API key, no per-scan cost, and the photo never leaves
- * the phone). Lazy-imported so the ~heavy wasm/worker only loads the first time
- * the rep actually scans a label, not on app start.
+ * On-device OCR for implant labels and packing slips, using tesseract.js. Runs
+ * entirely in the browser (no server, no API key, no per-scan cost, and the
+ * photo never leaves the phone). Lazy-imported so the heavy wasm/worker only
+ * loads the first time the rep actually scans something, not on app start.
  *
  * The recognizer core + English data are fetched from a CDN on first use, so
  * the very first scan needs a connection; after that the browser caches them.
- * The caller always wraps this in try/catch — if OCR fails for any reason, the
- * photo still attaches and manual entry is unaffected.
+ * That first fetch is tens of megabytes, which is why every entry point here
+ * reports progress -- a silent spinner during it is indistinguishable from a
+ * hang, and a rep standing in a hospital corridor will give up long before it
+ * finishes. Callers always wrap this in try/catch: if OCR fails for any reason
+ * the photo still attaches and manual entry is unaffected.
  */
-export async function ocrLabel(file: File): Promise<string> {
-  const Tesseract = (await import("tesseract.js")).default;
-  const { data } = await Tesseract.recognize(file, "eng");
-  return data.text ?? "";
-}
 
-/** Rotates an image file by a quarter-turn multiple, returning a new blob. */
-async function rotated(file: File, degrees: 0 | 90 | 180 | 270): Promise<Blob> {
-  if (degrees === 0) return file;
+/**
+ * A 12-megapixel phone photo is the wrong input for tesseract. The extra pixels
+ * carry no additional letter shape, but the recognizer still walks all of them,
+ * and on a phone CPU one 4032x3024 pass runs for the better part of a minute --
+ * times four orientations. Capping the long edge at 2000px still leaves roughly
+ * 30px of cap height on a full page (comfortably inside what the recognizer
+ * needs) and turns that minute into a few seconds.
+ */
+const MAX_EDGE = 2000;
 
-  const bitmap = await createImageBitmap(file);
-  const swap = degrees === 90 || degrees === 270;
-  const canvas = document.createElement("canvas");
-  canvas.width = swap ? bitmap.height : bitmap.width;
-  canvas.height = swap ? bitmap.width : bitmap.height;
+/** Give up on the first-use download rather than spinning forever on bad signal. */
+const INIT_TIMEOUT_MS = 45_000;
 
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-  ctx.rotate((degrees * Math.PI) / 180);
-  ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
-  bitmap.close();
+export type OcrProgress = (message: string) => void;
 
-  return new Promise((resolve) =>
-    canvas.toBlob((b) => resolve(b ?? file), "image/jpeg", 0.92),
-  );
+/**
+ * Progress from tesseract arrives on the worker's logger, which is fixed at
+ * worker-creation time -- but the worker outlives any single scan. So the
+ * active scan parks its reporter here and clears it when done.
+ */
+let activeProgress: OcrProgress | null = null;
+let activeAttempt = "";
+
+type TesseractWorker = Awaited<ReturnType<typeof createWorkerOnce>>;
+let workerPromise: Promise<TesseractWorker> | null = null;
+
+async function createWorkerOnce() {
+  const { createWorker } = await import("tesseract.js");
+  return createWorker("eng", 1, {
+    logger: (m: { status?: string; progress?: number }) => {
+      if (!activeProgress) return;
+      activeProgress(phrase(m.status ?? "", m.progress ?? 0) + activeAttempt);
+    },
+  });
 }
 
 /**
- * OCR for a full page rather than a single label.
+ * One worker for the whole session. `Tesseract.recognize()` spins up and tears
+ * down a worker per call, which re-initialises the recognizer for every single
+ * orientation attempt -- four times the setup cost for one photo.
+ */
+async function getWorker(): Promise<TesseractWorker> {
+  if (!workerPromise) {
+    workerPromise = withTimeout(createWorkerOnce(), INIT_TIMEOUT_MS).catch((err) => {
+      // A failed init must not poison the next attempt.
+      workerPromise = null;
+      throw err;
+    });
+  }
+  return workerPromise;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("The text reader took too long to download.")),
+      ms,
+    );
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
+/** Turns tesseract's internal status strings into something a rep can act on. */
+function phrase(status: string, progress: number): string {
+  if (/core|traineddata|loading|initiali/i.test(status)) {
+    return "Getting the reader ready (first scan only)…";
+  }
+  if (/recogniz/i.test(status)) return `Reading… ${Math.round(progress * 100)}%`;
+  return "Reading…";
+}
+
+/**
+ * Rotates and downscales an image into something worth handing to the
+ * recognizer. Returns the original untouched if the canvas is unavailable.
+ */
+async function prepare(source: Blob, degrees: 0 | 90 | 180 | 270): Promise<Blob> {
+  const bitmap = await createImageBitmap(source);
+  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+  const swap = degrees === 90 || degrees === 270;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = swap ? h : w;
+  canvas.height = swap ? w : h;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return source;
+  }
+  ctx.imageSmoothingQuality = "high";
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate((degrees * Math.PI) / 180);
+  ctx.drawImage(bitmap, -w / 2, -h / 2, w, h);
+  bitmap.close();
+
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b ?? source), "image/jpeg", 0.9));
+}
+
+async function recognise(source: Blob, degrees: 0 | 90 | 180 | 270): Promise<string> {
+  const worker = await getWorker();
+  const { data } = await worker.recognize(await prepare(source, degrees));
+  return data.text ?? "";
+}
+
+/** Single label, upright. Used by the add-item and sticker-sheet flows. */
+export async function ocrLabel(file: Blob, onProgress?: OcrProgress): Promise<string> {
+  activeProgress = onProgress ?? null;
+  activeAttempt = "";
+  try {
+    return await recognise(file, 0);
+  } finally {
+    activeProgress = null;
+  }
+}
+
+/**
+ * OCR for a page or a box label, trying each quarter-turn.
  *
  * A packing slip gets photographed however it happens to be lying on the
- * counter, and tesseract does not recover from a sideways page on its own --
- * it returns confident nonsense. So each quarter-turn is tried and the caller
- * scores the result; the orientation that yields the most real catalog matches
- * wins. Upright is tried first and short-circuits when it clearly worked, so
- * the common case still costs a single pass.
- *
- * `onProgress` reports which attempt is running, because four passes over a
- * 4000px photo is slow enough that silence looks like a hang.
+ * counter, and tesseract does not recover from a sideways page on its own -- it
+ * returns confident nonsense. So the caller scores each result and the
+ * orientation yielding the most real catalog matches wins. Upright is tried
+ * first and short-circuits as soon as it clearly worked, so the common case
+ * still costs a single pass.
  */
 export async function ocrPage(
-  file: File,
+  source: Blob,
   score: (text: string) => number,
-  onProgress?: (attempt: number, total: number) => void,
+  onProgress?: OcrProgress,
 ): Promise<{ text: string; degrees: number; score: number }> {
-  const Tesseract = (await import("tesseract.js")).default;
   const angles: (0 | 90 | 180 | 270)[] = [0, 90, 270, 180];
-
   let best = { text: "", degrees: 0, score: -1 };
+  let lastError: unknown = null;
 
-  for (let i = 0; i < angles.length; i++) {
-    onProgress?.(i + 1, angles.length);
-    try {
-      const blob = await rotated(file, angles[i]);
-      const { data } = await Tesseract.recognize(blob, "eng");
-      const text = data.text ?? "";
-      const s = score(text);
-      if (s > best.score) best = { text, degrees: angles[i], score: s };
-      // One real catalog match already proves the orientation, and a single
-      // box label only ever scores ~11. Anything at or above that is the right
-      // way up, so stop rather than paying for three more slow rotations.
-      if (s >= 10) break;
-    } catch {
-      // A single failed orientation should not lose the whole scan.
+  activeProgress = onProgress ?? null;
+  try {
+    for (let i = 0; i < angles.length; i++) {
+      activeAttempt = i === 0 ? "" : ` (turn ${i + 1} of ${angles.length})`;
+      onProgress?.(i === 0 ? "Reading…" : `Trying it sideways…${activeAttempt}`);
+      try {
+        const text = await recognise(source, angles[i]);
+        const s = score(text);
+        if (s > best.score) best = { text, degrees: angles[i], score: s };
+        // One real catalog match already proves the orientation, and a single
+        // box label only ever scores ~11. Anything at or above that is the
+        // right way up, so stop rather than paying for three more passes.
+        if (s >= 10) break;
+      } catch (err) {
+        // A single failed orientation should not lose the whole scan.
+        lastError = err;
+      }
     }
+  } finally {
+    activeProgress = null;
+    activeAttempt = "";
   }
 
+  // Every orientation threw -- that is a setup failure, not an unreadable
+  // photo, and the two need different advice.
+  if (best.score < 0 && lastError) throw lastError;
   return best;
 }
