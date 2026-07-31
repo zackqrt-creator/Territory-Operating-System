@@ -195,6 +195,34 @@ export default function Home() {
       ) : (
         <div className="mt-6 space-y-6">
           {/*
+           * The database holds 931 catalogued products but only a handful of
+           * rows saying anything is actually on a shelf. Everything that asks
+           * "do I have enough" diffs against that, so with the shelf empty every
+           * case reads as short and the app looks broken when it is in fact
+           * reporting honestly. Say so, once, rather than letting a wall of red
+           * imply a crisis that is really just un-entered stock.
+           */}
+          {items.length < 10 && (
+            <div className="rounded-2xl border border-amber-800 bg-amber-950 p-3.5">
+              <p className="text-sm font-medium text-amber-200">
+                {items.length === 0
+                  ? "No stock recorded yet"
+                  : `Only ${items.length} item${items.length === 1 ? "" : "s"} recorded as on hand`}
+              </p>
+              <p className="mt-1 text-[13px] leading-relaxed text-amber-300">
+                Shortage warnings below are measured against that, not against what is really in
+                your car and at your facilities. They will settle down as stock goes in.
+              </p>
+              <Link
+                to="/scan"
+                className="mt-2.5 inline-flex items-center gap-1.5 text-[13px] font-medium text-amber-200 underline underline-offset-2"
+              >
+                Scan stock in <ArrowRight size={13} />
+              </Link>
+            </div>
+          )}
+
+          {/*
            * Four counts, because they are the four things that can ruin a day:
            * what is on, what is not covered, what has run down, and what has to
            * go back. Each is a link -- a number you cannot act on is trivia.
