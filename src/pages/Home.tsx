@@ -16,6 +16,7 @@ import {
   MessageSquare,
   ChevronRight,
 } from "lucide-react";
+import BrandMark from "../components/BrandMark";
 import { useAuth } from "../hooks/useAuth";
 import {
   listUpcomingCases,
@@ -167,11 +168,9 @@ export default function Home() {
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 text-lg font-bold text-white shadow-lg shadow-sky-900/50">
-            CT
-          </div>
+          <BrandMark className="h-11 w-11 shrink-0" />
           <div>
-            <h1 className="text-2xl font-bold text-white">CaseTrack</h1>
+            <h1 className="text-2xl font-bold text-white">Territory OS</h1>
             <p className="text-sm text-slate-400">
               {profile ? `Hi, ${profile.display_name}` : "Loading..."}
             </p>

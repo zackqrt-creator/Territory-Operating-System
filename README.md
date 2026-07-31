@@ -1,4 +1,4 @@
-# CaseTrack 2.0
+# Territory OS
 
 Mobile-first PWA for tracking territory inventory and case logistics: loaner kits, instrument
 trays, implants, and consumables moving between storage facilities, surgery centers, and your
