@@ -144,7 +144,7 @@ export default function BottomNav() {
             */}
             <button
               onClick={signOut}
-              className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-900 py-2.5 text-sm font-medium text-slate-400 active:bg-slate-800"
+              className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-800 py-2.5 text-sm font-medium text-slate-400 active:bg-slate-700"
             >
               Sign out
             </button>
