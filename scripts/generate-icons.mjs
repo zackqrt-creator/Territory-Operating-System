@@ -1,79 +1,53 @@
-// Generates simple solid-background "+" mark PNG icons for the PWA manifest
-// (no image toolchain available in this environment).
-import { deflateSync } from "node:zlib";
-import { writeFileSync, mkdirSync } from "node:fs";
+/**
+ * Rasterise public/brand/emblem.svg into the app icons.
+ *
+ * Replaces a hand-rolled PNG encoder that drew a generic white "+" on a blue
+ * square, from back when this environment had no image toolchain. Chromium is
+ * available now, so the home-screen icon can be the real emblem.
+ *
+ * Run by hand (`node scripts/generate-icons.mjs`) when the emblem changes, not
+ * on every build -- it needs a browser, which the deploy environment has no
+ * reason to carry. The PNGs are committed, so deploys stay a plain static
+ * build.
+ *
+ * The emblem is navy on white, so the icons get a white field rather than a
+ * transparent one: iOS composites a home-screen icon onto white anyway, and a
+ * transparent PNG there leaves a muddy edge. At 76% of the canvas the artwork
+ * stays inside the maskable safe zone, so one file serves both `any` and
+ * `maskable` without a second cropped variant.
+ */
+import { chromium } from "playwright-core";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
-const BG = [0x0f, 0x62, 0x8c]; // brand blue
-const FG = [0xff, 0xff, 0xff]; // white cross
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const svg = readFileSync(join(root, "public/brand/emblem.svg"), "utf8");
 
-function crc32(buf) {
-  let c;
-  const table = crc32.table || (crc32.table = (() => {
-    const t = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      t[n] = c >>> 0;
-    }
-    return t;
-  })());
-  let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) crc = table[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
-  return (crc ^ 0xffffffff) >>> 0;
+const SIZES = [
+  { file: "public/icons/icon-512.png", size: 512 },
+  { file: "public/icons/icon-192.png", size: 192 },
+  { file: "public/icons/icon-180.png", size: 180 },
+];
+
+const EXECUTABLE =
+  process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+
+mkdirSync(join(root, "public/icons"), { recursive: true });
+
+const browser = await chromium.launch({ executablePath: EXECUTABLE, args: ["--no-sandbox"] });
+
+for (const { file, size } of SIZES) {
+  const page = await browser.newPage({ viewport: { width: size, height: size } });
+  await page.setContent(
+    `<body style="margin:0;width:${size}px;height:${size}px;background:#fff;display:flex;align-items:center;justify-content:center">
+       <div style="width:76%;height:76%">${svg}</div>
+     </body>`,
+  );
+  await page.waitForTimeout(150);
+  writeFileSync(join(root, file), await page.screenshot());
+  await page.close();
+  console.log(`wrote ${file} (${size}x${size})`);
 }
 
-function chunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length, 0);
-  const typeBuf = Buffer.from(type, "ascii");
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-  return Buffer.concat([len, typeBuf, data, crc]);
-}
-
-function makeIcon(size) {
-  const raw = Buffer.alloc((size * 3 + 1) * size);
-  const armThickness = Math.round(size * 0.22);
-  const cx = size / 2;
-  const cy = size / 2;
-  let offset = 0;
-  for (let y = 0; y < size; y++) {
-    raw[offset++] = 0; // filter type: none
-    for (let x = 0; x < size; x++) {
-      const inVertical = Math.abs(x - cx) < armThickness / 2;
-      const inHorizontal = Math.abs(y - cy) < armThickness / 2;
-      const margin = size * 0.12;
-      const inBounds = x > margin && x < size - margin && y > margin && y < size - margin;
-      const isCross = inBounds && (inVertical || inHorizontal);
-      const [r, g, b] = isCross ? FG : BG;
-      raw[offset++] = r;
-      raw[offset++] = g;
-      raw[offset++] = b;
-    }
-  }
-
-  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 2; // color type: RGB
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
-
-  const idat = deflateSync(raw);
-  return Buffer.concat([
-    sig,
-    chunk("IHDR", ihdr),
-    chunk("IDAT", idat),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
-}
-
-mkdirSync(new URL("../public/icons", import.meta.url), { recursive: true });
-for (const size of [192, 512, 180]) {
-  const out = new URL(`../public/icons/icon-${size}.png`, import.meta.url);
-  writeFileSync(out, makeIcon(size));
-  console.log(`wrote icon-${size}.png`);
-}
+await browser.close();

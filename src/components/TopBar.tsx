@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import BrandMark from "./BrandMark";
 
 /**
  * One consistent header across every screen but Home (which has its own
@@ -59,9 +60,7 @@ export default function TopBar() {
         <span className="text-lg leading-none">‹</span> Back
       </button>
       <div className="flex min-w-0 flex-1 items-center gap-2 py-2.5">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-sky-500 to-sky-700 text-[10px] font-bold text-white">
-          CT
-        </span>
+        <BrandMark className="h-6 w-6" />
         {title && <span className="truncate text-sm font-semibold text-slate-200">{title}</span>}
       </div>
     </div>

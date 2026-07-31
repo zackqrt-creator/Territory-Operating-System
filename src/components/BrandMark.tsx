@@ -1,67 +1,74 @@
+import { useId } from "react";
+
 /**
- * The Territory OS mark: a tray, and what is in it.
+ * The Territory OS emblem.
  *
- * Four cells in a case, two of them accounted for -- which is the whole job.
- * Geometric rather than pictorial so it survives being 20px in a nav bar and
- * still reads at 64px on the sign-in screen.
+ * Kept as inline SVG rather than an <img> so it paints with the first frame --
+ * it sits in the sign-in header and the Home header, and a logo that pops in a
+ * beat late is the most noticeable kind of slow.
+ *
+ * The artwork is navy on white by design, which disappears against this app's
+ * near-black background. So by default it is set in a light tile, the way it
+ * appears as a home-screen icon. Pass `tile={false}` when placing it on a light
+ * surface. The identical artwork lives at public/brand/emblem.svg, which is
+ * what scripts/generate-icons.mjs rasterises into the app icons -- one source,
+ * so the icon on the home screen and the mark in the header cannot drift.
  */
-export default function BrandMark({ className = "h-10 w-10" }: { className?: string }) {
+export default function BrandMark({
+  className = "h-10 w-10",
+  tile = true,
+}: {
+  className?: string;
+  tile?: boolean;
+}) {
+  // SVG ids are document-global. Two marks on one screen (the top bar plus a
+  // page header, say) would both define "tos-right", and unmounting the first
+  // would silently break the second's mask.
+  const maskId = `tos-right-${useId()}`;
+
   return (
-    <svg
-      viewBox="0 0 40 40"
-      fill="none"
-      role="img"
-      aria-label="Territory OS"
-      className={className}
+    <span
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden ${
+        tile ? "rounded-[22%] bg-white shadow-lg shadow-black/30 ring-1 ring-white/15" : ""
+      } ${className}`}
     >
-      <defs>
-        <linearGradient id="tos-body" x1="6" y1="4" x2="34" y2="36" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#173257" />
-          <stop offset="1" stopColor="#0b1526" />
-        </linearGradient>
-        <linearGradient id="tos-fill" x1="12" y1="12" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#5cabff" />
-          <stop offset="1" stopColor="#1273e6" />
-        </linearGradient>
-      </defs>
+      <svg
+        viewBox="0 0 64 64"
+        fill="none"
+        role="img"
+        aria-label="Territory OS"
+        className={tile ? "h-[78%] w-[78%]" : "h-full w-full"}
+      >
+        <defs>
+          {/* Removes the hexagon's right edge; the coloured layers replace it. */}
+          <mask id={maskId}>
+            <rect width="64" height="64" fill="#fff" />
+            <rect x="45" y="16" width="19" height="32" fill="#000" />
+          </mask>
+        </defs>
 
-      <rect x="2" y="2" width="36" height="36" rx="11" fill="url(#tos-body)" />
-      <rect
-        x="2.75"
-        y="2.75"
-        width="34.5"
-        height="34.5"
-        rx="10.25"
-        stroke="#2f8cf4"
-        strokeOpacity="0.42"
-        strokeWidth="1.5"
-      />
+        <g mask={`url(#${maskId})`}>
+          <path
+            d="M31 2 56.98 17 56.98 47 31 62 5.02 47 5.02 17Z"
+            stroke="#17375E"
+            strokeWidth="7.6"
+            strokeLinejoin="round"
+          />
+        </g>
 
-      {/* Filled cells: the diagonal keeps it from reading as a plain window. */}
-      <rect x="10.5" y="10.5" width="8" height="8" rx="2.4" fill="url(#tos-fill)" />
-      <rect x="21.5" y="21.5" width="8" height="8" rx="2.4" fill="url(#tos-fill)" />
+        {/* Three stacked layers, left edges echoing the hexagon's diagonals. */}
+        <path d="M53 17.4 H61.4 A1.6 1.6 0 0 1 63 19v5.6a1.6 1.6 0 0 1-1.6 1.6H47.6Z" fill="#159C99" />
+        <path d="M49.4 28.2H61.4A1.6 1.6 0 0 1 63 29.8v4.4a1.6 1.6 0 0 1-1.6 1.6H49.4Z" fill="#1560F0" />
+        <path d="M47.6 37.8H61.4A1.6 1.6 0 0 1 63 39.4V45a1.6 1.6 0 0 1-1.6 1.6H53Z" fill="#159C99" />
 
-      {/* Empty cells: the ones still to account for. */}
-      <rect
-        x="21.5"
-        y="10.5"
-        width="8"
-        height="8"
-        rx="2.4"
-        stroke="#5cabff"
-        strokeOpacity="0.5"
-        strokeWidth="1.5"
-      />
-      <rect
-        x="10.5"
-        y="21.5"
-        width="8"
-        height="8"
-        rx="2.4"
-        stroke="#5cabff"
-        strokeOpacity="0.5"
-        strokeWidth="1.5"
-      />
-    </svg>
+        {/* Location pin, centred in the open field left of the layers. */}
+        <path
+          d="M28 46.4C28 46.4 18.1 34.7 18.1 28.3a9.9 9.9 0 1 1 19.8 0c0 6.4-9.9 18.1-9.9 18.1Z"
+          fill="#159C99"
+        />
+        <circle cx="28" cy="28.1" r="5" fill="#fff" />
+        <circle cx="28" cy="28.1" r="2.9" fill="#17375E" />
+      </svg>
+    </span>
   );
 }

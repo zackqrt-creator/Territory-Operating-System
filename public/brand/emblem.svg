@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!--
+    Territory OS emblem: a hexagon whose right edge breaks into three stacked
+    layers, with a location pin at its centre. Territory, and what is in it.
+
+    Vector rather than a bitmap so one file drives the sign-in header, the Home
+    header and every generated app icon, with no second set of assets to keep
+    in sync. The pin's hole is a real hole, so it takes the colour of whatever
+    it is placed on.
+  -->
+  <defs>
+    <!-- Removes the hexagon's right edge; the coloured layers replace it. -->
+    <mask id="tos-right">
+      <rect width="64" height="64" fill="#fff" />
+      <rect x="45" y="16" width="19" height="32" fill="#000" />
+    </mask>
+  </defs>
+
+  <g mask="url(#tos-right)">
+    <path
+      d="M31 2 56.98 17 56.98 47 31 62 5.02 47 5.02 17Z"
+      stroke="#17375E"
+      stroke-width="7.6"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <!-- The three layers, right-aligned, left edges echoing the hex diagonals. -->
+  <path d="M53 17.4 H61.4 A1.6 1.6 0 0 1 63 19v5.6a1.6 1.6 0 0 1-1.6 1.6H47.6Z" fill="#159C99" />
+  <path d="M49.4 28.2H61.4A1.6 1.6 0 0 1 63 29.8v4.4a1.6 1.6 0 0 1-1.6 1.6H49.4Z" fill="#1560F0" />
+  <path d="M47.6 37.8H61.4A1.6 1.6 0 0 1 63 39.4V45a1.6 1.6 0 0 1-1.6 1.6H53Z" fill="#159C99" />
+
+  <!-- Location pin, centred in the open field left of the layers. -->
+  <path
+    d="M28 46.4C28 46.4 18.1 34.7 18.1 28.3a9.9 9.9 0 1 1 19.8 0c0 6.4-9.9 18.1-9.9 18.1Z"
+    fill="#159C99"
+  />
+  <circle cx="28" cy="28.1" r="5" fill="#fff" />
+  <circle cx="28" cy="28.1" r="2.9" fill="#17375E" />
+</svg>
