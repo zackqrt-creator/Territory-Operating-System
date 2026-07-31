@@ -281,7 +281,7 @@ export default function AddItemSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
-        <h2 className="text-lg font-semibold text-white">Add inventory</h2>
+        <h2 className="text-lg font-semibold text-slate-100">Add inventory</h2>
 
         <div className="mt-4 flex rounded-lg border border-slate-700 bg-slate-800/50 p-1">
           {(["consignment", "loaner", "restock"] as const).map((a) => (
@@ -404,7 +404,7 @@ export default function AddItemSheet({
               value={catalogSearch}
               onChange={(e) => onCatalogSearchChange(e.target.value)}
               placeholder="Search by name, side, or size..."
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
             />
             <datalist id="catalog-options">
               {filteredCatalog.map((c) => (
@@ -441,7 +441,7 @@ export default function AddItemSheet({
                 <select
                   value={newDeviceTypeChoice}
                   onChange={(e) => setNewDeviceTypeChoice(e.target.value)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
                 >
                   <option value="" disabled>
                     Select a device type...
@@ -458,7 +458,7 @@ export default function AddItemSheet({
                     value={newDeviceTypeOther}
                     onChange={(e) => setNewDeviceTypeOther(e.target.value)}
                     placeholder="Custom device type"
-                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
                   />
                 )}
               </div>
@@ -467,7 +467,7 @@ export default function AddItemSheet({
                 <select
                   value={newProductLineChoice}
                   onChange={(e) => setNewProductLineChoice(e.target.value)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
                 >
                   <option value="" disabled>
                     Select a product line...
@@ -484,7 +484,7 @@ export default function AddItemSheet({
                     value={newProductLineOther}
                     onChange={(e) => setNewProductLineOther(e.target.value)}
                     placeholder="Custom product line"
-                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
                   />
                 )}
               </div>
@@ -494,7 +494,7 @@ export default function AddItemSheet({
                   <select
                     value={newSide}
                     onChange={(e) => setNewSide(e.target.value as CatalogSide)}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
                   >
                     {SIDES.map((s) => (
                       <option key={s.value} value={s.value}>
@@ -509,7 +509,7 @@ export default function AddItemSheet({
                     value={newSizeLabel}
                     onChange={(e) => setNewSizeLabel(e.target.value)}
                     placeholder="e.g. 50mm"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
@@ -518,7 +518,7 @@ export default function AddItemSheet({
                 <select
                   value={newCementType}
                   onChange={(e) => setNewCementType(e.target.value as CementType)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
                 >
                   {CEMENT_TYPES.map((c) => (
                     <option key={c.value} value={c.value}>
@@ -547,7 +547,7 @@ export default function AddItemSheet({
                 setCatalogItemId(null);
               }}
               placeholder="GMK Total Knee Loaner Kit"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
             />
           </div>
 
@@ -598,7 +598,7 @@ export default function AddItemSheet({
             <select
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
             >
               {facilities.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -614,7 +614,7 @@ export default function AddItemSheet({
               <input
                 value={lot}
                 onChange={(e) => setLot(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
               />
             </div>
             <div>
@@ -623,7 +623,7 @@ export default function AddItemSheet({
                 type="date"
                 value={expiration}
                 onChange={(e) => setExpiration(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
               />
             </div>
           </div>
@@ -633,7 +633,7 @@ export default function AddItemSheet({
             <input
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
             />
           </div>
 
@@ -644,7 +644,7 @@ export default function AddItemSheet({
                 type="date"
                 value={returnDeadline}
                 onChange={(e) => setReturnDeadline(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
               />
             </div>
           )}
@@ -652,7 +652,7 @@ export default function AddItemSheet({
           <button
             onClick={onSubmit}
             disabled={saving || !name.trim() || !locationId}
-            className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-lg font-semibold text-white shadow-lg shadow-sky-950/60 disabled:opacity-50"
+            className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-lg font-semibold text-white shadow-lg shadow-sky-600/25 disabled:opacity-50"
           >
             {saving ? "Saving..." : "Add item"}
           </button>

@@ -47,7 +47,7 @@ export default function AddCase() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Add case</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Add case</h1>
 
       <div className="mt-4 flex rounded-lg border border-slate-700 bg-slate-800/50 p-1">
         <button
@@ -277,7 +277,7 @@ function QuickAddForm({
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
         />
       </div>
 
@@ -293,7 +293,7 @@ function QuickAddForm({
             setTimeTouched(true);
           }}
           onBlur={() => setTimeTouched(true)}
-          className={`w-full rounded-lg border bg-slate-800 px-4 py-3 text-white ${
+          className={`w-full rounded-lg border bg-slate-800 px-4 py-3 text-slate-100 ${
             !time && timeTouched ? "border-red-800" : "border-slate-700"
           }`}
         />
@@ -414,7 +414,7 @@ function QuickAddForm({
         <select
           value={facilityId}
           onChange={(e) => setFacilityId(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
         >
           {/* Only real surgical sites — a case can't happen at storage, corporate, or a rep's vehicle. */}
           {surgicalFacilities.map((f) => (
@@ -433,7 +433,7 @@ function QuickAddForm({
           value={surgeon}
           onChange={(e) => setSurgeon(e.target.value)}
           placeholder="Start typing a name..."
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
         />
         <datalist id="surgeon-options">
           {surgeons.map((s) => (
@@ -505,7 +505,7 @@ function QuickAddForm({
               value={manualName}
               onChange={(e) => setManualName(e.target.value)}
               placeholder="Add another item..."
-              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
             />
             <button
               onClick={() => {
@@ -517,7 +517,7 @@ function QuickAddForm({
                 setManualName("");
               }}
               disabled={!manualName.trim()}
-              className="min-h-0 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="min-h-0 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
             >
               Add
             </button>
@@ -691,13 +691,13 @@ function PasteImport({
         onChange={(e) => setText(e.target.value)}
         placeholder="Paste myOPS rows here..."
         rows={6}
-        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
       />
 
       <button
         onClick={onParse}
         disabled={!text.trim()}
-        className="w-full rounded-lg bg-slate-700 px-4 py-3 font-medium text-white disabled:opacity-50"
+        className="w-full rounded-lg bg-slate-700 px-4 py-3 font-medium text-slate-100 disabled:opacity-50"
       >
         Parse
       </button>
@@ -716,7 +716,7 @@ function PasteImport({
             <select
               value={facilityId}
               onChange={(e) => setFacilityId(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
             >
               {surgicalFacilities.map((f) => (
                 <option key={f.id} value={f.id}>

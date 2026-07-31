@@ -117,11 +117,11 @@ export default function WikiPageView() {
           autoFocus
           value={titleDraft}
           onChange={(e) => setTitleDraft(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xl font-bold text-white"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xl font-bold text-slate-100"
         />
       ) : (
         <div className="flex items-start justify-between gap-2">
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-slate-100">
             {page.pinned && <span className="mr-1 text-amber-400">📌</span>}
             {page.title}
           </h1>
@@ -157,7 +157,7 @@ export default function WikiPageView() {
             placeholder={
               "Write freely. Use [[Title]] to link another page (surgeon, facility, set, or a new note).\n\nStructured fields the pack-list engine can read:\nSet:: [[KAONE Setup]]\nFacilities:: [[Saint Joseph's]]\nExcludes:: [[San Joaquin General]]"
             }
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-sm text-white placeholder:text-slate-600"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600"
           />
         ) : page.body ? (
           <RenderedBody body={page.body} onFollow={onFollow} />

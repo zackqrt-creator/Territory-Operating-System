@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import PasswordSetting from "./PasswordSetting";
+import { useAuth } from "../hooks/useAuth";
 import {
-  Home,
+  Gauge,
   Calendar,
   Package,
   CheckSquare,
@@ -24,11 +25,11 @@ import {
 } from "lucide-react";
 
 const PRIMARY: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
-  { to: "/", label: "Home", icon: Home, end: true },
+  { to: "/", label: "Command", icon: Gauge, end: true },
   { to: "/cases", label: "Cases", icon: Calendar },
   { to: "/inventory", label: "Inventory", icon: Package },
-  { to: "/tasks", label: "Tasks", icon: CheckSquare },
-  { to: "/notes", label: "Notes", icon: NotebookPen },
+  { to: "/tasks", label: "Work", icon: CheckSquare },
+  { to: "/notes", label: "Knowledge", icon: NotebookPen },
 ];
 
 const MORE: { to: string; label: string; icon: LucideIcon }[] = [
@@ -47,6 +48,7 @@ const MORE: { to: string; label: string; icon: LucideIcon }[] = [
 ];
 
 export default function BottomNav() {
+  const { signOut } = useAuth();
   const [showMore, setShowMore] = useState(false);
   const loc = useLocation();
   const moreActive = MORE.some((m) => loc.pathname === m.to || loc.pathname.startsWith(m.to + "/"));
@@ -112,7 +114,7 @@ export default function BottomNav() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">More</h2>
+              <h2 className="text-lg font-semibold text-slate-100">More</h2>
               <button onClick={() => setShowMore(false)} className="text-slate-400">
                 <X className="h-5 w-5" />
               </button>
@@ -135,6 +137,17 @@ export default function BottomNav() {
             </div>
 
             <PasswordSetting />
+
+            {/*
+              Sign out lived only on the Home header, which no longer has room
+              for it. Settings is where anyone would look for it anyway.
+            */}
+            <button
+              onClick={signOut}
+              className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-900 py-2.5 text-sm font-medium text-slate-400 active:bg-slate-800"
+            >
+              Sign out
+            </button>
 
             {/*
               Which build is actually running. An installed PWA can sit on a

@@ -67,7 +67,7 @@ export default function Scan() {
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Scan</h1>
+          <h1 className="text-2xl font-bold text-slate-100">Scan</h1>
           <p className="mt-1 text-sm text-slate-400">
             Point the camera at a loaner kit or tray barcode/QR to check it in or out.
           </p>
@@ -94,11 +94,11 @@ export default function Scan() {
           <input
             value={manualCode}
             onChange={(e) => setManualCode(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
           />
           <button
             onClick={onManualLookup}
-            className="rounded-lg bg-slate-700 px-4 py-3 font-medium text-white"
+            className="rounded-lg bg-slate-700 px-4 py-3 font-medium text-slate-100"
           >
             Look up
           </button>

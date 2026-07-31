@@ -66,7 +66,7 @@ export default function StagingReport() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Staging report</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Staging report</h1>
       <p className="mt-1 text-sm text-slate-400">
         Everything to haul so tomorrow's cases are ready, and what needs to ship back before the
         week gets away from you.
@@ -184,7 +184,7 @@ function HaulItemRow({ item, onMove }: { item: HaulItem; onMove: () => void }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <div>
-        <p className="text-sm text-white">
+        <p className="text-sm text-slate-100">
           {item.quantity}x {item.name}
         </p>
         <p className="text-xs text-slate-500">
@@ -210,7 +210,7 @@ function LoanerReturnRow({ r, onMove }: { r: LoanerReturn; onMove: () => void })
       }`}
     >
       <div>
-        <p className="text-sm font-medium text-white">{r.item.name}</p>
+        <p className="text-sm font-medium text-slate-100">{r.item.name}</p>
         <p className={`text-xs ${urgent ? "text-red-300" : "text-slate-500"}`}>
           {r.facility.name} ·{" "}
           {r.daysLeft < 0

@@ -187,7 +187,7 @@ export default function DaySheet({
                 {repInitials(profiles.find((p) => p.id === a.profile_id))}
               </span>
             ))}
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
             {c.surgery_type === "KNEE" ? "Knee" : c.surgery_type === "HIP" ? "Hip" : "Instrument"}
             {c.variant === "partial" ? " · Partial" : ""}
             {c.side ? ` · ${c.side === "LEFT" ? "L" : "R"}` : ""}
@@ -210,7 +210,7 @@ export default function DaySheet({
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <div>
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-slate-100">
             {formatDateShort(date)}
             {isToday(date) && <span className="ml-2 text-xs font-normal text-sky-400">Today</span>}
           </h2>
@@ -310,7 +310,7 @@ export default function DaySheet({
                         value={draftLabel}
                         onChange={(e) => setDraftLabel(e.target.value)}
                         placeholder={`What is ${hourLabel(h)} for?`}
-                        className="w-full rounded-md border border-slate-700 bg-slate-800 px-2.5 py-2 text-sm text-white placeholder:text-slate-500"
+                        className="w-full rounded-md border border-slate-700 bg-slate-800 px-2.5 py-2 text-sm text-slate-100 placeholder:text-slate-500"
                       />
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {BLOCK_KINDS.map((k) => (

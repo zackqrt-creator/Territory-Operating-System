@@ -50,7 +50,7 @@ export default function ExtendSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
-        <h2 className="text-lg font-semibold text-white">Extend return</h2>
+        <h2 className="text-lg font-semibold text-slate-100">Extend return</h2>
         <p className="text-sm text-slate-400">{item.name}</p>
 
         <div className="mt-4 space-y-4">
@@ -60,7 +60,7 @@ export default function ExtendSheet({
               type="date"
               value={until}
               onChange={(e) => setUntil(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
             />
           </div>
           <div>
@@ -70,7 +70,7 @@ export default function ExtendSheet({
               onChange={(e) => setReason(e.target.value)}
               rows={3}
               placeholder="Why is this staying out past 48 hours?"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
             />
           </div>
 

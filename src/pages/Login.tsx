@@ -103,7 +103,7 @@ export default function Login() {
   }
 
   const field =
-    "mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-[15px] font-normal text-white placeholder:text-slate-600";
+    "mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-[15px] font-normal text-slate-100 placeholder:text-slate-600";
 
   return (
     <div className="relative min-h-full overflow-hidden">
@@ -121,14 +121,14 @@ export default function Login() {
           <div className="flex items-center gap-3">
             <BrandMark className="h-11 w-11 shrink-0" />
             <div className="leading-tight">
-              <p className="text-lg font-semibold tracking-tight text-white">Territory OS</p>
+              <p className="text-lg font-semibold tracking-tight text-slate-100">Territory OS</p>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400/80">
                 Field operations
               </p>
             </div>
           </div>
 
-          <h1 className="mt-8 text-[1.85rem] font-semibold leading-[1.12] text-white sm:text-4xl lg:text-[2.6rem]">
+          <h1 className="mt-8 text-[1.85rem] font-semibold leading-[1.12] text-slate-100 sm:text-4xl lg:text-[2.6rem]">
             Every tray, every case,
             <br className="hidden sm:block" /> every lot accounted for.
           </h1>
@@ -139,7 +139,7 @@ export default function Login() {
           {sent ? (
             <Panel>
               <p className="text-2xl">📬</p>
-              <h2 className="mt-2 text-base font-semibold text-white">Check your email</h2>
+              <h2 className="mt-2 text-base font-semibold text-slate-100">Check your email</h2>
               <p className="mt-1 text-sm text-slate-400">
                 A one-tap sign-in link is on its way to {email}.
               </p>
@@ -156,7 +156,7 @@ export default function Login() {
           ) : (
             <Panel>
               <div className="flex items-baseline justify-between">
-                <h2 className="text-base font-semibold text-white">Sign in</h2>
+                <h2 className="text-base font-semibold text-slate-100">Sign in</h2>
                 <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
                   {mode === "password" ? "Password" : "Email link"}
                 </span>
@@ -202,7 +202,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={busy}
-                  className="w-full rounded-xl bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-3 text-[15px] font-semibold text-white shadow-lg shadow-sky-950/60 disabled:opacity-50"
+                  className="w-full rounded-xl bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-3 text-[15px] font-semibold text-white shadow-lg shadow-sky-600/25 disabled:opacity-50"
                 >
                   {busy
                     ? mode === "password"
@@ -294,7 +294,7 @@ export default function Login() {
 
 function Panel({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-2xl shadow-black/50 backdrop-blur-sm sm:p-6">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-2xl shadow-slate-900/[0.06] backdrop-blur-sm sm:p-6">
       {children}
     </div>
   );
@@ -308,17 +308,17 @@ function Backdrop() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
       <div
-        className="absolute inset-0 opacity-[0.35]"
+        className="absolute inset-0"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(68,85,125,0.16) 1px, transparent 1px)," +
-            "linear-gradient(90deg, rgba(68,85,125,0.16) 1px, transparent 1px)",
+            "linear-gradient(rgba(22,35,60,0.055) 1px, transparent 1px)," +
+            "linear-gradient(90deg, rgba(22,35,60,0.055) 1px, transparent 1px)",
           backgroundSize: "56px 56px",
           maskImage: "radial-gradient(115% 70% at 50% 0%, #000 20%, transparent 78%)",
           WebkitMaskImage: "radial-gradient(115% 70% at 50% 0%, #000 20%, transparent 78%)",
         }}
       />
-      <div className="absolute -top-40 left-1/2 h-[26rem] w-[46rem] -translate-x-1/2 rounded-full bg-sky-600/15 blur-[110px]" />
+      <div className="absolute -top-40 left-1/2 h-[26rem] w-[46rem] -translate-x-1/2 rounded-full bg-sky-600/[0.07] blur-[110px]" />
     </div>
   );
 }

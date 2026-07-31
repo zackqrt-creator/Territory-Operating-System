@@ -58,7 +58,7 @@ export default function Surgeons() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Surgeons</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Surgeons</h1>
       <p className="mt-1 text-sm text-slate-400">
         Preferences drive the pack list. Notes are just for the team — what they like, what to
         expect, anything worth knowing before a case.
@@ -69,7 +69,7 @@ export default function Surgeons() {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder="Add a surgeon..."
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+          className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
         />
         <button
           onClick={onAddSurgeon}
@@ -151,7 +151,7 @@ function SurgeonCard({
       <div className="flex items-center justify-between gap-2">
         <RenameField
           value={surgeon.name}
-          textClassName="font-semibold text-white"
+          textClassName="font-semibold text-slate-100"
           onSave={async (next) => {
             await updateSurgeonName(surgeon.id, next);
             onSaved();
@@ -164,10 +164,10 @@ function SurgeonCard({
         <div className="mt-2 rounded-lg bg-slate-800/50 p-2.5">
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300">
             <span>
-              <span className="font-semibold text-white">{done.length}</span> cases on record
+              <span className="font-semibold text-slate-100">{done.length}</span> cases on record
             </span>
             <span>
-              Last 90d: <span className="font-semibold text-white">{thisQ}</span>
+              Last 90d: <span className="font-semibold text-slate-100">{thisQ}</span>
               {trend !== null && (
                 <span className={trend >= 0 ? "text-emerald-400" : "text-red-400"}>
                   {" "}
@@ -216,7 +216,7 @@ function SurgeonCard({
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder="What they like most, what to expect, anything worth knowing..."
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
         />
         {dirty && (
           <button

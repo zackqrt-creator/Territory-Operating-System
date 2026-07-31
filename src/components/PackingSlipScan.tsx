@@ -331,7 +331,7 @@ export default function PackingSlipScan({
         style={{ paddingTop: "calc(0.75rem + var(--safe-top))" }}
       >
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-100">
             <ScanLine size={18} /> Scan boxes or slip
           </h2>
           <p className="text-xs text-slate-400">
@@ -434,13 +434,13 @@ export default function PackingSlipScan({
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     {r.match ? (
-                      <p className="truncate text-sm font-medium text-white">{r.match.name}</p>
+                      <p className="truncate text-sm font-medium text-slate-100">{r.match.name}</p>
                     ) : (
                       <input
                         value={r.description ?? ""}
                         onChange={(e) => update(r.key, { description: e.target.value || null })}
                         placeholder="Name this item"
-                        className="min-h-0 w-full rounded border border-amber-800/60 bg-slate-900 px-2 py-1 text-sm text-white placeholder:text-slate-500"
+                        className="min-h-0 w-full rounded border border-amber-800/60 bg-slate-900 px-2 py-1 text-sm text-slate-100 placeholder:text-slate-500"
                       />
                     )}
                     <p className="mt-0.5 font-mono text-[11px] text-slate-400">
@@ -476,7 +476,7 @@ export default function PackingSlipScan({
                     value={r.lot ?? ""}
                     onChange={(e) => update(r.key, { lot: e.target.value || null })}
                     placeholder="—"
-                    className="min-h-0 w-32 rounded border border-slate-700 bg-slate-800 px-2 py-1 font-mono text-xs text-white"
+                    className="min-h-0 w-32 rounded border border-slate-700 bg-slate-800 px-2 py-1 font-mono text-xs text-slate-100"
                   />
                   <label className="ml-auto text-[11px] text-slate-500">Qty</label>
                   <input
@@ -486,7 +486,7 @@ export default function PackingSlipScan({
                     onChange={(e) =>
                       update(r.key, { quantity: Math.max(1, Number(e.target.value) || 1) })
                     }
-                    className="min-h-0 w-16 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-white"
+                    className="min-h-0 w-16 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100"
                   />
                 </div>
               </div>
@@ -524,7 +524,7 @@ export default function PackingSlipScan({
         >
           <button
             onClick={confirm}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 py-3.5 text-lg font-semibold text-white shadow-lg shadow-sky-950/40"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 py-3.5 text-lg font-semibold text-white shadow-lg shadow-sky-600/20"
           >
             <Check size={18} />
             Add {units} item{units === 1 ? "" : "s"}

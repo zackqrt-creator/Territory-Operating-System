@@ -2,43 +2,116 @@
 @import "tailwindcss";
 
 /*
- * CaseTrack design tokens.
+ * Territory OS design tokens -- light.
  *
- * The whole app is written against Tailwind's slate/sky scales, so the
- * palette is retuned here in one place instead of restyling every page:
- * slate gets a richer navy tint with noticeably brighter mid-tones
- * (the old defaults read muddy/"blurry" on the dark background), and
- * sky-600 -- the primary action color everywhere -- gets a more vivid,
- * confident blue. Any component using these utilities picks the new
- * values up automatically.
+ * Every screen in this app is written against Tailwind's slate and sky
+ * scales, so the palette is retuned here rather than restyling ~25 pages.
+ * Going light meant inverting the slate ramp in place: what used to be the
+ * darkest surface (slate-950) is now the page background, and what used to be
+ * the faintest text (slate-100) is now the ink. Each utility keeps doing the
+ * same job it always did -- bg-slate-900 is still "a card", text-slate-400 is
+ * still "secondary text" -- it just renders light.
+ *
+ * The sky ramp is deliberately NOT monotonic, because its two halves do
+ * unrelated jobs: 500-700 stay strong action blues (buttons, gradients, white
+ * text sits on them), while 200-400 become dark accent text that has to be
+ * legible ON white, and 800-950 become pale tints used as panel fills.
+ *
+ * Contrast against white, for the text ramp: slate-400 7.4:1, slate-500 5.4:1,
+ * slate-600 4.0:1 (hint text only), sky-400 5.6:1, sky-300 4.9:1.
  */
 @theme {
   --font-sans: "Inter Variable", system-ui, "Segoe UI", Roboto, sans-serif;
 
-  --color-slate-950: #05080f;
-  --color-slate-900: #0d1526;
-  --color-slate-800: #172138;
-  --color-slate-700: #2b3a58;
-  --color-slate-600: #44557d;
-  --color-slate-500: #8b9ab8;
-  --color-slate-400: #a9b6d0;
-  --color-slate-300: #c6d0e4;
-  --color-slate-200: #dee5f2;
-  --color-slate-100: #eef2f9;
+  /* Surfaces, lightest first -- the inverse of what these names used to mean. */
+  --color-slate-950: #f7f8fa; /* page */
+  --color-slate-900: #ffffff; /* cards */
+  --color-slate-800: #f2f4f7; /* input + chip fill */
+  --color-slate-700: #dfe3ea; /* borders */
 
-  --color-sky-950: #0a1a30;
-  --color-sky-900: #0d2c55;
-  --color-sky-800: #11498f;
-  --color-sky-700: #0f62c8;
-  --color-sky-600: #1273e6;
-  --color-sky-500: #2f8cf4;
-  --color-sky-400: #5cabff;
-  --color-sky-300: #8ec7ff;
-  --color-sky-200: #c0deff;
+  /* Text, faintest first. */
+  --color-slate-600: #7d8798;
+  --color-slate-500: #667085;
+  --color-slate-400: #4a5568;
+  --color-slate-300: #33405a;
+  --color-slate-200: #22304c;
+  --color-slate-100: #16233c; /* ink */
+
+  /* Pale tints for panel fills and borders. */
+  --color-sky-950: #eff4ff;
+  --color-sky-900: #dbe7fe;
+  --color-sky-800: #c3d8fd;
+
+  /* Action blues -- white text sits on these, so they stay strong. */
+  --color-sky-700: #1b57c8;
+  --color-sky-600: #1560f0;
+  --color-sky-500: #3d7bf4;
+
+  /* Accent text, read on white. */
+  --color-sky-400: #1b5ad4;
+  --color-sky-300: #2264dd;
+  --color-sky-200: #2e6fe8;
+
+  /*
+   * Semantic colours, inverted on the same principle as slate.
+   *
+   * Every alert in this app was written dark-first: a deep tint at 950/900, a
+   * border at 800, and light text at 300/400. Flipping the ramp keeps all of
+   * those pairings meaningful -- pale tint, light border, dark text -- without
+   * touching the ~200 places that use them.
+   *
+   * 700-500 stay strong, because they are solid fills with white text on them
+   * (the destructive buttons) and 15%-opacity chip backgrounds. 400 is pulled
+   * dark deliberately: it is used both as a solid dot and as body text, and
+   * text on white is the harder constraint.
+   */
+  --color-red-950: #fef2f2;
+  --color-red-900: #fde7e7;
+  --color-red-800: #f8c9c9;
+  --color-red-700: #b91c1c;
+  --color-red-600: #dc2626;
+  --color-red-500: #e04343;
+  --color-red-400: #b42318;
+  --color-red-300: #a81e14;
+  --color-red-200: #8f1d14;
+  --color-red-100: #7a1c12;
+
+  --color-amber-950: #fffaeb;
+  --color-amber-900: #fef0c7;
+  --color-amber-800: #fadfa0;
+  --color-amber-700: #b45309;
+  --color-amber-600: #d97706;
+  --color-amber-500: #f59e0b;
+  --color-amber-400: #b45309;
+  --color-amber-300: #92400e;
+  --color-amber-200: #7c3a0c;
+  --color-amber-100: #6b3308;
+
+  --color-emerald-950: #ecfdf5;
+  --color-emerald-900: #d1fae5;
+  --color-emerald-800: #a7e8cb;
+  --color-emerald-700: #047857;
+  --color-emerald-600: #059669;
+  --color-emerald-500: #10b981;
+  --color-emerald-400: #047857;
+  --color-emerald-300: #036b4d;
+  --color-emerald-200: #025940;
+  --color-emerald-100: #024a36;
+
+  --color-violet-950: #f5f3ff;
+  --color-violet-900: #ede9fe;
+  --color-violet-800: #d6cefb;
+  --color-violet-700: #6d28d9;
+  --color-violet-600: #7c3aed;
+  --color-violet-500: #8b5cf6;
+  --color-violet-400: #6d28d9;
+  --color-violet-300: #5b21b6;
+  --color-violet-200: #4c1d95;
+  --color-violet-100: #42177f;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -51,8 +124,8 @@ body,
 
 body {
   margin: 0;
-  background: #070c18;
-  color: #dee5f2;
+  background: #f7f8fa;
+  color: #16233c;
   font: 16px/1.45 "Inter Variable", system-ui, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -62,8 +135,9 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Soft brand glow at the top of every screen; fixed pseudo-element so it
- * doesn't scroll away or repaint (iOS-safe, unlike background-attachment). */
+/* A whisper of brand tint at the top of every screen. Much fainter than the
+ * dark theme's glow needed to be -- on a light page anything stronger reads as
+ * a smudge rather than depth. */
 body::before {
   content: "";
   position: fixed;
@@ -71,8 +145,8 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(120% 45% at 50% -12%, rgba(29, 106, 226, 0.16), transparent 70%),
-    #070c18;
+    radial-gradient(120% 40% at 50% -14%, rgba(21, 96, 240, 0.055), transparent 72%),
+    #f7f8fa;
 }
 
 h1,
@@ -83,7 +157,7 @@ h3 {
 }
 
 ::selection {
-  background: rgba(47, 140, 244, 0.35);
+  background: rgba(21, 96, 240, 0.18);
 }
 
 /* Bigger tap targets everywhere by default; this is a one-handed field app. */
@@ -120,13 +194,13 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
-  border-color: #2f8cf4;
-  box-shadow: 0 0 0 3px rgba(47, 140, 244, 0.22);
+  border-color: #1560f0;
+  box-shadow: 0 0 0 3px rgba(21, 96, 240, 0.16);
 }
 
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid #2f8cf4;
+  outline: 2px solid #1560f0;
   outline-offset: 2px;
 }
 
@@ -137,7 +211,7 @@ a:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2b3a58;
+  background: #cbd2dd;
   border-radius: 999px;
 }
 

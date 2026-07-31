@@ -68,7 +68,7 @@ export default function PackList() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Pack list</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Pack list</h1>
         <Link to="/surgeons" className="text-sm text-sky-400">
           Surgeons &rarr;
         </Link>
@@ -113,7 +113,7 @@ function PackGroupCard({ group }: { group: PackGroup }) {
     <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-semibold text-white">{title}</h2>
+          <h2 className="font-semibold text-slate-100">{title}</h2>
           <p className="text-sm text-slate-400">
             {sideLabel} {typeLabel} × {group.cases.length}
           </p>
@@ -188,7 +188,7 @@ function PackLineRow({ line }: { line: PackLine }) {
     <div className={`rounded-lg border p-3 ${STATUS_STYLE[line.status]}`}>
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-medium text-white">
+          <p className="text-sm font-medium text-slate-100">
             {STATUS_ICON[line.status]} {item.name}
             {item.size_label ? ` · Size ${item.size_label}` : ""}
           </p>

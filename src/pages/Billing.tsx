@@ -48,7 +48,7 @@ export default function Billing() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Chase the money</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Chase the money</h1>
       <p className="mt-1 text-sm text-slate-400">
         Every completed case and where its billing stands. Tap a stage to advance it — a finished
         case should never quietly go unbilled.
@@ -77,7 +77,7 @@ export default function Billing() {
               return (
                 <div key={c.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-white">
+                    <span className="font-medium text-slate-100">
                       {c.surgery_type === "KNEE" ? "Knee" : c.surgery_type === "HIP" ? "Hip" : "Instr"}
                       {c.side ? ` ${c.side === "LEFT" ? "L" : "R"}` : ""} ·{" "}
                       {formatDateShort(c.surgery_date)}

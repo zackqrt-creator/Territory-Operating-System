@@ -94,7 +94,7 @@ export default function ReadinessSheet({
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
 
-        <h2 className="text-lg font-semibold text-white">
+        <h2 className="text-lg font-semibold text-slate-100">
           {caseRow.surgery_type === "KNEE" ? "Knee" : caseRow.surgery_type === "HIP" ? "Hip" : "Instrument"}
           {caseRow.variant === "partial" ? " · Partial" : caseRow.surgery_type !== "INSTRUMENT" ? " · Total" : ""}
           {caseRow.side ? ` · ${caseRow.side === "LEFT" ? "Left" : "Right"}` : ""}
@@ -114,7 +114,7 @@ export default function ReadinessSheet({
                 : "border-emerald-800 bg-emerald-950/20"
           }`}
         >
-          <p className="text-sm font-semibold text-white">
+          <p className="text-sm font-semibold text-slate-100">
             Readiness:{" "}
             {score.color === "green" ? "Ready" : score.color === "yellow" ? "Needs attention" : "At risk"}
           </p>
@@ -217,7 +217,7 @@ export default function ReadinessSheet({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <span className="font-medium text-white">
+                        <span className="font-medium text-slate-100">
                           {STATUS_ICON[item.status]} {item.name}
                         </span>
                         <p className="text-xs text-slate-500">

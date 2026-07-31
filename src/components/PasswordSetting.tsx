@@ -43,7 +43,7 @@ export default function PasswordSetting() {
   }
 
   const field =
-    "w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-white placeholder:text-slate-500";
+    "w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500";
 
   return (
     <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/50 p-3">

@@ -59,7 +59,7 @@ export default function Knowledge() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Knowledge base</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Knowledge base</h1>
       <p className="mt-1 text-sm text-slate-400">
         Durable knowledge promoted from notes — surgeon quirks, facility rules, sets,
         troubleshooting. Type{" "}
@@ -73,7 +73,7 @@ export default function Knowledge() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search or create a note…"
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 py-3 pl-9 pr-4 text-white placeholder:text-slate-500"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 py-3 pl-9 pr-4 text-slate-100 placeholder:text-slate-500"
         />
       </div>
 
@@ -106,7 +106,7 @@ export default function Knowledge() {
                 <div className="flex items-center gap-1.5">
                   {p.pinned && <Pin className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
                   <Icon className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="font-medium text-white">{p.title}</span>
+                  <span className="font-medium text-slate-100">{p.title}</span>
                 </div>
                 {p.body && (
                   <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-slate-400">

@@ -146,7 +146,7 @@ export default function CatalogItemEditor({
   }
 
   const field =
-    "w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-white placeholder:text-slate-500";
+    "w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500";
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
@@ -154,7 +154,7 @@ export default function CatalogItemEditor({
         className="flex items-center justify-between border-b border-slate-800 px-4 py-3"
         style={{ paddingTop: "calc(0.75rem + var(--safe-top))" }}
       >
-        <h2 className="truncate text-lg font-semibold text-white">
+        <h2 className="truncate text-lg font-semibold text-slate-100">
           {item ? "Edit product" : "New product"}
         </h2>
         <button
@@ -288,7 +288,7 @@ export default function CatalogItemEditor({
         <button
           onClick={save}
           disabled={busy || !name.trim()}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 py-3.5 text-lg font-semibold text-white shadow-lg shadow-sky-950/40 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 py-3.5 text-lg font-semibold text-white shadow-lg shadow-sky-600/20 disabled:opacity-50"
         >
           <Check size={18} /> {busy ? "Saving…" : item ? "Save changes" : "Create product"}
         </button>

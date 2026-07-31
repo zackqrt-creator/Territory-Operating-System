@@ -128,7 +128,7 @@ export default function EntityTasks({
               if (e.key === "Enter") add();
             }}
             placeholder="What needs doing?"
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
           <div className="mt-1.5 flex items-center gap-2">
             <label className="text-[11px] text-slate-500">Due</label>
@@ -136,7 +136,7 @@ export default function EntityTasks({
               type="date"
               value={due}
               onChange={(e) => setDue(e.target.value)}
-              className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-white"
+              className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-100"
             />
             <button
               onClick={() => {
@@ -218,7 +218,7 @@ function TaskRow({
         {isDone && <Check size={11} />}
       </button>
       <div className="min-w-0 flex-1">
-        <p className={`text-sm ${isDone ? "text-slate-500 line-through" : "text-white"}`}>
+        <p className={`text-sm ${isDone ? "text-slate-500 line-through" : "text-slate-100"}`}>
           {task.title}
         </p>
         {task.due_date && (

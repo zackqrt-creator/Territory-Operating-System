@@ -74,7 +74,7 @@ export default function TeamBoard() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Team board</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Team board</h1>
       <p className="mt-1 text-sm text-slate-400">
         Notes, hand-offs, and to-dos for the whole territory. Assign a to-do, tag whoever needs to
         see it, and keep the thread in one place.
@@ -113,7 +113,7 @@ export default function TeamBoard() {
         <button
           onClick={() => setCatFilter("all")}
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-            catFilter === "all" ? "bg-slate-600 text-white" : "bg-slate-800/70 text-slate-500"
+            catFilter === "all" ? "bg-slate-600 text-slate-100" : "bg-slate-800/70 text-slate-500"
           }`}
         >
           All topics
@@ -123,7 +123,7 @@ export default function TeamBoard() {
             key={c.value}
             onClick={() => setCatFilter(c.value)}
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-              catFilter === c.value ? "bg-slate-600 text-white" : "bg-slate-800/70 text-slate-500"
+              catFilter === c.value ? "bg-slate-600 text-slate-100" : "bg-slate-800/70 text-slate-500"
             }`}
           >
             {c.label}
@@ -205,7 +205,7 @@ function Composer({
         onChange={(e) => setBody(e.target.value)}
         rows={2}
         placeholder="Post a note or hand-off for the team..."
-        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder:text-slate-500"
+        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 placeholder:text-slate-500"
       />
 
       <div className="mt-2 flex items-center gap-2">
@@ -221,7 +221,7 @@ function Composer({
           <select
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
           >
             <option value="">Assign to…</option>
             {teammates.map((t) => (
@@ -240,7 +240,7 @@ function Composer({
             key={c.value}
             onClick={() => setCategory(c.value)}
             className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              category === c.value ? "bg-slate-600 text-white" : "bg-slate-800 text-slate-500"
+              category === c.value ? "bg-slate-600 text-slate-100" : "bg-slate-800 text-slate-500"
             }`}
           >
             #{c.label.toLowerCase()}
@@ -272,7 +272,7 @@ function Composer({
       <button
         onClick={onPost}
         disabled={posting || !body.trim()}
-        className="mt-3 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-sky-950/40 disabled:opacity-50"
+        className="mt-3 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-sky-600/20 disabled:opacity-50"
       >
         {posting ? "Posting…" : "Post"}
       </button>
@@ -387,7 +387,7 @@ function PostCard({
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <p className={`text-sm ${post.done ? "text-slate-400 line-through" : "text-white"}`}>
+          <p className={`text-sm ${post.done ? "text-slate-400 line-through" : "text-slate-100"}`}>
             {post.body}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
@@ -441,7 +441,7 @@ function PostCard({
             onChange={(e) => setReply(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onReply()}
             placeholder="Reply…"
-            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
           <button
             onClick={onReply}

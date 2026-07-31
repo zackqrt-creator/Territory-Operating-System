@@ -55,7 +55,7 @@ export default function MoveItemSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
-        <h2 className="text-lg font-semibold text-white">{item.name}</h2>
+        <h2 className="text-lg font-semibold text-slate-100">{item.name}</h2>
         <p className="text-sm text-slate-400">Currently at {currentFacility?.name ?? "unknown"}</p>
 
         {!target ? (
@@ -64,7 +64,7 @@ export default function MoveItemSheet({
               <button
                 key={f.id}
                 onClick={() => setTarget(f)}
-                className="rounded-lg bg-slate-800 py-4 font-medium text-white active:bg-slate-700"
+                className="rounded-lg bg-slate-800 py-4 font-medium text-slate-100 active:bg-slate-700"
               >
                 {f.name}
               </button>
@@ -73,12 +73,12 @@ export default function MoveItemSheet({
         ) : (
           <div className="mt-4 space-y-3">
             <p className="text-slate-200">
-              Move to <span className="font-semibold text-white">{target.name}</span>?
+              Move to <span className="font-semibold text-slate-100">{target.name}</span>?
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setTarget(null)}
-                className="flex-1 rounded-lg bg-slate-800 py-3 font-medium text-white"
+                className="flex-1 rounded-lg bg-slate-800 py-3 font-medium text-slate-100"
               >
                 Back
               </button>

@@ -7,16 +7,16 @@ import { useId } from "react";
  * it sits in the sign-in header and the Home header, and a logo that pops in a
  * beat late is the most noticeable kind of slow.
  *
- * The artwork is navy on white by design, which disappears against this app's
- * near-black background. So by default it is set in a light tile, the way it
- * appears as a home-screen icon. Pass `tile={false}` when placing it on a light
- * surface. The identical artwork lives at public/brand/emblem.svg, which is
+ * The artwork is navy on white by design, so on this app's light surfaces it
+ * sits directly on the page. Pass `tile` to set it in a white rounded tile --
+ * the way it reads as a home-screen icon -- when it has to hold up against a
+ * dark or busy background. The identical artwork lives at public/brand/emblem.svg, which is
  * what scripts/generate-icons.mjs rasterises into the app icons -- one source,
  * so the icon on the home screen and the mark in the header cannot drift.
  */
 export default function BrandMark({
   className = "h-10 w-10",
-  tile = true,
+  tile = false,
 }: {
   className?: string;
   tile?: boolean;
@@ -29,7 +29,7 @@ export default function BrandMark({
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center overflow-hidden ${
-        tile ? "rounded-[22%] bg-white shadow-lg shadow-black/30 ring-1 ring-white/15" : ""
+        tile ? "rounded-[22%] bg-white shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5" : ""
       } ${className}`}
     >
       <svg

@@ -56,7 +56,7 @@ export default function SecondBrainQueue() {
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center gap-2">
         <BrainCircuit className="h-6 w-6 text-sky-400" />
-        <h1 className="text-2xl font-bold text-white">Review queue</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Review queue</h1>
       </div>
       <p className="mt-1 text-sm text-slate-400">
         Triage raw notes, then promote the keepers into durable knowledge pages the whole team can

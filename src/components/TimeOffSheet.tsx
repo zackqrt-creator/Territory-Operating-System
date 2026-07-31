@@ -78,7 +78,7 @@ export default function TimeOffSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
-        <h2 className="text-lg font-semibold text-white">🏖️ Time off</h2>
+        <h2 className="text-lg font-semibold text-slate-100">🏖️ Time off</h2>
         <p className="mt-1 text-sm text-slate-400">
           Mark yourself out and the team sees it here, on the calendar, and as a warning when
           scheduling a case on a day you're gone.
@@ -93,7 +93,7 @@ export default function TimeOffSheet({
                 setStart(e.target.value);
                 if (end < e.target.value) setEnd(e.target.value);
               }}
-              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-white"
+              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
             />
             <span className="text-slate-500">→</span>
             <input
@@ -101,14 +101,14 @@ export default function TimeOffSheet({
               value={end}
               min={start}
               onChange={(e) => setEnd(e.target.value)}
-              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-white"
+              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
             />
           </div>
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Reason (optional) — vacation, training..."
-            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
           <button
             onClick={onAdd}
@@ -130,7 +130,7 @@ export default function TimeOffSheet({
                 className="flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-2"
               >
                 <div>
-                  <p className="text-sm font-medium text-white">
+                  <p className="text-sm font-medium text-slate-100">
                     {nameOf(e.rep_id)} ·{" "}
                     {e.start_date === e.end_date
                       ? formatDateShort(e.start_date)

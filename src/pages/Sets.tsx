@@ -67,7 +67,7 @@ export default function Sets() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-4">
-      <h1 className="text-2xl font-bold text-white">Sets &amp; totes</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Sets &amp; totes</h1>
       <p className="mt-1 text-sm text-slate-400">
         Every KAONE set and revision tote, where it is right now, and when it's free again.
       </p>
@@ -105,7 +105,7 @@ export default function Sets() {
                 <div className="min-w-0">
                   <RenameField
                     value={t.name}
-                    textClassName="font-medium text-white"
+                    textClassName="font-medium text-slate-100"
                     onSave={async (next) => {
                       await updateToteTemplateName(t.id, next);
                       await refresh();
@@ -197,7 +197,7 @@ function Section({
               className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3 text-left active:bg-slate-800"
             >
               <div className="min-w-0">
-                <p className="font-medium text-white">
+                <p className="font-medium text-slate-100">
                   {a.code}
                   {a.label && a.label !== a.code ? (
                     <span className="ml-2 text-sm font-normal text-slate-500">{a.label}</span>
@@ -280,7 +280,7 @@ function MoveSheet({
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-lg font-semibold text-white"
+            className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-lg font-semibold text-slate-100"
           />
         </div>
         <p className="mb-3 text-xs text-slate-500">
@@ -306,7 +306,7 @@ function MoveSheet({
         <select
           value={locationId ?? ""}
           onChange={(e) => setLocationId(e.target.value || null)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
         >
           <option value="">Unknown</option>
           {facilities.map((f) => (
@@ -323,13 +323,13 @@ function MoveSheet({
           type="date"
           value={availableDate}
           onChange={(e) => setAvailableDate(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
         />
 
         <button
           onClick={onSave}
           disabled={saving}
-          className="mt-5 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 py-3 font-semibold text-white shadow-lg shadow-sky-950/40 disabled:opacity-50"
+          className="mt-5 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 py-3 font-semibold text-white shadow-lg shadow-sky-600/20 disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save & log move"}
         </button>

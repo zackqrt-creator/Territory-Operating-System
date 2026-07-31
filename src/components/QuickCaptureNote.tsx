@@ -82,21 +82,21 @@ export default function QuickCaptureNote({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
-        <h2 className="text-lg font-semibold text-white">New note</h2>
+        <h2 className="text-lg font-semibold text-slate-100">New note</h2>
 
         <input
           autoFocus
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title"
-          className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-white placeholder:text-slate-500"
+          className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
         />
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="What's going on..."
           rows={4}
-          className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-white placeholder:text-slate-500"
+          className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
         />
 
         <div className="mt-3 grid grid-cols-2 gap-1.5">
@@ -147,7 +147,7 @@ export default function QuickCaptureNote({
             <select
               value={linkCaseId}
               onChange={(e) => setLinkCaseId(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
             >
               <option value="">No case</option>
               {(cases ?? []).map((c) => (
@@ -161,7 +161,7 @@ export default function QuickCaptureNote({
             <select
               value={linkFacilityId}
               onChange={(e) => setLinkFacilityId(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
             >
               <option value="">No facility</option>
               {(facilities ?? []).map((f) => (

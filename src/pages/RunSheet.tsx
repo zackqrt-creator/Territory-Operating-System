@@ -84,7 +84,7 @@ export default function RunSheet() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Run Sheet</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Run Sheet</h1>
         <Link
           to={`/staging?date=${date}`}
           className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-sky-400"
@@ -146,13 +146,13 @@ export default function RunSheet() {
                 className="flex w-full items-stretch gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-left active:bg-slate-800"
               >
                 <div className="flex w-14 shrink-0 flex-col items-center justify-center border-r border-slate-700 pr-3">
-                  <span className="text-sm font-semibold text-white">
+                  <span className="text-sm font-semibold text-slate-100">
                     {c.time_tba || !c.surgery_time ? "TBA" : formatTime(c.surgery_time)}
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-medium text-white">
+                    <span className="truncate font-medium text-slate-100">
                       {c.surgery_type === "KNEE" ? "Knee" : c.surgery_type === "HIP" ? "Hip" : "Instrument"}
                       {c.variant === "partial" ? " · Partial" : ""}
                       {c.side ? ` · ${c.side === "LEFT" ? "L" : "R"}` : ""}

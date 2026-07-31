@@ -67,7 +67,7 @@ export default function QaWall() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Q&A wall</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Q&A wall</h1>
       <p className="mt-1 text-sm text-slate-400">
         Ask the team anything. Pin a question to a product, surgeon, or procedure and it'll show
         up automatically on matching case screens.
@@ -79,13 +79,13 @@ export default function QaWall() {
           onChange={(e) => setBody(e.target.value)}
           rows={2}
           placeholder="e.g. Which insert does Dr. Sidhu fall back to when 12mm is too tight?"
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder:text-slate-500"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 placeholder:text-slate-500"
         />
         <div className="mt-2 grid grid-cols-3 gap-2">
           <select
             value={pinSurgeon}
             onChange={(e) => setPinSurgeon(e.target.value)}
-            className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-xs text-white"
+            className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-xs text-slate-100"
           >
             <option value="">Pin surgeon…</option>
             {surgeons.map((s) => (
@@ -97,7 +97,7 @@ export default function QaWall() {
           <select
             value={pinType}
             onChange={(e) => setPinType(e.target.value)}
-            className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-xs text-white"
+            className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-xs text-slate-100"
           >
             <option value="">Pin procedure…</option>
             <option value="KNEE">Knee</option>
@@ -107,13 +107,13 @@ export default function QaWall() {
             value={pinProduct}
             onChange={(e) => setPinProduct(e.target.value)}
             placeholder="Pin product…"
-            className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-xs text-white placeholder:text-slate-500"
+            className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-xs text-slate-100 placeholder:text-slate-500"
           />
         </div>
         <button
           onClick={onAsk}
           disabled={posting || !body.trim()}
-          className="mt-2 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-sky-950/40 disabled:opacity-50"
+          className="mt-2 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-sky-600/20 disabled:opacity-50"
         >
           {posting ? "Posting…" : "Ask the team"}
         </button>
@@ -192,7 +192,7 @@ function QuestionCard({
 
   return (
     <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-3">
-      <p className="text-sm font-medium text-white">{q.body}</p>
+      <p className="text-sm font-medium text-slate-100">{q.body}</p>
       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
         <span>
           {nameOf(q.author_id)} · {formatRelativeDay(q.created_at)}
@@ -233,7 +233,7 @@ function QuestionCard({
           onChange={(e) => setReply(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onAnswer()}
           placeholder="Answer…"
-          className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+          className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
         />
         <button
           onClick={onAnswer}

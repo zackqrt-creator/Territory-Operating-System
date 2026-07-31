@@ -73,7 +73,7 @@ export default function LoanerReturns() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Loaner returns</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Loaner returns</h1>
       <p className="mt-1 text-sm text-slate-400">
         48 hours back to corporate after the case it was used on, unless extended for something
         coming up. Since loaners go out overnight, shipping it on the ship-by date is what
@@ -110,7 +110,7 @@ export default function LoanerReturns() {
           <div className="space-y-2">
             {unassigned.map((item) => (
               <div key={item.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
-                <p className="text-sm text-white">{item.name}</p>
+                <p className="text-sm text-slate-100">{item.name}</p>
                 <p className="text-xs text-slate-500">
                   {facilities.find((f) => f.id === item.location_id)?.name}
                 </p>
@@ -169,7 +169,7 @@ function LoanerCard({
     <div className={`rounded-lg border p-3 ${URGENCY_STYLE[status.urgency]}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="font-medium text-white">{status.item.name}</p>
+          <p className="font-medium text-slate-100">{status.item.name}</p>
           <p className="text-sm text-slate-400">{status.facility.name}</p>
         </div>
         <span
@@ -217,7 +217,7 @@ function LoanerCard({
             {suggestion.type === "swap" && (
               <button
                 onClick={() => onShip(suggestion.alternate)}
-                className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white active:bg-slate-600"
+                className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-slate-100 active:bg-slate-600"
               >
                 Ship the spare instead
               </button>
@@ -236,7 +236,7 @@ function LoanerCard({
         {!suggestion && (
           <button
             onClick={() => onExtend(status.item)}
-            className="flex-1 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white active:bg-slate-600"
+            className="flex-1 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-slate-100 active:bg-slate-600"
           >
             Extend
           </button>

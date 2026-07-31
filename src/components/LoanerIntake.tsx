@@ -240,7 +240,7 @@ export default function LoanerIntake({
             value={templateSearch}
             onChange={(e) => setTemplateSearch(e.target.value)}
             placeholder="GSKAIMPL, 500KATRL, Revision..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500"
           />
           {templateSearch.trim().length > 0 && (
             <div className="mt-1 max-h-44 space-y-1 overflow-y-auto">
@@ -260,7 +260,7 @@ export default function LoanerIntake({
                     className="flex w-full items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-2 text-left active:bg-slate-700"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-white">{t.name}</span>
+                      <span className="block truncate text-sm text-slate-100">{t.name}</span>
                       {t.code && (
                         <span className="font-mono text-[11px] text-slate-500">{t.code}</span>
                       )}
@@ -282,7 +282,7 @@ export default function LoanerIntake({
           value={loanerCode}
           onChange={(e) => setLoanerCode(e.target.value)}
           placeholder="SPKAEFFR08"
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 font-medium uppercase tracking-wide text-white placeholder:text-slate-500 placeholder:normal-case"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 font-medium uppercase tracking-wide text-slate-100 placeholder:text-slate-500 placeholder:normal-case"
         />
       </div>
 
@@ -292,7 +292,7 @@ export default function LoanerIntake({
           value={contentsLabel}
           onChange={(e) => setContentsLabel(e.target.value)}
           placeholder="Ins-Spherika Efficiency Right"
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
         />
       </div>
 
@@ -302,7 +302,7 @@ export default function LoanerIntake({
           <select
             value={locationId}
             onChange={(e) => setLocationId(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
           >
             {facilities.map((f) => (
               <option key={f.id} value={f.id}>
@@ -317,7 +317,7 @@ export default function LoanerIntake({
             type="date"
             value={returnDeadline}
             onChange={(e) => setReturnDeadline(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
           />
         </div>
       </div>
@@ -349,7 +349,7 @@ export default function LoanerIntake({
           value={search}
           onChange={(e) => onSearchPick(e.target.value)}
           placeholder="Search catalog by size/side..."
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
         />
         <datalist id="loaner-catalog">
           {catalog.map((c) => (
@@ -379,14 +379,14 @@ export default function LoanerIntake({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setQty(l.key, l.quantity - 1)}
-                      className="h-7 w-7 rounded-md bg-slate-700 text-white"
+                      className="h-7 w-7 rounded-md bg-slate-700 text-slate-100"
                     >
                       −
                     </button>
-                    <span className="w-5 text-center text-sm text-white">{l.quantity}</span>
+                    <span className="w-5 text-center text-sm text-slate-100">{l.quantity}</span>
                     <button
                       onClick={() => setQty(l.key, l.quantity + 1)}
-                      className="h-7 w-7 rounded-md bg-slate-700 text-white"
+                      className="h-7 w-7 rounded-md bg-slate-700 text-slate-100"
                     >
                       +
                     </button>
@@ -401,7 +401,7 @@ export default function LoanerIntake({
       <button
         onClick={onSubmit}
         disabled={saving || !loanerCode.trim() || !locationId}
-        className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-lg font-semibold text-white shadow-lg shadow-sky-950/60 disabled:opacity-50"
+        className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-lg font-semibold text-white shadow-lg shadow-sky-600/25 disabled:opacity-50"
       >
         {saving ? "Saving..." : "Log loaner tote"}
       </button>

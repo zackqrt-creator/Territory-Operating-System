@@ -106,7 +106,7 @@ export default function Compliance() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <h1 className="text-2xl font-bold text-white">Compliance</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Compliance</h1>
       <p className="mt-1 text-sm text-slate-400">
         Rep certifications and facility credentialing (RepTrax, Symplr…), cross-checked against
         your scheduled cases so an expired badge never surprises you at the door.
@@ -132,7 +132,7 @@ export default function Compliance() {
           )}
 
           <div className="mt-5 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-            <h2 className="font-semibold text-white">Facility credentials</h2>
+            <h2 className="font-semibold text-slate-100">Facility credentials</h2>
             {creds.length === 0 && (
               <p className="mt-1 text-sm text-slate-500">None on file yet.</p>
             )}
@@ -151,12 +151,12 @@ export default function Compliance() {
                 value={credVendor}
                 onChange={(e) => setCredVendor(e.target.value)}
                 placeholder="RepTrax"
-                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-white placeholder:text-slate-500"
+                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100 placeholder:text-slate-500"
               />
               <select
                 value={credFacility}
                 onChange={(e) => setCredFacility(e.target.value)}
-                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-white"
+                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
               >
                 <option value="">Facility…</option>
                 {facilities.map((f) => (
@@ -169,20 +169,20 @@ export default function Compliance() {
                 type="date"
                 value={credExpires}
                 onChange={(e) => setCredExpires(e.target.value)}
-                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-white"
+                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
               />
             </div>
             <button
               onClick={addCred}
               disabled={saving || !credVendor.trim() || !credFacility || !credExpires}
-              className="mt-2 w-full rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="mt-2 w-full rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
             >
               Add my credential
             </button>
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-            <h2 className="font-semibold text-white">Locations</h2>
+            <h2 className="font-semibold text-slate-100">Locations</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               Anyone on the team can rename a location or set its address here — e.g. once you
               find out where Matt's or Karl's inventory actually lives.
@@ -195,7 +195,7 @@ export default function Compliance() {
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-            <h2 className="font-semibold text-white">Facility playbooks</h2>
+            <h2 className="font-semibold text-slate-100">Facility playbooks</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               The stuff that matters at 6am: dock hours, parking, door codes, who to find. Also
               shown on every case at that facility.
@@ -214,7 +214,7 @@ export default function Compliance() {
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-            <h2 className="font-semibold text-white">Rep certifications</h2>
+            <h2 className="font-semibold text-slate-100">Rep certifications</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               Product/system training. These feed each case's readiness score.
             </p>
@@ -234,19 +234,19 @@ export default function Compliance() {
                 value={certName}
                 onChange={(e) => setCertName(e.target.value)}
                 placeholder="GMK Sphere certification"
-                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-white placeholder:text-slate-500"
+                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100 placeholder:text-slate-500"
               />
               <input
                 type="date"
                 value={certExpires}
                 onChange={(e) => setCertExpires(e.target.value)}
-                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-white"
+                className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
               />
             </div>
             <button
               onClick={addCert}
               disabled={saving || !certName.trim()}
-              className="mt-2 w-full rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="mt-2 w-full rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
             >
               Add my certification
             </button>
@@ -304,13 +304,13 @@ function FacilityEditor({ facility, onSaved }: { facility: Facility; onSaved: ()
         autoFocus
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
       />
       <input
         value={address}
         onChange={(e) => setAddress(e.target.value)}
         placeholder="Address (optional)"
-        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
       />
       <div className="mt-2 flex gap-2">
         <button

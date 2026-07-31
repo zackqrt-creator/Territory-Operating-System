@@ -77,7 +77,7 @@ export default function EditItemSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
-        <h2 className="text-lg font-semibold text-white">Edit item</h2>
+        <h2 className="text-lg font-semibold text-slate-100">Edit item</h2>
 
         <div className="mt-4 space-y-4">
           <div>
@@ -88,7 +88,7 @@ export default function EditItemSheet({
               <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5">
                 <RenameField
                   value={name}
-                  textClassName="text-white"
+                  textClassName="text-slate-100"
                   onSave={async (next) => {
                     await updateCatalogItemName(item.catalog_item_id as string, next);
                     setName(next);
@@ -99,7 +99,7 @@ export default function EditItemSheet({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
               />
             )}
           </div>
@@ -118,7 +118,7 @@ export default function EditItemSheet({
               <input
                 value={lot}
                 onChange={(e) => setLot(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
               />
             </div>
             <div>
@@ -127,7 +127,7 @@ export default function EditItemSheet({
                 type="date"
                 value={expiration}
                 onChange={(e) => setExpiration(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
               />
             </div>
           </div>
@@ -138,14 +138,14 @@ export default function EditItemSheet({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setQuantity((q) => Math.max(0, q - 1))}
-                  className="h-11 w-11 rounded-lg bg-slate-800 text-xl text-white"
+                  className="h-11 w-11 rounded-lg bg-slate-800 text-xl text-slate-100"
                 >
                   −
                 </button>
-                <span className="w-8 text-center text-lg font-medium text-white">{quantity}</span>
+                <span className="w-8 text-center text-lg font-medium text-slate-100">{quantity}</span>
                 <button
                   onClick={() => setQuantity((q) => q + 1)}
-                  className="h-11 w-11 rounded-lg bg-slate-800 text-xl text-white"
+                  className="h-11 w-11 rounded-lg bg-slate-800 text-xl text-slate-100"
                 >
                   +
                 </button>
@@ -156,7 +156,7 @@ export default function EditItemSheet({
               <select
                 value={locationId}
                 onChange={(e) => setLocationId(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
               >
                 {facilities.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -199,7 +199,7 @@ export default function EditItemSheet({
                 <select
                   value={sterilization}
                   onChange={(e) => setSterilization(e.target.value as SterilizationStatus)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
                 >
                   <option value="unknown">Not tracked</option>
                   <option value="sterile">Sterile</option>
@@ -213,7 +213,7 @@ export default function EditItemSheet({
                   type="date"
                   value={sterilExpires}
                   onChange={(e) => setSterilExpires(e.target.value)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
                 />
               </div>
             </div>
@@ -226,7 +226,7 @@ export default function EditItemSheet({
                 <select
                   value={delivery}
                   onChange={(e) => setDelivery(e.target.value as DeliveryStatus | "")}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
                 >
                   <option value="">Not tracked</option>
                   <option value="ordered">Ordered</option>
@@ -240,7 +240,7 @@ export default function EditItemSheet({
                   type="date"
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-white"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100"
                 />
               </div>
             </div>
@@ -251,7 +251,7 @@ export default function EditItemSheet({
           <button
             onClick={onSave}
             disabled={saving}
-            className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-lg font-semibold text-white shadow-lg shadow-sky-950/60 disabled:opacity-50"
+            className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-4 text-lg font-semibold text-white shadow-lg shadow-sky-600/25 disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save changes"}
           </button>
@@ -264,7 +264,7 @@ export default function EditItemSheet({
               <div className="mt-2 flex gap-2">
                 <button
                   onClick={() => setConfirmingDelete(false)}
-                  className="flex-1 rounded-lg bg-slate-800 py-2.5 font-medium text-white"
+                  className="flex-1 rounded-lg bg-slate-800 py-2.5 font-medium text-slate-100"
                 >
                   Keep
                 </button>

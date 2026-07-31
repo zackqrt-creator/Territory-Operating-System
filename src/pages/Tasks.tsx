@@ -77,7 +77,7 @@ export default function Tasks() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">My tasks</h1>
+        <h1 className="text-2xl font-bold text-slate-100">My tasks</h1>
         <button
           onClick={() => setShowForm((v) => !v)}
           className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white"
@@ -97,14 +97,14 @@ export default function Tasks() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Task title..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-white placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
           />
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
             placeholder="Notes (optional)..."
-            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
           <div className="mt-2 flex items-center gap-2">
             <label className="text-xs text-slate-400">Due</label>
@@ -112,7 +112,7 @@ export default function Tasks() {
               type="date"
               value={due}
               onChange={(e) => setDue(e.target.value)}
-              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-white"
+              className="min-h-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
             />
           </div>
           {teammates.length > 0 && (
@@ -166,7 +166,7 @@ export default function Tasks() {
           <button
             onClick={onCreate}
             disabled={saving || !title.trim()}
-            className="mt-3 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-sky-950/40 disabled:opacity-50"
+            className="mt-3 w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-sky-600/20 disabled:opacity-50"
           >
             {saving
               ? "Saving…"
@@ -299,17 +299,17 @@ function TaskCard({
           <input
             value={eTitle}
             onChange={(e) => setETitle(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
           />
           <textarea
             value={eNotes}
             onChange={(e) => setENotes(e.target.value)}
             rows={2}
             placeholder="Notes..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
           <div className="flex gap-2">
-            <button onClick={() => setEditing(false)} className="flex-1 rounded-lg bg-slate-800 py-2 text-sm text-white">
+            <button onClick={() => setEditing(false)} className="flex-1 rounded-lg bg-slate-800 py-2 text-sm text-slate-100">
               Cancel
             </button>
             <button onClick={onSaveEdit} disabled={busy} className="flex-1 rounded-lg bg-sky-600 py-2 text-sm font-medium text-white disabled:opacity-50">
@@ -319,7 +319,7 @@ function TaskCard({
         </div>
       ) : (
         <>
-          <p className={`text-sm font-medium ${task.status === "done" ? "text-slate-400 line-through" : "text-white"}`}>
+          <p className={`text-sm font-medium ${task.status === "done" ? "text-slate-400 line-through" : "text-slate-100"}`}>
             {task.title}
           </p>
           {task.notes && <p className="mt-0.5 text-sm text-slate-400">{task.notes}</p>}

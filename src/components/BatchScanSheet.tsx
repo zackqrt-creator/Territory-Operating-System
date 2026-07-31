@@ -182,7 +182,7 @@ export default function BatchScanSheet({
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3" style={{ paddingTop: "calc(0.75rem + var(--safe-top))" }}>
         <div>
-          <h2 className="text-lg font-semibold text-white">Batch scan</h2>
+          <h2 className="text-lg font-semibold text-slate-100">Batch scan</h2>
           <p className="text-xs text-slate-500">Scan each box's barcode — save all at the end.</p>
         </div>
         <button onClick={onClose} className="min-h-0 rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-300">
@@ -207,7 +207,7 @@ export default function BatchScanSheet({
           <select
             value={locationId}
             onChange={(e) => setLocationId(e.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
           >
             {facilities.map((f) => (
               <option key={f.id} value={f.id}>
@@ -237,7 +237,7 @@ export default function BatchScanSheet({
                         <p className="text-sm font-medium text-amber-400">⚠ Unrecognized — pick the product</p>
                       ) : (
                         <>
-                          <p className="truncate font-medium text-white">{row.name}</p>
+                          <p className="truncate font-medium text-slate-100">{row.name}</p>
                           {(() => {
                             const cat = catalog.find((c) => c.id === row.catalogItemId);
                             const bits: string[] = [];
@@ -272,7 +272,7 @@ export default function BatchScanSheet({
                         value={row.pickSearch}
                         onChange={(e) => updateRow(row.id, { pickSearch: e.target.value })}
                         placeholder="Search catalog by name, side, size…"
-                        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
                       />
                       <div className="mt-1 max-h-40 space-y-1 overflow-y-auto">
                         {filtered.slice(0, 30).map((c) => (
@@ -292,7 +292,7 @@ export default function BatchScanSheet({
                         value={row.name}
                         onChange={(e) => updateRow(row.id, { name: e.target.value })}
                         placeholder="Or type a name for this item"
-                        className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                        className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
                       />
                       <div className="mt-1.5 flex gap-1.5">
                         {CATEGORY_OPTIONS.map((opt) => (
@@ -330,7 +330,7 @@ export default function BatchScanSheet({
         <button
           onClick={onSaveAll}
           disabled={!canSave}
-          className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 py-3.5 text-lg font-semibold text-white shadow-lg shadow-sky-950/40 disabled:opacity-50"
+          className="w-full rounded-lg bg-gradient-to-b from-sky-500 to-sky-700 py-3.5 text-lg font-semibold text-white shadow-lg shadow-sky-600/20 disabled:opacity-50"
         >
           {saving ? "Saving…" : `Save all (${readyRows.length})`}
         </button>

@@ -42,7 +42,7 @@ export default function LoanerDetailSheet({
           </span>
           <span className="font-mono text-sm tracking-wide text-slate-300">{tote.loaner_code}</span>
         </div>
-        <h2 className="mt-1 text-lg font-semibold text-white">{tote.contents_label || tote.name}</h2>
+        <h2 className="mt-1 text-lg font-semibold text-slate-100">{tote.contents_label || tote.name}</h2>
         <p className="text-sm text-slate-400">
           {facilityName}
           {tote.loaner_return_deadline ? ` · return by ${tote.loaner_return_deadline}` : ""}
@@ -77,7 +77,7 @@ export default function LoanerDetailSheet({
 
         <button
           onClick={onMove}
-          className="mt-5 w-full rounded-lg bg-slate-700 px-4 py-3 font-medium text-white"
+          className="mt-5 w-full rounded-lg bg-slate-700 px-4 py-3 font-medium text-slate-100"
         >
           Move / check out this tote
         </button>

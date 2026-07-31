@@ -169,7 +169,7 @@ export default function SetEditor({
         style={{ paddingTop: "calc(0.75rem + var(--safe-top))" }}
       >
         <div className="min-w-0">
-          <h2 className="truncate text-lg font-semibold text-white">
+          <h2 className="truncate text-lg font-semibold text-slate-100">
             {setId ? name || "Set" : "New set"}
           </h2>
           {setId && (
@@ -205,7 +205,7 @@ export default function SetEditor({
                 setDirtyHeader(true);
               }}
               placeholder="e.g. KA One Complete Tote"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-white placeholder:text-slate-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
             />
           </div>
 
@@ -220,7 +220,7 @@ export default function SetEditor({
                 setDirtyHeader(true);
               }}
               placeholder="GSKAIMPL"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 font-mono text-sm text-white placeholder:text-slate-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 font-mono text-sm text-slate-100 placeholder:text-slate-500"
             />
           </div>
 
@@ -257,7 +257,7 @@ export default function SetEditor({
               }}
               rows={2}
               placeholder="Anything worth remembering about this tray"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
             />
           </div>
 
@@ -282,7 +282,7 @@ export default function SetEditor({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search the catalog by name, REF or size"
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500"
               />
               {search.trim() && (
                 <div className="mt-1.5 max-h-56 space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/60 p-1">
@@ -336,7 +336,7 @@ export default function SetEditor({
                       className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/50 px-2.5 py-2"
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm text-white">
+                        <span className="block truncate text-sm text-slate-100">
                           {l.catalog_item ? itemLabel(l.catalog_item) : "Unknown product"}
                         </span>
                         {l.catalog_item?.item_number && (
@@ -354,7 +354,7 @@ export default function SetEditor({
                         >
                           <Minus size={13} />
                         </button>
-                        <span className="w-6 text-center text-sm tabular-nums text-white">
+                        <span className="w-6 text-center text-sm tabular-nums text-slate-100">
                           {l.quantity_per_tote}
                         </span>
                         <button

@@ -169,7 +169,7 @@ export default function NoteDetail() {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onBlur={saveText}
-        className="w-full bg-transparent text-2xl font-bold text-white outline-none"
+        className="w-full bg-transparent text-2xl font-bold text-slate-100 outline-none"
         placeholder="Untitled note"
       />
       <p className="mt-1 text-xs text-slate-500">
@@ -182,7 +182,7 @@ export default function NoteDetail() {
         onBlur={saveText}
         rows={6}
         placeholder="Write here..."
-        className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-white placeholder:text-slate-500"
+        className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
       />
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -235,7 +235,7 @@ export default function NoteDetail() {
 
       <div className="mt-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Linked records</h2>
+          <h2 className="text-sm font-semibold text-slate-100">Linked records</h2>
           {!showLinkPicker && (
             <button onClick={openLinkPicker} className="text-sm font-medium text-sky-400">
               + Link
@@ -268,7 +268,7 @@ export default function NoteDetail() {
                 setEntityType(e.target.value as TerritoryNoteEntityType);
                 setEntityId("");
               }}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
             >
               {(Object.keys(ENTITY_TYPE_LABEL) as TerritoryNoteEntityType[]).map((t) => (
                 <option key={t} value={t}>
@@ -279,7 +279,7 @@ export default function NoteDetail() {
             <select
               value={entityId}
               onChange={(e) => setEntityId(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
             >
               <option value="">Choose…</option>
               {entityType === "case" &&
@@ -343,7 +343,7 @@ export default function NoteDetail() {
       </div>
 
       <div className="mt-5">
-        <h2 className="text-sm font-semibold text-white">Tasks from this note</h2>
+        <h2 className="text-sm font-semibold text-slate-100">Tasks from this note</h2>
         {tasks.length === 0 ? (
           <p className="mt-1 text-sm text-slate-500">No tasks yet.</p>
         ) : (

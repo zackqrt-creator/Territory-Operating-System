@@ -189,7 +189,7 @@ export default function QuickLogSheet({
                 onChange={(e) => setDebrief(e.target.value)}
                 rows={2}
                 placeholder="e.g. Went up a size on the femur late — have 4+ opened early next time"
-                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
               />
             </div>
             <button
@@ -202,7 +202,7 @@ export default function QuickLogSheet({
           </>
         ) : !readiness.applicable || !hasChecklist ? (
           <>
-            <h2 className="text-lg font-semibold text-white">Log case</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Log case</h2>
             <p className="mt-2 text-sm text-slate-400">
               No implant, consumable, or loaner checklist for this case. Mark it complete?
             </p>
@@ -219,7 +219,7 @@ export default function QuickLogSheet({
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold text-white">Log case</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Log case</h2>
             <p className="mt-1 text-sm text-slate-400">
               Tap what was used — this decrements inventory, starts the loaner return clock, and
               marks the case complete.
@@ -233,7 +233,7 @@ export default function QuickLogSheet({
                     className="flex items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800/50 p-3"
                   >
                     <div>
-                      <p className="text-sm font-medium text-white">{c.name}</p>
+                      <p className="text-sm font-medium text-slate-100">{c.name}</p>
                       <p className="text-xs text-slate-500">Loaner kit · starts 48h return clock</p>
                     </div>
                     <input
@@ -260,20 +260,20 @@ export default function QuickLogSheet({
                       className="flex items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800/50 p-3"
                     >
                       <div>
-                        <p className="text-sm font-medium text-white">{item.name}</p>
+                        <p className="text-sm font-medium text-slate-100">{item.name}</p>
                         <p className="text-xs text-slate-500">{CATEGORY_LABEL[item.category]}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => setQty(key, qty - 1)}
-                          className="h-9 w-9 rounded-lg bg-slate-700 text-lg font-medium text-white"
+                          className="h-9 w-9 rounded-lg bg-slate-700 text-lg font-medium text-slate-100"
                         >
                           −
                         </button>
-                        <span className="w-4 text-center text-white">{qty}</span>
+                        <span className="w-4 text-center text-slate-100">{qty}</span>
                         <button
                           onClick={() => setQty(key, qty + 1)}
-                          className="h-9 w-9 rounded-lg bg-slate-700 text-lg font-medium text-white"
+                          className="h-9 w-9 rounded-lg bg-slate-700 text-lg font-medium text-slate-100"
                         >
                           +
                         </button>

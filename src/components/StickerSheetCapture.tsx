@@ -209,7 +209,7 @@ export default function StickerSheetCapture({
 
         {result ? (
           <>
-            <h2 className="text-lg font-semibold text-white">Sticker sheet logged ✓</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Sticker sheet logged ✓</h2>
             <p className="mt-2 text-sm text-slate-300">
               {result.deducted} unit{result.deducted === 1 ? "" : "s"} deducted from inventory with
               an audit trail on this case, and a reorder task is on{" "}
@@ -230,7 +230,7 @@ export default function StickerSheetCapture({
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold text-white">📸 Sticker sheet</h2>
+            <h2 className="text-lg font-semibold text-slate-100">📸 Sticker sheet</h2>
             <p className="mt-1 text-sm text-slate-400">
               Photograph the case paper with the implant stickers on it. Every sticker gets read,
               matched to your stock, and — after you confirm — deducted, with a reorder task
@@ -323,7 +323,7 @@ export default function StickerSheetCapture({
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <span className="text-sm font-medium text-white">
+                          <span className="text-sm font-medium text-slate-100">
                             {m.quality !== "none" && (on ? "☑ " : "☐ ")}
                             {m.sticker.quantity > 1 ? `${m.sticker.quantity}× ` : ""}
                             {name}

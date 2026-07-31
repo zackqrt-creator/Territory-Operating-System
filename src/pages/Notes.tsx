@@ -58,7 +58,7 @@ export default function Notes() {
     <div className="min-h-screen px-4 pb-28 pt-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Notes</h1>
+          <h1 className="text-2xl font-bold text-slate-100">Notes</h1>
           <p className="mt-1 text-sm text-slate-400">Capture the field. Turn it into playbooks.</p>
         </div>
         <Link
@@ -81,7 +81,7 @@ export default function Notes() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search notes…"
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 py-3 pl-9 pr-4 text-white placeholder:text-slate-500"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 py-3 pl-9 pr-4 text-slate-100 placeholder:text-slate-500"
         />
       </div>
 
@@ -115,7 +115,7 @@ export default function Notes() {
                 to={`/notes/${n.id}`}
                 className="block rounded-xl border border-slate-700 bg-slate-900/40 p-3 active:bg-slate-900"
               >
-                <div className="flex items-center gap-1.5 text-sm font-medium text-white">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-slate-100">
                   {n.pinned && <Pin className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
                   <Icon className="h-4 w-4 shrink-0 text-sky-300" />
                   <span className="truncate">{n.title}</span>

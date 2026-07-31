@@ -196,7 +196,7 @@ export default function Inventory() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Inventory</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Inventory</h1>
         {tab !== "movements" && (
           <button
             onClick={() =>
@@ -222,7 +222,7 @@ export default function Inventory() {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-medium ${
-                tab === t.key ? "bg-slate-700 text-white" : "text-slate-400"
+                tab === t.key ? "bg-slate-700 text-slate-100" : "text-slate-400"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -245,7 +245,7 @@ export default function Inventory() {
                   ? "Search catalog name, REF, product line…"
                   : "Search sets…"
             }
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 py-3 pl-9 pr-4 text-white placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 py-3 pl-9 pr-4 text-slate-100 placeholder:text-slate-500"
           />
         </div>
       )}
@@ -255,7 +255,7 @@ export default function Inventory() {
           <select
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
           >
             <option value="all">All locations</option>
             {facilities.map((f) => (
@@ -267,7 +267,7 @@ export default function Inventory() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
           >
             <option value="all">All categories</option>
             {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
@@ -455,7 +455,7 @@ function OnHandList({
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="min-w-0 flex-1 truncate font-medium text-white">{item.name}</span>
+              <span className="min-w-0 flex-1 truncate font-medium text-slate-100">{item.name}</span>
               <div className="flex shrink-0 items-center gap-1.5">
                 {item.acquisition_type === "loaner" ? (
                   <span className="rounded-full bg-amber-900/50 px-2 py-0.5 text-[10px] font-medium text-amber-200">
@@ -528,7 +528,7 @@ function CatalogList({
           className="block w-full rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-left active:bg-slate-800"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="min-w-0 flex-1 font-medium text-white">{c.name}</span>
+            <span className="min-w-0 flex-1 font-medium text-slate-100">{c.name}</span>
             {c.side && c.side !== "NA" && (
               <span className="shrink-0 rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-slate-300">
                 {c.side === "LEFT" ? "L" : "R"}
@@ -584,7 +584,7 @@ function SetsList({
             className="block w-full rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-left active:bg-slate-800"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="min-w-0 flex-1 font-medium text-white">{s.name}</span>
+              <span className="min-w-0 flex-1 font-medium text-slate-100">{s.name}</span>
               <Pencil className="h-3.5 w-3.5 shrink-0 text-slate-600" />
             </div>
             <p className="mt-0.5 text-xs text-slate-500">
@@ -676,7 +676,7 @@ function MovementsList({
         <div key={m.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-white">{itemName(m.item_id)}</p>
+              <p className="text-sm font-medium text-slate-100">{itemName(m.item_id)}</p>
               <p className="mt-0.5 flex items-center gap-1 text-sm text-slate-400">
                 {m.from_location ? facilityName(m.from_location) : "Medacta"}
                 <ArrowLeftRight className="h-3 w-3 text-slate-500" />
@@ -718,7 +718,7 @@ function MovementsList({
                 onChange={(e) => setDraft(e.target.value)}
                 rows={2}
                 placeholder="Why this moved, who asked, what to remember"
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
               />
               <div className="mt-1.5 flex gap-2">
                 <button

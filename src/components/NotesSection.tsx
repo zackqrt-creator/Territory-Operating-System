@@ -216,7 +216,7 @@ export default function NotesSection({
             onChange={(e) => setDraft(e.target.value)}
             rows={2}
             placeholder={placeholder}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
           <div className="mt-1.5 flex gap-2">
             <button
@@ -254,7 +254,7 @@ export default function NotesSection({
                 value={editDraft}
                 onChange={(e) => setEditDraft(e.target.value)}
                 rows={2}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
               />
               <div className="mt-1.5 flex gap-2">
                 <button
@@ -299,7 +299,7 @@ export default function NotesSection({
                       type="date"
                       value={followUpDate}
                       onChange={(e) => setFollowUpDate(e.target.value)}
-                      className="min-h-0 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-white"
+                      className="min-h-0 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100"
                     />
                     <button
                       onClick={() => onCreateFollowUp(n)}

@@ -47,7 +47,7 @@ export default function Readiness() {
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Am I ready?</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Am I ready?</h1>
         <Link to="/inventory" className="text-sm text-sky-400">
           Inventory &rarr;
         </Link>
@@ -75,7 +75,7 @@ export default function Readiness() {
             <div className={`mt-4 rounded-xl border p-4 ${headline.ring}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-lg font-bold text-white">
+                  <p className="text-lg font-bold text-slate-100">
                     {readiness.worstStatus === "ready"
                       ? "You're set for the day"
                       : readiness.worstStatus === "reserve"
@@ -118,7 +118,7 @@ function SectionCard({ section, facilities }: { section: ReadinessSection; facil
     <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
       <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between text-left">
         <div>
-          <h2 className="font-semibold text-white">
+          <h2 className="font-semibold text-slate-100">
             {sideLabel} {section.deviceType}
           </h2>
           <p className="text-sm text-slate-400">
@@ -149,7 +149,7 @@ function LineRow({ line, facilities }: { line: ReadinessLine; facilities: Facili
   return (
     <div className={`rounded-lg border p-3 ${meta.ring}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-white">
+        <p className="text-sm font-medium text-slate-100">
           {meta.icon} Size {size}
         </p>
         <p className={`text-xs font-medium ${meta.text}`}>
@@ -170,7 +170,7 @@ function InventorySummaryCard({ summary }: { summary: ReturnType<typeof buildDay
   return (
     <div className="mt-6 rounded-xl border border-slate-700 bg-slate-800/40 p-4">
       <h2 className="text-sm font-semibold text-slate-200">Total inventory</h2>
-      <p className="mt-1 text-3xl font-bold text-white">{summary.totalUnits}</p>
+      <p className="mt-1 text-3xl font-bold text-slate-100">{summary.totalUnits}</p>
       <p className="text-sm text-slate-400">
         {summary.consignmentUnits} consignment · {summary.loanerUnits} loaner
       </p>

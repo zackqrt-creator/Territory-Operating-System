@@ -15,6 +15,7 @@ import {
   ArrowRight,
   MessageSquare,
   ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 import { useAuth } from "../hooks/useAuth";
@@ -52,7 +53,7 @@ import { expiringLotSuggestions, scoreCase } from "../lib/crm";
 import { computeReadiness } from "../lib/readiness";
 
 export default function Home() {
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -166,28 +167,82 @@ export default function Home() {
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <BrandMark className="h-11 w-11 shrink-0" />
-          <div>
-            <h1 className="text-2xl font-bold text-white">Territory OS</h1>
-            <p className="text-sm text-slate-400">
-              {profile ? `Hi, ${profile.display_name}` : "Loading..."}
-            </p>
-          </div>
+      {/*
+       * Header: date, then greeting, then what the day holds. Reading order
+       * matches the question being asked -- "what have I got today" -- rather
+       * than leading with the product's own name, which the rep already knows.
+       */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            {new Date().toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+          <h1 className="mt-1 text-[1.75rem] font-semibold leading-tight text-slate-100">
+            {greeting()}
+            {profile ? `, ${profile.display_name.split(" ")[0]}` : ""}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">Here's what needs attention today.</p>
         </div>
-        <button onClick={signOut} className="text-sm text-slate-500 underline underline-offset-2">
-          Sign out
-        </button>
+        <BrandMark className="mt-1 h-9 w-9 shrink-0" />
       </div>
 
       {loading ? (
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : (
         <div className="mt-6 space-y-6">
+          {/*
+           * Four counts, because they are the four things that can ruin a day:
+           * what is on, what is not covered, what has run down, and what has to
+           * go back. Each is a link -- a number you cannot act on is trivia.
+           */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard
+              icon={CalendarDays}
+              tone="neutral"
+              label="Today's cases"
+              value={todayCases.length}
+              detail={`${new Set(todayCases.map((c) => c.facility_id)).size} ${
+                new Set(todayCases.map((c) => c.facility_id)).size === 1 ? "hospital" : "hospitals"
+              }`}
+              action="View schedule"
+              to="/cases"
+            />
+            <StatCard
+              icon={AlertTriangle}
+              tone="danger"
+              label="Cases at risk"
+              value={tomorrowScores.red}
+              detail="Missing required inventory"
+              action="Resolve now"
+              to="/readiness"
+            />
+            <StatCard
+              icon={RotateCcw}
+              tone="warn"
+              label="Replenishment"
+              value={expiryFlags.length}
+              detail={expiredCount > 0 ? `${expiredCount} already expired` : "Lots expiring soon"}
+              action="Review queue"
+              to="/inventory"
+            />
+            <StatCard
+              icon={Truck}
+              tone="info"
+              label="Loaners due"
+              value={urgentLoaners.length}
+              detail={haulCount > 0 ? `${haulCount} to haul tomorrow` : "Nothing outstanding"}
+              action="View loaners"
+              to="/loaners"
+            />
+          </div>
+
           <Link
             to="/cases/new"
-            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-3.5 text-base font-semibold text-white shadow-lg shadow-sky-950/60 active:from-sky-600 active:to-sky-700"
+            className="flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3.5 text-base font-semibold text-white shadow-lg shadow-sky-600/25 active:bg-sky-700"
           >
             <Plus className="h-5 w-5" /> Add case
           </Link>
@@ -288,12 +343,12 @@ export default function Home() {
             <div className="mt-2 grid grid-cols-2 gap-2">
               <Link to={`/runsheet?date=${today}`} className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Today</p>
-                <p className="mt-1 text-2xl font-bold text-white">{todayCases.length}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-100">{todayCases.length}</p>
                 <p className="text-xs text-slate-400">case{todayCases.length === 1 ? "" : "s"}</p>
               </Link>
               <Link to={`/runsheet?date=${tomorrowISO}`} className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tomorrow</p>
-                <p className="mt-1 text-2xl font-bold text-white">{tomorrowCases.length}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-100">{tomorrowCases.length}</p>
                 <p className="flex flex-wrap gap-x-2 text-xs">
                   {tomorrowScores.green > 0 && <span className="text-emerald-400">{tomorrowScores.green} ready</span>}
                   {tomorrowScores.yellow > 0 && <span className="text-amber-400">{tomorrowScores.yellow} check</span>}
@@ -336,17 +391,17 @@ export default function Home() {
             <SectionHeader icon={Package} title="Inventory pulse" />
             <div className="mt-2 grid grid-cols-3 gap-2">
               <Link to="/inventory" className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
-                <p className="text-2xl font-bold text-white">{items.length}</p>
+                <p className="text-2xl font-bold text-slate-100">{items.length}</p>
                 <p className="text-xs text-slate-400">tracked</p>
               </Link>
               <Link to="/inventory" className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
-                <p className={`text-2xl font-bold ${expiryFlags.length > 0 ? "text-amber-300" : "text-white"}`}>
+                <p className={`text-2xl font-bold ${expiryFlags.length > 0 ? "text-amber-300" : "text-slate-100"}`}>
                   {expiryFlags.length}
                 </p>
                 <p className="text-xs text-slate-400">expiring</p>
               </Link>
               <Link to="/loaners" className="rounded-xl border border-slate-700 bg-slate-800/50 p-3 active:bg-slate-800">
-                <p className="text-2xl font-bold text-white">{loanersInTransit}</p>
+                <p className="text-2xl font-bold text-slate-100">{loanersInTransit}</p>
                 <p className="text-xs text-slate-400">inbound</p>
               </Link>
             </div>
@@ -379,7 +434,7 @@ export default function Home() {
                 <span className="flex items-center gap-2">
                   <Stethoscope className="h-5 w-5 text-sky-300" />
                   <span>
-                    <span className="block font-medium text-white">Am I ready?</span>
+                    <span className="block font-medium text-slate-100">Am I ready?</span>
                     <span className="block text-xs text-slate-400">Every size, checked against stock</span>
                   </span>
                 </span>
@@ -394,7 +449,7 @@ export default function Home() {
                 <span className="flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-sky-300" />
                   <span>
-                    <span className="block font-medium text-white">Team board</span>
+                    <span className="block font-medium text-slate-100">Team board</span>
                     <span className="block text-xs text-slate-400">
                       {openTodos.length > 0
                         ? `${openTodos.length} to-do${openTodos.length === 1 ? "" : "s"} for you`
@@ -459,5 +514,61 @@ function SectionHeader({
         {title}
       </h2>
     </div>
+  );
+}
+
+/** Morning / afternoon / evening, so the greeting is not wrong by 3pm. */
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+const STAT_TONES = {
+  neutral: "bg-sky-950 text-sky-400",
+  danger: "bg-red-950 text-red-400",
+  warn: "bg-amber-950 text-amber-400",
+  info: "bg-violet-950 text-violet-400",
+} as const;
+
+/**
+ * One number, and the one thing to do about it.
+ *
+ * The whole tile is the link, not just the text at the bottom -- on a phone the
+ * text is a 90px target inside a 150px card, and missing it does nothing.
+ */
+function StatCard({
+  icon: Icon,
+  tone,
+  label,
+  value,
+  detail,
+  action,
+  to,
+}: {
+  icon: LucideIcon;
+  tone: keyof typeof STAT_TONES;
+  label: string;
+  value: number;
+  detail: string;
+  action: string;
+  to: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex flex-col rounded-2xl border border-slate-700 bg-slate-900 p-3.5 active:bg-slate-800"
+    >
+      <span
+        className={`flex h-8 w-8 items-center justify-center rounded-lg ${STAT_TONES[tone]}`}
+      >
+        <Icon size={16} />
+      </span>
+      <p className="mt-2.5 text-[13px] font-medium text-slate-400">{label}</p>
+      <p className="mt-0.5 text-[2rem] font-semibold leading-none text-slate-100">{value}</p>
+      <p className="mt-1.5 text-[11px] leading-snug text-slate-500">{detail}</p>
+      <span className="mt-2 text-[12px] font-medium text-sky-400">{action} →</span>
+    </Link>
   );
 }

@@ -203,7 +203,7 @@ export default function Calendar() {
       )}
 
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Calendar</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Calendar</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowTimeOff(true)}
@@ -243,7 +243,7 @@ export default function Calendar() {
               key={v}
               onClick={() => switchView(v)}
               className={`rounded-md px-4 py-1 text-xs font-medium capitalize ${
-                view === v ? "bg-slate-700 text-white" : "text-slate-500"
+                view === v ? "bg-slate-700 text-slate-100" : "text-slate-500"
               }`}
             >
               {v}
@@ -256,7 +256,7 @@ export default function Calendar() {
               key={f}
               onClick={() => setRepFilter(f)}
               className={`rounded-md px-4 py-1 text-xs font-medium ${
-                repFilter === f ? "bg-slate-700 text-white" : "text-slate-500"
+                repFilter === f ? "bg-slate-700 text-slate-100" : "text-slate-500"
               }`}
             >
               {f === "all" ? "Everyone" : "Mine"}
@@ -422,7 +422,7 @@ export default function Calendar() {
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-2 font-medium text-white">
+                  <span className="flex min-w-0 items-center gap-2 font-medium text-slate-100">
                     <span
                       className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
                         caseRepId(c) === profile?.id

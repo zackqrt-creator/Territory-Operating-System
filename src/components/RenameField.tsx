@@ -8,7 +8,7 @@ import { useState } from "react";
 export default function RenameField({
   value,
   onSave,
-  textClassName = "text-lg font-semibold text-white",
+  textClassName = "text-lg font-semibold text-slate-100",
 }: {
   value: string;
   onSave: (next: string) => Promise<void>;
@@ -47,7 +47,7 @@ export default function RenameField({
               setEditing(false);
             }
           }}
-          className="min-w-0 flex-1 rounded-lg border border-sky-600 bg-slate-800 px-2 py-1 text-white"
+          className="min-w-0 flex-1 rounded-lg border border-sky-600 bg-slate-800 px-2 py-1 text-slate-100"
         />
         <button
           onClick={onSubmit}

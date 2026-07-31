@@ -123,7 +123,7 @@ export default function RestockIntake({
         <select
           value={locationId}
           onChange={(e) => setLocationId(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100"
         >
           {facilities.map((f) => (
             <option key={f.id} value={f.id}>
@@ -161,7 +161,7 @@ export default function RestockIntake({
               className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/50 px-2.5 py-2"
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-white">{l.name}</span>
+                <span className="block truncate text-sm text-slate-100">{l.name}</span>
                 {l.lot_number && (
                   <span className="font-mono text-[11px] text-slate-500">Lot {l.lot_number}</span>
                 )}
