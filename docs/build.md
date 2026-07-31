@@ -208,17 +208,58 @@ Lesson for this log: for days, "typecheck clean, production build clean" was rep
 
 ---
 
+
+---
+
+## 7. Live row counts, 2026-07-31
+
+Read directly from the database, not inferred. The shape of this list is the
+point: **reference data is loaded, operational data is nearly empty.**
+
+| Table | Rows |
+| --- | --- |
+| `catalog_items` | 931 |
+| `tote_template_items` | 860 |
+| `procedure_sets` | 25 |
+| `tote_templates` | 19 |
+| `case_template_items` | 19 |
+| `cases` | 14 |
+| `facilities` | 11 |
+| `case_templates` | 11 |
+| `tasks` | 11 |
+| `tracked_assets` | 8 |
+| **`inventory_items`** | **6** |
+| `entity_notes` | 4 |
+| `surgeons` | 4 |
+| `task_photos` | 4 |
+| `territory_notes` | 3 |
+| `movements` | 2 |
+| `calendar_blocks` | 0 |
+| `rep_certifications` | 0 |
+
+**`inventory_items` = 6 is the finding that matters.** The catalog knows about
+931 products, but only six rows record stock actually held. Everything that
+compares a case against what is on hand -- the readiness engine, the staging
+report, the pack list, the at-risk count on the Command Center -- diffs against
+that table. With six rows, essentially every case will read as short, and those
+screens will look broken when they are in fact reporting honestly on an empty
+shelf.
+
+That is an intake problem, not a code problem: the territory's real stock has
+never been entered. It is the single highest-value thing to fix, and the
+scanner work exists precisely to make it survivable.
+
 ## 6. What still needs review
 
 - [x] **Apply 044** — run by Zack on 2026-07-29. The notes views now obey the querying user's RLS.
 - [x] **Run 045** — applied by Zack on 2026-07-29. Calendar blocks and case coverage are live.
-- [ ] **Confirm the rest of the live schema.** Which of 026–043 are actually applied has **not been verified** — the Supabase connector kept dropping. Worth one audit query.
+- [x] **Live schema audited 2026-07-31** via the Supabase MCP connector, against project `Zack CaseTrack` (`tylytbjxizxukefpplcw`, us-west-1, ACTIVE_HEALTHY). 35 tables in `public`, **RLS enabled on every one**. See §7 for the counts.
 - [ ] **Live click-through** of the new UI once logged in: Home command center, Notes capture → review → promote-to-page, Inventory tabs (esp. Catalog/Sets showing the loaded myOPS data), the More nav sheet, `/wiki`→`/pages` redirects.
 - [ ] **Confirm remaining procedures** to load (TiN Right series for the 300 line, any others myOPS lists).
 - [ ] **Surgeon-specific pack customization** — currently `surgeon_preferences` can only swap whole Sets; it cannot add extra or non-catalog items to a surgeon's tray. Design deferred by instruction; revisit when ready.
 - [ ] **Second-brain AI pipeline** — `ai_summary`/`ai_action_items`/`ai_entities` columns + status flow exist and are shown in the UI, but nothing populates them yet (manual triage only for now).
 - [ ] **Calendar revamp** — 6 of 7 parts built (month/personal default, day-tap day sheet with an hour rail, labelled time blocks, case coverage via `case_assignees`, required add-case time with quick-pick chips, navigate-to-calendar on save). **Remaining: subscribing to the myOPS calendar** — needs an ICS feed URL (env var, not chat) and a policy for subscribed-vs-local edits.
 - [ ] **Field-test the live barcode scanner.** The GS1 parsing is verified against real Medacta codes (data-matrix, GS1-128 with separators, the printed UDI line, bare EAN-13/GTIN-14) and the box-label OCR path is verified against Zack's `02.12.3D03L` tibial-tray label both clean and glyph-damaged. What is **not** verified is the camera itself — the sandbox has no camera, so autofocus, capture resolution and real data-matrix decode range are untested on an actual phone.
-- [ ] **Run migrations 047 and 048.** 047 lets the movement log be corrected; 048 lets notes and tasks attach to Sets, catalog products, movements and calendar blocks. Both fail visibly rather than silently: the movement delete names 047, and the task list hides itself without 048.
-- [x] ~~Run migration 047~~ (`047_movements_editable.sql`) — adds the update/delete policies `movements` never had, so the log can be corrected. Until it runs, the delete button fails with a message naming the migration rather than a raw RLS error.
-- [ ] **Whether the catalog migrations ever ran.** The scanner reports "N in catalog"; if a known REF or GTIN scans as *not in catalog*, 026–041 did not apply. This is the cheapest available probe of live schema state.
+- [x] **048 confirmed applied.** Both `entity_notes_entity_type_check` and `tasks_entity_type_check` carry the full 12-value list, and `entity_notes_entity_idx` / `tasks_entity_idx` both exist.
+- [x] **047 applied 2026-07-31, by this session.** It had **not** run, despite being reported as run: `movements` carried only `movements_select` and `movements_insert`, so the log had been read-only the whole time and the delete button would have failed naming the migration. Applied as migration `movements_editable`; `movements_update` and `movements_delete` now exist.
+- [x] **The catalog migrations did run.** `catalog_items` holds **931** rows, `tote_templates` 19, `tote_template_items` 860, `procedure_sets` 25. The scanner's "not in catalog" path is therefore a data question, not a schema one.
