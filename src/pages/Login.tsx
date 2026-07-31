@@ -1,5 +1,12 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Boxes, CalendarClock, NotebookPen, ScanLine, ShieldCheck } from "lucide-react";
+import {
+  Boxes,
+  CalendarClock,
+  ListChecks,
+  NotebookPen,
+  ScanLine,
+  ShieldCheck,
+} from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { hardReset } from "../lib/pwa";
 import BrandMark from "../components/BrandMark";
@@ -19,6 +26,12 @@ import BrandMark from "../components/BrandMark";
  * screen is the one screen you can always reach when that happens.
  */
 
+/*
+ * Two halves, deliberately equal. Counting boxes is only half the job -- what
+ * you know about a tray and what you still owe on it carry the same weight,
+ * so notes and tasks get their own entries here rather than one line tacked on
+ * at the end.
+ */
 const CAPABILITIES = [
   {
     icon: ScanLine,
@@ -31,14 +44,19 @@ const CAPABILITIES = [
     body: "Sets, on-hand counts and every movement between facilities, editable down to the individual line.",
   },
   {
+    icon: NotebookPen,
+    title: "A note on anything, kept where you'll find it",
+    body: "A surgeon's preference, a tray that came back short, why that transfer was really Wednesday — written on the record itself, editable later, not buried in your phone.",
+  },
+  {
+    icon: ListChecks,
+    title: "Follow-ups that come find you",
+    body: "Tasks hang off the same records as the notes and carry due dates, so the thing you promised on Monday shows up on the screen you open Thursday.",
+  },
+  {
     icon: CalendarClock,
     title: "Walk in ready",
     body: "Each case checked against the stock you actually hold, so shortages surface the night before instead of in the sterile core.",
-  },
-  {
-    icon: NotebookPen,
-    title: "Nothing lives in your head",
-    body: "Notes and tasks attach to anything — a tray, a surgeon, a shipment, a movement you need to correct later.",
   },
 ];
 
@@ -114,10 +132,6 @@ export default function Login() {
             Every tray, every case,
             <br className="hidden sm:block" /> every lot accounted for.
           </h1>
-          <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-slate-400">
-            The field system for orthopedic device reps. Live consignment inventory, surgical case
-            logistics, and a scanner that reads the box instead of asking you to type it.
-          </p>
         </header>
 
         {/* Mobile row 2 / desktop right column: the reason anyone is here. */}
@@ -234,8 +248,21 @@ export default function Login() {
         </div>
 
         {/* Mobile row 3 / desktop below the headline: what it actually does. */}
-        <div className="lg:col-start-1 lg:row-start-2 lg:pt-10">
-          <ul className="space-y-5 border-t border-slate-800/80 pt-8 lg:border-0 lg:pt-0">
+        {/*
+         * On a wide screen this sits directly under the headline, in the same
+         * column -- exactly where it reads as the sub-head. On a phone it falls
+         * below the sign-in panel instead, because six lines of prose above the
+         * panel pushed the Sign in button off a 664px-tall screen.
+         */}
+        <div className="lg:col-start-1 lg:row-start-2 lg:pt-6">
+          <p className="max-w-lg border-t border-slate-800/80 pt-8 text-[15px] leading-relaxed text-slate-400 lg:border-0 lg:pt-0">
+            The field system for orthopedic device reps. Consignment inventory and case logistics on
+            one side; on the other, every note and follow-up filed against the tray, the surgeon or
+            the shipment it belongs to — because what you know about a tray counts for as much as
+            what you counted in it.
+          </p>
+
+          <ul className="mt-8 space-y-5">
             {CAPABILITIES.map(({ icon: Icon, title, body }) => (
               <li key={title} className="flex gap-3.5">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-sky-900/70 bg-sky-950/50 text-sky-400">
