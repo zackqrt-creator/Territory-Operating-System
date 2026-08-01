@@ -4,7 +4,7 @@ import { findItemByBarcode, listFacilities } from "../lib/api";
 import type { Facility, InventoryItem } from "../lib/types";
 import MoveItemSheet from "../components/MoveItemSheet";
 import AddItemSheet from "../components/AddItemSheet";
-import BatchScanSheet from "../components/BatchScanSheet";
+import { BatchScanSheet } from "../components/scanners";
 
 const SCANNER_ID = "casetrack-scanner";
 

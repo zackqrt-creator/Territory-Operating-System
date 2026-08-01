@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createLoanerTote, type LoanerContentLine } from "../lib/api";
 import { Camera, ScanLine } from "lucide-react";
 import { listToteTemplatesWithItems, uploadItemPhoto } from "../lib/api";
-import PackingSlipScan, { type SlipContentLine } from "./PackingSlipScan";
+import { PackingSlipScan } from "./scanners";
+import type { SlipContentLine } from "./PackingSlipScan";
 import type { CatalogItem, Facility, ToteTemplateWithItems } from "../lib/types";
 
 interface Line extends LoanerContentLine {

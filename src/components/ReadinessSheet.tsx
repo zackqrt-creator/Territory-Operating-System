@@ -21,7 +21,7 @@ import CaseCoverage from "./CaseCoverage";
 import MoveItemSheet from "./MoveItemSheet";
 import NotesSection from "./NotesSection";
 import QuickLogSheet from "./QuickLogSheet";
-import StickerSheetCapture from "./StickerSheetCapture";
+import { StickerSheetCapture } from "./scanners";
 import { formatDateShort } from "../utils/dates";
 
 const CHECK_STYLE: Record<CheckStatus, { icon: string; text: string }> = {

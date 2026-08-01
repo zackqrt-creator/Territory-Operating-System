@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { Camera, ScanLine, Trash2 } from "lucide-react";
 import { createConsignmentRestock, uploadItemPhoto } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
-import PackingSlipScan, { type SlipContentLine } from "./PackingSlipScan";
+import { PackingSlipScan } from "./scanners";
+import type { SlipContentLine } from "./PackingSlipScan";
 import type { CatalogItem, Facility } from "../lib/types";
 
 /**
