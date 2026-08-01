@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { downscaleImage } from "./images";
 import type {
   AssetMovement,
   AssetStatus,
@@ -675,11 +676,19 @@ export async function linkCatalogItemGtin(catalogItemId: string, gtin: string): 
   if (error) throw error;
 }
 
-/** Uploads a reference photo to the public `item-photos` bucket and returns its public URL. */
+/**
+ * Uploads a reference photo to the public `item-photos` bucket and returns its
+ * public URL.
+ *
+ * Every photo in the app goes through here -- item shots, loaner kits, restock
+ * intake and task stage photos -- so the downscale is applied once, at the one
+ * point they all pass.
+ */
 export async function uploadItemPhoto(file: File, territoryId: string): Promise<string> {
-  const ext = file.name.split(".").pop() ?? "jpg";
+  const shrunk = await downscaleImage(file);
+  const ext = shrunk.name.split(".").pop() ?? "jpg";
   const path = `${territoryId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const { error } = await supabase.storage.from("item-photos").upload(path, file);
+  const { error } = await supabase.storage.from("item-photos").upload(path, shrunk);
   if (error) throw error;
   const { data } = supabase.storage.from("item-photos").getPublicUrl(path);
   return data.publicUrl;
