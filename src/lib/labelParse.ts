@@ -17,7 +17,9 @@ import type { CatalogItem } from "./types";
 export interface LabelScan {
   /** The REF token we read, normalized (uppercase, spaces removed). */
   refText: string | null;
-  /** Exact catalog match on item_number, if any. */
+  /** GTIN read off the printed UDI line (GS1 AI 01), if present. */
+  gtin: string | null;
+  /** Catalog match — exact on item_number, else on the GTIN we read. */
   match: CatalogItem | null;
   side: "LEFT" | "RIGHT" | null;
   size: string | null;
@@ -134,16 +136,31 @@ export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan 
   const upper = text.toUpperCase();
   const fieldsRead: string[] = [];
 
+  // Most reliable source for GTIN + lot + expiration: the GS1 UDI line printed
+  // under the barcode, e.g. "UDI (01)07630345716248(17)301014(10)2520862". The
+  // AIs are defined by the standard — (01) GTIN, (10) lot, (17) expiration — so
+  // this beats reading the boxed "LOT"/hourglass cells, which OCR reorders
+  // unpredictably.
+  const gs1 = parseGs1(text);
+  const gtin = gs1?.gtin ?? null;
+
   // REF: two number groups then an alphanumeric tail, e.g. 02.12.KA13R.
   // Tolerant of OCR spaces/O-for-0 around the code.
   const refMatch = upper.match(/([0O]?\d\.\s?\d{2}\.\s?[A-Z0-9]{3,})/);
   const refText = refMatch ? normalizeRef(refMatch[1]) : null;
   if (refText) fieldsRead.push("item number");
 
+  if (gtin) fieldsRead.push("barcode");
+
+  // Prefer the REF (printed on every label); fall back to the GTIN, which the
+  // catalog learns the first time a rep matches a scanned box. Either one is an
+  // exact identifier, so a hit on it is authoritative.
   let match: CatalogItem | null = null;
   if (refText) {
-    match =
-      catalog.find((c) => c.item_number && normalizeRef(c.item_number) === refText) ?? null;
+    match = catalog.find((c) => c.item_number && normalizeRef(c.item_number) === refText) ?? null;
+  }
+  if (!match && gtin) {
+    match = catalog.find((c) => c.gtin === gtin) ?? null;
   }
 
   // SIDE
@@ -170,12 +187,6 @@ export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan 
   if (/\bCEMENTLESS\b/.test(upper)) cement = "cementless";
   else if (/\bCEMENTED\b/.test(upper)) cement = "cemented";
   if (cement) fieldsRead.push("cement");
-
-  // Most reliable source for lot + expiration: the GS1 UDI line printed under
-  // the barcode, e.g. "UDI (01)07630345716248(17)301014(10)2520862". The AIs
-  // are defined by the standard — (10) lot, (17) expiration — so this beats
-  // reading the boxed "LOT"/hourglass cells, which OCR reorders unpredictably.
-  const gs1 = parseGs1(text);
 
   // LOT: prefer the UDI (10) value; else fall back to scanning past the "LOT"
   // keyword for the first digit-containing token that isn't another field's
@@ -204,5 +215,5 @@ export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan 
   }
   if (expiration) fieldsRead.push("expiration");
 
-  return { refText, match, side, size, height, cement, lot, expiration, fieldsRead };
+  return { refText, gtin, match, side, size, height, cement, lot, expiration, fieldsRead };
 }
