@@ -32,6 +32,7 @@ export default function CaseCoverage({
   const [adding, setAdding] = useState(false);
   const [pickRole, setPickRole] = useState<CaseAssigneeRole>("covering");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     listCaseAssignees([caseId])
@@ -59,6 +60,7 @@ export default function CaseCoverage({
   async function add(profileId: string) {
     if (!territoryId) return;
     setBusy(true);
+    setError(null);
     try {
       await assignRepToCase({
         territory_id: territoryId,
@@ -69,13 +71,23 @@ export default function CaseCoverage({
       });
       setAdding(false);
       refresh();
+    } catch {
+      // Who is covering a case is the kind of thing you check once and then
+      // trust. A tap that quietly did nothing means two people think the
+      // other one has it.
+      setError("Couldn't add that rep. Check your signal and try again.");
     } finally {
       setBusy(false);
     }
   }
 
   async function remove(id: string) {
-    await unassignRepFromCase(id).catch(() => {});
+    setError(null);
+    try {
+      await unassignRepFromCase(id);
+    } catch {
+      setError("Couldn't remove that rep. Check your signal and try again.");
+    }
     refresh();
   }
 
@@ -92,6 +104,8 @@ export default function CaseCoverage({
           </button>
         )}
       </div>
+
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
 
       {assignees.length === 0 && !adding && (
         <p className="mt-1 text-xs text-slate-500">

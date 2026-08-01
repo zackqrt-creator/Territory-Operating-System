@@ -78,6 +78,7 @@ export default function DaySheet({
   const [draftLabel, setDraftLabel] = useState("");
   const [draftKind, setDraftKind] = useState<CalendarBlockKind>("hospital_visit");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [assignees, setAssignees] = useState<CaseAssignee[]>([]);
 
   // Coverage shows on the chip so a shared case is obvious from the day view
@@ -104,6 +105,7 @@ export default function DaySheet({
   async function saveBlock(hour: number) {
     if (!draftLabel.trim() || !territoryId || !currentProfileId) return;
     setBusy(true);
+    setError(null);
     try {
       await createCalendarBlock({
         territory_id: territoryId,
@@ -120,13 +122,24 @@ export default function DaySheet({
       setDraftLabel("");
       setDrafting(null);
       loadBlocks();
+    } catch {
+      // Keep the draft on screen -- retyping it is the last thing anyone
+      // wants after a save that looked like it worked.
+      setError("Couldn't save that block. Check your signal and try again.");
     } finally {
       setBusy(false);
     }
   }
 
   async function removeBlock(id: string) {
-    await deleteCalendarBlock(id).catch(() => {});
+    setError(null);
+    try {
+      await deleteCalendarBlock(id);
+    } catch {
+      // A block that quietly refuses to delete leaves a phantom commitment on
+      // the day, which is worse than an error message.
+      setError("Couldn't delete that block. Check your signal and try again.");
+    }
     loadBlocks();
   }
 
@@ -229,6 +242,10 @@ export default function DaySheet({
           <X size={18} />
         </button>
       </div>
+
+      {error && (
+        <p className="border-b border-red-900 bg-red-950 px-4 py-2 text-xs text-red-400">{error}</p>
+      )}
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-3">
         {untimed.length > 0 && (

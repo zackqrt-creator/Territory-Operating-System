@@ -76,7 +76,15 @@ export default function TaskPhotos({
   }
 
   async function remove(id: string) {
-    await deleteTaskPhoto(id).catch(() => {});
+    setError(null);
+    try {
+      await deleteTaskPhoto(id);
+    } catch {
+      // The photo staying on screen is the honest outcome -- it is still
+      // there. Silently refreshing would put it back with no explanation and
+      // read as a bug rather than a failed delete.
+      setError("Couldn't delete that photo. Check your signal and try again.");
+    }
     refresh();
   }
 
