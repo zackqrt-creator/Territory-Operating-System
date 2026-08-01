@@ -26,6 +26,7 @@ import Knowledge from "./pages/Wiki";
 import NotePage from "./pages/WikiPage";
 import BottomNav from "./components/BottomNav";
 import TopBar from "./components/TopBar";
+import OfflineBar from "./components/OfflineBar";
 
 /** Legacy /wiki/:id bookmarks now live under /pages/:id. */
 function WikiRedirect() {
@@ -85,6 +86,7 @@ function App() {
         <Route path="/wiki/:id" element={<WikiRedirect />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <OfflineBar />
       <BottomNav />
     </>
   );
