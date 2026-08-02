@@ -168,14 +168,26 @@ textarea {
   font: inherit;
 }
 
-input,
-select,
-textarea {
-  min-height: 44px;
+/*
+ * The 44px tap-target floor sits in @layer base so a control that must be a
+ * specific size can opt out with min-h-0. Unlayered, this rule beat every
+ * Tailwind utility -- min-h-0 included -- which is why task checkboxes written
+ * as h-5 w-5 rendered 20px wide and 44px tall in every list in the app.
+ * Buttons that do not opt out still get the full 44px target.
+ */
+@layer base {
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  button {
+    min-height: 44px;
+  }
 }
 
 button {
-  min-height: 44px;
   cursor: pointer;
   transition:
     background-color 0.15s ease,

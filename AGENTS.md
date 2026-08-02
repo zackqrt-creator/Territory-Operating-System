@@ -67,10 +67,24 @@ supabase/         migrations, numbered and ordered
   place, so `bg-slate-950` is the page background and `text-slate-100` is the
   ink. Check that file before assuming a color does what its name suggests.
 
-### Known trap
+### Known trap: unlayered rules in index.css
 
-`src/index.css` declares `button, input, select, textarea { font: inherit }`
-**outside any `@layer`**. Unlayered rules beat every layered one, so Tailwind
-`text-*` utilities are silently ignored on every button, input and select in
-the app. Wrapping those blocks in `@layer base` fixes it but changes type sizes
-app-wide, so it needs its own reviewed pass.
+`src/index.css` sets base styles **outside any `@layer`**. Unlayered rules beat
+every layered one, so a Tailwind utility cannot override them -- the utility is
+in `@layer utilities`, which loses.
+
+The `min-height: 44px` tap-target floor has been moved into `@layer base`, so a
+control that must be an exact size can now opt out with `min-h-0`. It could not
+before: task checkboxes written `h-5 w-5` rendered 20px wide and 44px tall, a
+rectangle, in every list in the app, and the ~15 `min-h-0` declarations already
+scattered around the codebase were being silently ignored. They now apply, which
+is what their authors intended.
+
+Two things that follow from this and are easy to get wrong:
+
+- A `min-height` always beats a smaller `height` regardless of layer. Layering
+  alone does not shrink a control; it only makes `min-h-0` reachable. You need
+  both.
+- `font: inherit` on `button, input, select, textarea` is still unlayered, so
+  Tailwind `text-*` utilities are still ignored on those elements. Layering it
+  would change type sizes app-wide and needs its own reviewed pass.

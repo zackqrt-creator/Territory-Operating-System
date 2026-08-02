@@ -211,11 +211,14 @@ function TaskRow({
         onClick={() => onToggle(task)}
         disabled={busy}
         aria-label={isDone ? "Mark not done" : "Mark done"}
-        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-          isDone ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-600"
+        /* min-h-0 is required: index.css sets a 44px min-height on every
+           button, and a min-height always beats a smaller height. Without it
+           this renders 20px wide and 44px tall -- the rectangle. */
+        className={`mt-0.5 flex h-5 w-5 min-h-0 shrink-0 items-center justify-center rounded-[5px] border-2 ${
+          isDone ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-600 bg-transparent"
         }`}
       >
-        {isDone && <Check size={11} />}
+        {isDone && <Check size={13} strokeWidth={3} />}
       </button>
       <div className="min-w-0 flex-1">
         <p className={`text-sm ${isDone ? "text-slate-500 line-through" : "text-slate-100"}`}>
