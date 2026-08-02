@@ -2,6 +2,8 @@ import { supabase } from "./supabase";
 import { downscaleImage } from "./images";
 import type {
   AssetMovement,
+  AssetPhoto,
+  AssetPhotoKind,
   AssetStatus,
   BillingStatus,
   BoardComment,
@@ -1821,4 +1823,60 @@ export async function createConsignmentRestock(params: {
   }
 
   return created.length;
+}
+
+/**
+ * The photos of how a tray arrived, ordered the way you repack it: the outside
+ * label first so you know you have the right tray, then each layer from the
+ * top down.
+ */
+export async function listAssetPhotos(params: {
+  inventoryItemId?: string;
+  trackedAssetId?: string;
+}): Promise<AssetPhoto[]> {
+  let q = supabase.from("asset_photos").select("*");
+  if (params.inventoryItemId) q = q.eq("inventory_item_id", params.inventoryItemId);
+  else if (params.trackedAssetId) q = q.eq("tracked_asset_id", params.trackedAssetId);
+  else return [];
+  // Label sorts before layer alphabetically, which is also the order you want.
+  const { data, error } = await q.order("kind").order("layer_index", { nullsFirst: true });
+  if (error) throw error;
+  return data as AssetPhoto[];
+}
+
+/** Upload one tray photo and record what it shows. */
+export async function addAssetPhoto(params: {
+  file: File;
+  territoryId: string;
+  inventoryItemId?: string;
+  trackedAssetId?: string;
+  kind: AssetPhotoKind;
+  layerIndex?: number | null;
+  caption?: string | null;
+  asReceived?: boolean;
+  uploadedBy?: string | null;
+}): Promise<AssetPhoto> {
+  const url = await uploadItemPhoto(params.file, params.territoryId);
+  const { data, error } = await supabase
+    .from("asset_photos")
+    .insert({
+      territory_id: params.territoryId,
+      inventory_item_id: params.inventoryItemId ?? null,
+      tracked_asset_id: params.trackedAssetId ?? null,
+      kind: params.kind,
+      layer_index: params.kind === "layer" ? (params.layerIndex ?? 1) : null,
+      caption: params.caption ?? null,
+      as_received: params.asReceived ?? true,
+      uploaded_by: params.uploadedBy ?? null,
+      url,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as AssetPhoto;
+}
+
+export async function deleteAssetPhoto(id: string): Promise<void> {
+  const { error } = await supabase.from("asset_photos").delete().eq("id", id);
+  if (error) throw error;
 }

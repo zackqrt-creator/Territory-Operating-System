@@ -583,3 +583,32 @@ export interface TaskPhoto {
   uploaded_by: string | null;
   created_at: string;
 }
+
+/**
+ * What a photo of a tray is showing.
+ *
+ * 'label' is the outside label — which tray this is. 'layer' is one layer of
+ * the inside, so the molded slots can be restored exactly. A two-layer tray is
+ * three photos: the label and both layers.
+ */
+export type AssetPhotoKind = "label" | "layer";
+
+/**
+ * A photo of how a tray was packed. Attached either to a loaner tote (an
+ * inventory item) or to a reusable set (a tracked asset) — exactly one.
+ */
+export interface AssetPhoto {
+  id: string;
+  territory_id: string;
+  inventory_item_id: string | null;
+  tracked_asset_id: string | null;
+  kind: AssetPhotoKind;
+  /** 1-based, top layer first. Null for a label photo. */
+  layer_index: number | null;
+  url: string;
+  caption: string | null;
+  /** True when taken at intake, before anything was removed. */
+  as_received: boolean;
+  uploaded_by: string | null;
+  created_at: string;
+}

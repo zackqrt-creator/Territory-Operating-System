@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { listLoanerContents } from "../lib/api";
-import type { Facility, InventoryItem } from "../lib/types";
+import { listAssetPhotos, listLoanerContents } from "../lib/api";
+import type { AssetPhoto, Facility, InventoryItem } from "../lib/types";
 import NotesSection from "./NotesSection";
 
 /**
@@ -19,10 +19,15 @@ export default function LoanerDetailSheet({
   onMove: () => void;
 }) {
   const [contents, setContents] = useState<InventoryItem[] | null>(null);
+  const [photos, setPhotos] = useState<AssetPhoto[]>([]);
+  const [zoomed, setZoomed] = useState<AssetPhoto | null>(null);
 
   useEffect(() => {
     listLoanerContents(tote.id).then(setContents);
+    listAssetPhotos({ inventoryItemId: tote.id }).then(setPhotos).catch(() => {});
   }, [tote.id]);
+
+  const asReceived = photos.filter((p) => p.as_received);
 
   const facilityName = facilities.find((f) => f.id === tote.location_id)?.name ?? "—";
   const totalUnits = contents?.reduce((sum, c) => sum + c.quantity, 0) ?? 0;
@@ -47,6 +52,36 @@ export default function LoanerDetailSheet({
           {facilityName}
           {tote.loaner_return_deadline ? ` · return by ${tote.loaner_return_deadline}` : ""}
         </p>
+
+        {asReceived.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              As it arrived
+            </p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              Put every piece back where it is in these photos.
+            </p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {asReceived.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setZoomed(p)}
+                  className="relative block"
+                >
+                  <img
+                    src={p.url}
+                    alt={p.kind === "label" ? "Kit label" : `Layer ${p.layer_index}`}
+                    className="h-24 w-full rounded-lg border border-slate-700 object-cover"
+                  />
+                  <span className="absolute bottom-1 left-1 rounded bg-slate-950/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-200">
+                    {p.kind === "label" ? "Label" : `Layer ${p.layer_index}`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -85,6 +120,27 @@ export default function LoanerDetailSheet({
           Close
         </button>
       </div>
+
+      {zoomed && (
+        <div
+          /* Fully opaque: at 95% the contents list showed through the photo,
+             which is the one thing you are trying to read carefully. */
+          className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setZoomed(null);
+          }}
+        >
+          <img
+            src={zoomed.url}
+            alt={zoomed.kind === "label" ? "Kit label" : `Layer ${zoomed.layer_index}`}
+            className="max-h-[85vh] w-full object-contain"
+          />
+          <p className="mt-3 text-sm text-slate-300">
+            {zoomed.kind === "label" ? "Kit label" : `Layer ${zoomed.layer_index}`} · tap to close
+          </p>
+        </div>
+      )}
     </div>
   );
 }

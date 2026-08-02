@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createLoanerTote, type LoanerContentLine } from "../lib/api";
-import { Camera, ScanLine } from "lucide-react";
-import { listToteTemplatesWithItems, uploadItemPhoto } from "../lib/api";
+import { Camera, Layers, ScanLine, X } from "lucide-react";
+import { addAssetPhoto, listToteTemplatesWithItems, uploadItemPhoto } from "../lib/api";
 import { PackingSlipScan } from "./scanners";
 import type { SlipContentLine } from "./PackingSlipScan";
-import type { CatalogItem, Facility, ToteTemplateWithItems } from "../lib/types";
+import type { AssetPhotoKind, CatalogItem, Facility, ToteTemplateWithItems } from "../lib/types";
+
+/** One tray photo staged locally, before the tote row exists to attach it to. */
+interface TrayShot {
+  key: string;
+  kind: AssetPhotoKind;
+  /** 1-based, top layer first. Null for the label shot. */
+  layerIndex: number | null;
+  file: File;
+  preview: string;
+}
 
 interface Line extends LoanerContentLine {
   key: string;
@@ -45,10 +55,24 @@ export default function LoanerIntake({
   const [lines, setLines] = useState<Line[]>([]);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const photoRef = useRef<HTMLInputElement>(null);
+  /*
+   * A loaner tray goes back into its molded slots exactly as it arrived, and
+   * intake is the only moment that layout is still authoritative. So this is a
+   * set of shots rather than one: the outside label (which tray is this) and
+   * one per layer, top down (where everything goes). A two-layer tray is three
+   * photos.
+   *
+   * They are held as files, not uploaded on pick: the tote row does not exist
+   * until createLoanerTote runs, and there is nothing to attach them to before
+   * that. Uploading here would orphan them if the rep backs out.
+   */
+  const [shots, setShots] = useState<TrayShot[]>([]);
+  const labelRef = useRef<HTMLInputElement>(null);
+  const layerRef = useRef<HTMLInputElement>(null);
+  const labelShot = shots.find((s) => s.kind === "label") ?? null;
+  const layerCount = shots.filter((s) => s.kind === "layer").length;
   // The myOPS Sets already loaded into the catalog. A kit that arrives without
   // paper can still be filled in from the Set it is supposed to be.
   const [toteTemplates, setToteTemplates] = useState<ToteTemplateWithItems[]>([]);
@@ -80,11 +104,40 @@ export default function LoanerIntake({
     setTemplateSearch("");
   }
 
-  function onPhotoSelected(file: File | null) {
-    setPhotoFile(file);
-    setPhotoPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return file ? URL.createObjectURL(file) : null;
+  /** Re-shooting the label replaces it; layers append in the order taken. */
+  function addShot(file: File | null, kind: AssetPhotoKind) {
+    if (!file) return;
+    setShots((prev) => {
+      const next =
+        kind === "label"
+          ? prev.filter((s) => {
+              if (s.kind !== "label") return true;
+              URL.revokeObjectURL(s.preview);
+              return false;
+            })
+          : [...prev];
+      return [
+        ...next,
+        {
+          key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          kind,
+          layerIndex: kind === "layer" ? next.filter((s) => s.kind === "layer").length + 1 : null,
+          file,
+          preview: URL.createObjectURL(file),
+        },
+      ];
+    });
+  }
+
+  /** Removing a layer renumbers the rest, so layer 2 never goes missing. */
+  function removeShot(key: string) {
+    setShots((prev) => {
+      const gone = prev.find((s) => s.key === key);
+      if (gone) URL.revokeObjectURL(gone.preview);
+      let layer = 0;
+      return prev
+        .filter((s) => s.key !== key)
+        .map((s) => (s.kind === "layer" ? { ...s, layerIndex: ++layer } : s));
     });
   }
 
@@ -158,13 +211,15 @@ export default function LoanerIntake({
     if (!loanerCode.trim() || !locationId || !territoryId) return;
     setSaving(true);
     try {
-      await createLoanerTote({
+      const tote = await createLoanerTote({
         loanerCode: loanerCode.trim(),
         contentsLabel: contentsLabel.trim() || null,
         locationId,
         territoryId,
         returnDeadline: returnDeadline || null,
-        photoUrl: photoFile ? await uploadItemPhoto(photoFile, territoryId) : null,
+        // The label shot doubles as the kit's thumbnail, so the item still
+        // shows a picture everywhere inventory items already do.
+        photoUrl: labelShot ? await uploadItemPhoto(labelShot.file, territoryId) : null,
         contents: lines.map(
           ({ catalog_item_id, name, category, quantity, lot_number, expiration_date }) => ({
             catalog_item_id,
@@ -179,6 +234,26 @@ export default function LoanerIntake({
           }),
         ),
       });
+
+      /*
+       * Photos after the tote exists, sequentially so layer order survives.
+       * A failure here must not read as "the tote did not save" -- it did, and
+       * the contents are the part that matters, so this is reported separately
+       * rather than thrown.
+       */
+      try {
+        for (const shot of shots) {
+          await addAssetPhoto({
+            file: shot.file,
+            territoryId,
+            inventoryItemId: tote.id,
+            kind: shot.kind,
+            layerIndex: shot.layerIndex,
+          });
+        }
+      } catch {
+        setPhotoError("Kit saved, but the photos did not upload. Add them from the loaner's page.");
+      }
       onCreated();
     } finally {
       setSaving(false);
@@ -205,30 +280,85 @@ export default function LoanerIntake({
         </button>
         <button
           type="button"
-          onClick={() => photoRef.current?.click()}
+          onClick={() => labelRef.current?.click()}
           className="flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-3 text-sm font-medium text-slate-300"
         >
-          <Camera size={15} /> {photoFile ? "Retake photo" : "Photo of kit"}
+          <Camera size={15} /> {labelShot ? "Retake label" : "Photo of label"}
         </button>
         <input
-          ref={photoRef}
+          ref={labelRef}
           type="file"
           accept="image/*"
           capture="environment"
           className="hidden"
           onChange={(e) => {
-            onPhotoSelected(e.target.files?.[0] ?? null);
+            addShot(e.target.files?.[0] ?? null, "label");
             e.target.value = "";
           }}
         />
       </div>
 
-      {photoPreview && (
-        <img
-          src={photoPreview}
-          alt="Kit"
-          className="h-28 w-full rounded-lg border border-slate-700 object-cover"
+      {/*
+       * The layout shots. This tray has to go back into its molded slots
+       * exactly as it came, and right now is the only time that layout is
+       * still correct -- once instruments start coming out, the reference is
+       * gone. One shot per layer, top down.
+       */}
+      <div>
+        <button
+          type="button"
+          onClick={() => layerRef.current?.click()}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-sky-800 bg-sky-950/40 px-3 py-3 text-sm font-medium text-sky-300"
+        >
+          <Layers size={15} /> Photograph layer {layerCount + 1}
+        </button>
+        <input
+          ref={layerRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            addShot(e.target.files?.[0] ?? null, "layer");
+            e.target.value = "";
+          }}
         />
+        <p className="mt-1.5 text-xs text-slate-500">
+          {layerCount === 0
+            ? "Shoot each layer before anything comes out — this is what you'll repack against."
+            : `${layerCount} layer${layerCount === 1 ? "" : "s"} captured. Add another if the tray has one.`}
+        </p>
+      </div>
+
+      {shots.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {shots.map((s) => (
+            <div key={s.key} className="relative">
+              <img
+                src={s.preview}
+                alt={s.kind === "label" ? "Label" : `Layer ${s.layerIndex}`}
+                className="h-24 w-full rounded-lg border border-slate-700 object-cover"
+              />
+              <span className="absolute bottom-1 left-1 rounded bg-slate-950/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-200">
+                {s.kind === "label" ? "Label" : `Layer ${s.layerIndex}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeShot(s.key)}
+                aria-label={`Remove ${s.kind === "label" ? "label" : `layer ${s.layerIndex}`} photo`}
+                className="absolute right-1 top-1 rounded-full bg-slate-950/80 p-1 text-slate-300"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {photoError && (
+        <p className="rounded-lg border border-amber-800 bg-amber-950/30 p-2.5 text-xs text-amber-200">
+          {photoError}
+        </p>
       )}
 
       {toteTemplates.length > 0 && (
@@ -414,7 +544,7 @@ export default function LoanerIntake({
           catalog={catalog}
           onClose={() => setScanning(false)}
           onConfirm={(slipLines, shipment, photo) => {
-            if (photo && !photoFile) onPhotoSelected(photo);
+            if (photo && !labelShot) addShot(photo, "label");
             applySlip(slipLines, shipment);
           }}
         />
