@@ -6,7 +6,6 @@ import {
   listFacilities,
   listInventory,
   listProfiles,
-  listRepCertifications,
   listTimeOff,
 } from "../lib/api";
 import type {
@@ -15,7 +14,6 @@ import type {
   Facility,
   InventoryItem,
   Profile,
-  RepCertification,
   TimeOff,
 } from "../lib/types";
 import { computeReadiness } from "../lib/readiness";
@@ -57,7 +55,6 @@ export default function Calendar() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [templates, setTemplates] = useState<CaseTemplateWithItems[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [certs, setCerts] = useState<RepCertification[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,16 +93,14 @@ export default function Calendar() {
       listFacilities(),
       listCaseTemplatesWithItems(),
       listInventory(),
-      listRepCertifications(),
       listProfiles(),
       listTimeOff(),
     ])
-      .then(([c, f, t, i, rc, p, to]) => {
+      .then(([c, f, t, i, p, to]) => {
         setCases(c);
         setFacilities(f);
         setTemplates(t);
         setInventory(i);
-        setCerts(rc);
         setProfiles(p);
         setTimeOff(to);
       })
@@ -406,7 +401,7 @@ export default function Calendar() {
           </div>
           {selectedCases.map((c) => {
             const readiness = computeReadiness(c, templates, inventory, facilities);
-            const score = scoreCase(c, readiness, inventory, certs);
+            const score = scoreCase(c, readiness, inventory);
             const flagged = score.color === "red";
             const scoreStyle: Record<ScoreColor, string> = {
               green: "bg-emerald-500/15 text-emerald-300",

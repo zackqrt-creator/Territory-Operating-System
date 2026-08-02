@@ -7,14 +7,12 @@ import type {
   InventoryItem,
   QaAnswer,
   QaQuestion,
-  RepCertification,
 } from "../lib/types";
 import { computeReadiness, gapMessage } from "../lib/readiness";
 import {
   listCaseItemPlans,
   listQaAnswers,
   listQaQuestions,
-  listRepCertifications,
 } from "../lib/api";
 import { scoreCase, type CheckStatus } from "../lib/crm";
 import CaseCoverage from "./CaseCoverage";
@@ -62,12 +60,10 @@ export default function ReadinessSheet({
   const [moving, setMoving] = useState<{ item: InventoryItem; target: Facility } | null>(null);
   const [logging, setLogging] = useState(false);
   const [scanningStickers, setScanningStickers] = useState(false);
-  const [certs, setCerts] = useState<RepCertification[]>([]);
   const [plans, setPlans] = useState<CaseItemPlan[]>([]);
   const [qa, setQa] = useState<{ q: QaQuestion; answers: QaAnswer[] }[]>([]);
 
   useEffect(() => {
-    listRepCertifications().then(setCerts).catch(() => {});
     listCaseItemPlans(caseRow.id).then(setPlans).catch(() => {});
     Promise.all([listQaQuestions(), listQaAnswers()])
       .then(([qs, ans]) => {
@@ -83,7 +79,7 @@ export default function ReadinessSheet({
 
   const caseFacility = facilities.find((f) => f.id === caseRow.facility_id);
   const readiness = computeReadiness(caseRow, templates, inventory, facilities);
-  const score = scoreCase(caseRow, readiness, inventory, certs);
+  const score = scoreCase(caseRow, readiness, inventory);
 
   return (
     <div className="fixed inset-0 z-30 flex items-end bg-black/60" onClick={onClose}>

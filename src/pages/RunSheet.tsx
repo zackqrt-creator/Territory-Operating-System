@@ -6,7 +6,6 @@ import {
   listFacilities,
   listInventory,
   listProfiles,
-  listRepCertifications,
   listTimeOff,
 } from "../lib/api";
 import type {
@@ -15,7 +14,6 @@ import type {
   Facility,
   InventoryItem,
   Profile,
-  RepCertification,
   TimeOff,
 } from "../lib/types";
 import { computeReadiness } from "../lib/readiness";
@@ -37,7 +35,6 @@ export default function RunSheet() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [templates, setTemplates] = useState<CaseTemplateWithItems[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [certs, setCerts] = useState<RepCertification[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,16 +47,14 @@ export default function RunSheet() {
       listFacilities(),
       listCaseTemplatesWithItems(),
       listInventory(),
-      listRepCertifications(),
       listProfiles(),
       listTimeOff(),
     ])
-      .then(([c, f, t, i, rc, p, to]) => {
+      .then(([c, f, t, i, p, to]) => {
         setCases(c);
         setFacilities(f);
         setTemplates(t);
         setInventory(i);
-        setCerts(rc);
         setProfiles(p);
         setTimeOff(to);
       })
@@ -137,7 +132,7 @@ export default function RunSheet() {
         <div className="mt-5 space-y-2">
           {ordered.map((c) => {
             const readiness = computeReadiness(c, templates, inventory, facilities);
-            const score = scoreCase(c, readiness, inventory, certs);
+            const score = scoreCase(c, readiness, inventory);
             const rep = profileById(caseRepId(c));
             return (
               <button

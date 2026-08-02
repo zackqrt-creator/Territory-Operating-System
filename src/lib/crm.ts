@@ -9,7 +9,6 @@ import type {
   ItemCategory,
   Movement,
   Profile,
-  RepCertification,
 } from "./types";
 import { daysUntil } from "../utils/dates";
 
@@ -25,7 +24,7 @@ export type ScoreColor = "green" | "yellow" | "red";
 export type CheckStatus = "pass" | "warn" | "fail" | "untracked";
 
 export interface ScoreCheck {
-  key: "items" | "sterilization" | "certification" | "delivery";
+  key: "items" | "delivery";
   label: string;
   status: CheckStatus;
   detail: string;
@@ -36,11 +35,18 @@ export interface CaseScore {
   checks: ScoreCheck[];
 }
 
+/*
+ * Sterilization and rep certification were scored here and have been removed.
+ * Both were "untracked" on essentially every case -- nobody logs tray
+ * sterilization in this territory and certifications live in RepTrax, not
+ * here -- so they contributed two permanent grey rows to every case panel and
+ * taught the rep to skim past the list that also carries the real warnings.
+ * A check nobody feeds is worse than no check.
+ */
 export function scoreCase(
   caseRow: CaseRow,
   itemReadiness: CaseReadiness,
   inventory: InventoryItem[],
-  certifications: RepCertification[],
 ): CaseScore {
   const checks: ScoreCheck[] = [];
 
@@ -57,46 +63,7 @@ export function scoreCase(
 
   const linked = inventory.filter((i) => i.assigned_case_id === caseRow.id);
 
-  // 2. Tray sterilization (trays linked to this case).
-  const trays = linked.filter((i) => i.category === "instrument_tray");
-  const trayTracked = trays.filter((t) => t.sterilization_status !== "unknown");
-  if (trays.length === 0 || trayTracked.length === 0) {
-    checks.push({ key: "sterilization", label: "Sterilization", status: "untracked", detail: "No tray sterilization logged for this case." });
-  } else {
-    const expired = trayTracked.filter(
-      (t) =>
-        t.sterilization_status === "expired" ||
-        (t.sterilization_expires_at !== null && t.sterilization_expires_at < caseRow.surgery_date),
-    );
-    const processing = trayTracked.filter((t) => t.sterilization_status === "processing");
-    if (expired.length > 0) {
-      checks.push({ key: "sterilization", label: "Sterilization", status: "fail", detail: `${expired.length} tray(s) expired or lapse before surgery.` });
-    } else if (processing.length > 0) {
-      checks.push({ key: "sterilization", label: "Sterilization", status: "warn", detail: `${processing.length} tray(s) still processing.` });
-    } else {
-      checks.push({ key: "sterilization", label: "Sterilization", status: "pass", detail: "All linked trays sterile." });
-    }
-  }
-
-  // 3. Rep certification (assigned rep, falling back to creator).
-  const repId = caseRow.assigned_rep_id ?? caseRow.created_by;
-  const certs = repId ? certifications.filter((c) => c.profile_id === repId) : [];
-  if (!repId || certs.length === 0) {
-    checks.push({ key: "certification", label: "Rep certification", status: "untracked", detail: "No certifications on file for the covering rep." });
-  } else {
-    const dated = certs.filter((c) => c.expires_on !== null);
-    const expired = dated.filter((c) => c.expires_on! < caseRow.surgery_date);
-    const soon = dated.filter((c) => c.expires_on! >= caseRow.surgery_date && daysUntil(c.expires_on!) <= 7);
-    if (expired.length > 0) {
-      checks.push({ key: "certification", label: "Rep certification", status: "fail", detail: `${expired[0].name} expires before surgery date.` });
-    } else if (soon.length > 0) {
-      checks.push({ key: "certification", label: "Rep certification", status: "warn", detail: `${soon[0].name} expires within 7 days.` });
-    } else {
-      checks.push({ key: "certification", label: "Rep certification", status: "pass", detail: "Covering rep's certifications current." });
-    }
-  }
-
-  // 4. Loaner delivery (inbound loaners linked to this case).
+  // 2. Loaner delivery (inbound loaners linked to this case).
   const loaners = linked.filter((i) => i.acquisition_type === "loaner" && i.delivery_status !== null);
   if (loaners.length === 0) {
     checks.push({ key: "delivery", label: "Loaner delivery", status: "untracked", detail: "No inbound loaner tracked for this case." });

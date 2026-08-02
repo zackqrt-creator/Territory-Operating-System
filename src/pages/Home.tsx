@@ -24,7 +24,6 @@ import {
   listProfiles,
   listCasesByIds,
   acknowledgeMovement,
-  listRepCertifications,
   listMyTasks,
 } from "../lib/api";
 import type {
@@ -35,7 +34,6 @@ import type {
   Movement,
   PersonalTask,
   Profile,
-  RepCertification,
 } from "../lib/types";
 import { buildStagingReport } from "../lib/staging";
 import { buildLoanerReport } from "../lib/loaners";
@@ -63,7 +61,6 @@ export default function Home() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activityCases, setActivityCases] = useState<CaseRow[]>([]);
-  const [certs, setCerts] = useState<RepCertification[]>([]);
   const [myTasks, setMyTasks] = useState<PersonalTask[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,16 +72,14 @@ export default function Home() {
       listCaseTemplatesWithItems(),
       listRecentMovements(50),
       listProfiles(),
-      listRepCertifications(),
       listMyTasks(),
-    ]).then(async ([c, i, f, t, m, p, rc, mt]) => {
+    ]).then(async ([c, i, f, t, m, p, mt]) => {
       setCases(c);
       setItems(i);
       setFacilities(f);
       setTemplates(t);
       setMovements(m);
       setProfiles(p);
-      setCerts(rc);
       setMyTasks(mt);
       const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
       setActivityCases(await listCasesByIds(caseIds));
@@ -121,13 +116,13 @@ export default function Home() {
       const counts = { green: 0, yellow: 0, red: 0 };
       for (const c of list) {
         const r = computeReadiness(c, templates, items, facilities);
-        counts[scoreCase(c, r, items, certs).color]++;
+        counts[scoreCase(c, r, items).color]++;
       }
       return counts;
     };
     return { today: tally(todayCases), tomorrow: tally(tomorrowCases) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cases, templates, items, facilities, certs]);
+  }, [cases, templates, items, facilities]);
 
   const activity = buildActivityFeed(movements, items, facilities, profiles, activityCases);
   const reserveAlerts = activity.filter((entry) => entry.reserveAlert && !entry.movement.acknowledged_at);
