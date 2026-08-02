@@ -3,6 +3,7 @@ import { createLoanerTote, type LoanerContentLine } from "../lib/api";
 import { Camera, Layers, ScanLine, X } from "lucide-react";
 import { addAssetPhoto, listToteTemplatesWithItems, uploadItemPhoto } from "../lib/api";
 import { PackingSlipScan } from "./scanners";
+import { useFrequentCatalog } from "../hooks/useFrequentCatalog";
 import type { SlipContentLine } from "./PackingSlipScan";
 import type {
   AssetPhotoKind,
@@ -86,6 +87,10 @@ export default function LoanerIntake({
   // paper can still be filled in from the Set it is supposed to be.
   const [toteTemplates, setToteTemplates] = useState<ToteTemplateWithItems[]>([]);
   const [templateSearch, setTemplateSearch] = useState("");
+  const frequent = useFrequentCatalog();
+  // Most-used first in the dropdown, and the top few as one-tap chips.
+  const orderedCatalog = useMemo(() => frequent.sort(catalog), [frequent, catalog]);
+  const topUsed = useMemo(() => frequent.top(catalog), [frequent, catalog]);
 
   useEffect(() => {
     listToteTemplatesWithItems().then(setToteTemplates).catch(() => {});
@@ -522,10 +527,34 @@ export default function LoanerIntake({
           className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
         />
         <datalist id="loaner-catalog">
-          {catalog.map((c) => (
+          {orderedCatalog.map((c) => (
             <option key={c.id} value={itemLabel(c)} />
           ))}
         </datalist>
+
+        {/*
+          The catalog holds ~931 products; this territory touches maybe sixty.
+          These are the ones actually stocked, counted from real inventory rows
+          rather than a list anyone has to keep up to date -- so the common case
+          is a tap and the long tail is still a search away.
+        */}
+        {topUsed.length > 0 && (
+          <div className="mt-2">
+            <p className="mb-1 text-xs text-slate-500">Frequently used</p>
+            <div className="flex flex-wrap gap-1.5">
+              {topUsed.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => addItem(c, 1)}
+                  className="rounded-full border border-sky-800 bg-sky-950/40 px-3 py-1.5 text-xs font-medium text-sky-300"
+                >
+                  + {itemLabel(c)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/*

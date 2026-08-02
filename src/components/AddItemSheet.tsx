@@ -13,6 +13,7 @@ import LoanerIntake from "./LoanerIntake";
 import RestockIntake from "./RestockIntake";
 import { ocrPage } from "../lib/ocr";
 import { catalogLabel, parseGs1, parseLabelText } from "../lib/labelParse";
+import { useFrequentCatalog } from "../hooks/useFrequentCatalog";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
   { value: "loaner_kit", label: "Loaner kit" },
@@ -145,7 +146,9 @@ export default function AddItemSheet({
     );
   }, [prefillBarcode]);
 
-  const filteredCatalog = catalog.filter((c) => c.joint === joint);
+  const frequent = useFrequentCatalog();
+  // Same ordering as the tray picker: what we actually stock, first.
+  const filteredCatalog = frequent.sort(catalog.filter((c) => c.joint === joint));
 
   function onJointChange(value: CatalogJoint) {
     setJoint(value);
