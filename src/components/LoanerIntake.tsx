@@ -4,7 +4,13 @@ import { Camera, Layers, ScanLine, X } from "lucide-react";
 import { addAssetPhoto, listToteTemplatesWithItems, uploadItemPhoto } from "../lib/api";
 import { PackingSlipScan } from "./scanners";
 import type { SlipContentLine } from "./PackingSlipScan";
-import type { AssetPhotoKind, CatalogItem, Facility, ToteTemplateWithItems } from "../lib/types";
+import type {
+  AssetPhotoKind,
+  CatalogItem,
+  Facility,
+  ItemCategory,
+  ToteTemplateWithItems,
+} from "../lib/types";
 
 /** One tray photo staged locally, before the tote row exists to attach it to. */
 interface TrayShot {
@@ -54,6 +60,9 @@ export default function LoanerIntake({
   const [returnDeadline, setReturnDeadline] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [search, setSearch] = useState("");
+  const [freeText, setFreeText] = useState("");
+  const [freeCategory, setFreeCategory] = useState<ItemCategory>("instrument_tray");
+  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -192,6 +201,35 @@ export default function LoanerIntake({
     for (const c of items) addItem(c, 1);
   }
 
+  /*
+   * Anything can end up in a tray. A hospital throws in an extra rasp, a
+   * ReVLite tray comes with a piece that was never catalogued, corporate
+   * substitutes a part mid-shipment. The catalog is a convenience, not a
+   * gate -- contents rows already allow a null catalog_item_id and carry the
+   * REF in the name, so an off-catalog line is a first-class row rather than
+   * a workaround.
+   */
+  function addFreeText() {
+    const name = freeText.trim();
+    if (!name) return;
+    setLines((prev) => [
+      ...prev,
+      {
+        key: `adhoc-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        catalog_item_id: null,
+        name,
+        category: freeCategory,
+        quantity: 1,
+      },
+    ]);
+    setFreeText("");
+  }
+
+  /** Any line can be renamed, catalogued or not -- labels get read wrong. */
+  function renameLine(key: string, name: string) {
+    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, name } : l)));
+  }
+
   function setQty(key: string, qty: number) {
     setLines((prev) =>
       prev.flatMap((l) => (l.key === key ? (qty <= 0 ? [] : [{ ...l, quantity: qty }]) : [l])),
@@ -266,8 +304,8 @@ export default function LoanerIntake({
     <div className="mt-4 space-y-4">
       <p className="text-xs text-slate-500">
         Scanning opens the camera and reads each box's barcode as you point at it —
-        the lot and expiry come through exactly as printed. Photo only attaches an
-        image without reading it.
+        the lot and expiry come through exactly as printed. The photo buttons just
+        attach images: shoot them now, or pick ones you took earlier.
       </p>
 
       <div className="grid grid-cols-2 gap-2">
@@ -283,13 +321,12 @@ export default function LoanerIntake({
           onClick={() => labelRef.current?.click()}
           className="flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-3 text-sm font-medium text-slate-300"
         >
-          <Camera size={15} /> {labelShot ? "Retake label" : "Photo of label"}
+          <Camera size={15} /> {labelShot ? "Replace label" : "Label photo"}
         </button>
         <input
           ref={labelRef}
           type="file"
           accept="image/*"
-          capture="environment"
           className="hidden"
           onChange={(e) => {
             addShot(e.target.files?.[0] ?? null, "label");
@@ -310,22 +347,24 @@ export default function LoanerIntake({
           onClick={() => layerRef.current?.click()}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-sky-800 bg-sky-950/40 px-3 py-3 text-sm font-medium text-sky-300"
         >
-          <Layers size={15} /> Photograph layer {layerCount + 1}
+          <Layers size={15} /> Add layer {layerCount + 1}
         </button>
         <input
           ref={layerRef}
           type="file"
           accept="image/*"
-          capture="environment"
+          // Layers shot earlier can be attached in one pass rather than one
+          // at a time, which is the whole point of allowing a later upload.
+          multiple
           className="hidden"
           onChange={(e) => {
-            addShot(e.target.files?.[0] ?? null, "layer");
+            for (const f of Array.from(e.target.files ?? [])) addShot(f, "layer");
             e.target.value = "";
           }}
         />
         <p className="mt-1.5 text-xs text-slate-500">
           {layerCount === 0
-            ? "Shoot each layer before anything comes out — this is what you'll repack against."
+            ? "One per layer, before anything comes out. Shoot now or attach photos you took earlier."
             : `${layerCount} layer${layerCount === 1 ? "" : "s"} captured. Add another if the tray has one.`}
         </p>
       </div>
@@ -489,6 +528,64 @@ export default function LoanerIntake({
         </datalist>
       </div>
 
+      {/*
+        Not everything that ends up in a tray is in the catalog -- a hospital
+        throws in an extra rasp, a ReVLite tray ships with a piece nobody has
+        catalogued, corporate substitutes a part mid-shipment. Typing it in has
+        to be as ordinary as picking from the list, or the record quietly stops
+        matching the tray.
+      */}
+      <div>
+        <label className="mb-1 block text-sm text-slate-400">
+          Not in the catalog? <span className="text-slate-500">Type it in</span>
+        </label>
+        <div className="flex gap-2">
+          <input
+            value={freeText}
+            onChange={(e) => setFreeText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addFreeText();
+              }
+            }}
+            placeholder="Extra rasp, ReVLite broach handle..."
+            className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder:text-slate-500"
+          />
+          <button
+            type="button"
+            onClick={addFreeText}
+            disabled={!freeText.trim()}
+            className="shrink-0 rounded-lg bg-sky-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            Add
+          </button>
+        </div>
+        <div className="mt-2 flex gap-1.5">
+          {(
+            [
+              ["instrument_tray", "Instrument"],
+              ["implant", "Implant"],
+              ["consumable", "Consumable"],
+              ["loaner_kit", "Kit"],
+            ] as [ItemCategory, string][]
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setFreeCategory(value)}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                freeCategory === value
+                  ? "bg-sky-600 text-white"
+                  : "border border-slate-700 bg-slate-800/60 text-slate-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {lines.length > 0 && (
         <div className="rounded-lg border border-slate-700">
           <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
@@ -504,9 +601,37 @@ export default function LoanerIntake({
               const c = catalog.find((x) => x.id === l.catalog_item_id);
               return (
                 <div key={l.key} className="flex items-center justify-between gap-2 rounded-md bg-slate-800/60 px-2 py-1.5">
-                  <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
-                    {c ? itemLabel(c) : l.name}
-                  </span>
+                  {/*
+                    Every line is renamable, catalogued or not. A slip gets OCR'd
+                    wrong, a catalog name does not match what is stencilled on
+                    the tray, a rep wants "Sidhu's short broach" instead of a
+                    REF. Tapping the name edits it.
+                  */}
+                  {editingKey === l.key ? (
+                    <input
+                      autoFocus
+                      value={l.name}
+                      onChange={(e) => renameLine(l.key, e.target.value)}
+                      onBlur={() => setEditingKey(null)}
+                      onKeyDown={(e) => e.key === "Enter" && setEditingKey(null)}
+                      className="min-w-0 flex-1 rounded border border-sky-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEditingKey(l.key)}
+                      className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm text-slate-200"
+                    >
+                      {/* Name truncates, badge does not -- an off-catalog line
+                          is exactly the one you need to see is off-catalog. */}
+                      <span className="truncate">{c ? itemLabel(c) : l.name}</span>
+                      {!l.catalog_item_id && (
+                        <span className="shrink-0 rounded bg-amber-950/60 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-300">
+                          off-catalog
+                        </span>
+                      )}
+                    </button>
+                  )}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setQty(l.key, l.quantity - 1)}

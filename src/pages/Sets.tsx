@@ -9,6 +9,7 @@ import {
   updateTrackedAsset,
 } from "../lib/api";
 import type { AssetStatus, Facility, ToteTemplateWithItems, TrackedAsset } from "../lib/types";
+import TrayPhotos from "../components/TrayPhotos";
 import { formatDateShort } from "../utils/dates";
 import RenameField from "../components/RenameField";
 import WikiLinkButton from "../components/WikiLinkButton";
@@ -286,6 +287,10 @@ function MoveSheet({
         <p className="mb-3 text-xs text-slate-500">
           Rename the code to match the real set/tote ID stamped on it.
         </p>
+
+        {/* Same layout record as a loaner tray -- our own sets go back into
+            their slots too, and whoever collects it may not be whoever packed it. */}
+        <TrayPhotos trackedAssetId={asset.id} territoryId={territoryId} uploadedBy={movedBy} />
 
         <label className="mb-1 block text-sm text-slate-400">Status</label>
         <div className="grid grid-cols-2 gap-2">

@@ -102,7 +102,6 @@ export default function RestockIntake({
           ref={photoRef}
           type="file"
           accept="image/*"
-          capture="environment"
           className="hidden"
           onChange={(e) => {
             onPhotoSelected(e.target.files?.[0] ?? null);

@@ -247,7 +247,6 @@ export default function StickerSheetCapture({
               ref={cameraRef}
               type="file"
               accept="image/*"
-              capture="environment"
               className="hidden"
               onChange={(e) => {
                 onPhotos(e.target.files);

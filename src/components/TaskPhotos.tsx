@@ -15,8 +15,11 @@ const STAGES: { value: TaskStage; label: string }[] = [
  * always a picture -- the tray as found, mid-fix, and back in the rack -- so
  * each stage gets its own strip and its own camera button.
  *
- * `capture="environment"` opens the rear camera directly on a phone instead of
- * making you dig through the photo library.
+ * The file inputs deliberately do NOT set `capture`. Forcing the rear camera
+ * saves a tap but removes the photo library, and a rep in a sterile corridor
+ * often cannot stop to shoot -- they photograph it in the moment and attach it
+ * an hour later. Without `capture` a phone offers both: Take Photo, or pick one
+ * already taken.
  *
  * Hides itself if migration 046 has not been run.
  */
@@ -119,7 +122,6 @@ export default function TaskPhotos({
                 }}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="hidden"
                 onChange={(e) => {
                   upload(s.value, e.target.files?.[0]);

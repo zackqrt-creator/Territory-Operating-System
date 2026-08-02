@@ -1880,3 +1880,30 @@ export async function deleteAssetPhoto(id: string): Promise<void> {
   const { error } = await supabase.from("asset_photos").delete().eq("id", id);
   if (error) throw error;
 }
+
+/**
+ * The catalog items this territory actually touches, most-used first.
+ *
+ * A manual "favourites" flag would be one more thing to curate and would go
+ * stale the week it stopped being fun. Every item ever stocked already left an
+ * inventory_items row carrying its catalog_item_id, so real usage is already
+ * recorded -- this just counts it. Roughly 60 REFs out of ~931 come back, which
+ * is the difference between a picker you scroll and a picker you scan.
+ *
+ * Recency-bounded so a product line dropped a year ago stops being "frequent".
+ */
+export async function listFrequentCatalogItemIds(withinDays = 180): Promise<string[]> {
+  const since = new Date(Date.now() - withinDays * 86400_000).toISOString();
+  const { data, error } = await supabase
+    .from("inventory_items")
+    .select("catalog_item_id")
+    .not("catalog_item_id", "is", null)
+    .gte("created_at", since);
+  if (error) throw error;
+
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as { catalog_item_id: string }[]) {
+    counts.set(row.catalog_item_id, (counts.get(row.catalog_item_id) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
