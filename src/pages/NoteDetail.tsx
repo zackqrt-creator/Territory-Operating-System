@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Lock, Users, Pin, Sparkles } from "lucide-react";
+import { Lock, Users, Pin } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
   deleteNote,
@@ -29,16 +29,20 @@ import type {
   TerritoryNote,
   TerritoryNoteEntityType,
   TerritoryNoteLink,
-  TerritoryNoteType,
   TerritoryNoteVisibility,
   ToteTemplateWithItems,
 } from "../lib/types";
 import { formatDateShort, formatRelativeDay } from "../utils/dates";
+import { NOTE_KINDS } from "../lib/noteKinds";
 
-const TYPE_OPTIONS: TerritoryNoteType[] = [
-  "general", "case", "hospital", "inventory", "replenishment",
-  "loaner", "consignment", "surgeon", "task", "meeting", "idea", "ai_summary",
-];
+/*
+ * This screen used to keep its own hardcoded list of note types, which had
+ * drifted badly from the real one in noteKinds.ts. It offered six categories
+ * that do not exist -- loaner, consignment, task, meeting, idea, and
+ * ai_summary, the last of which promised a machine-written summary this app
+ * has no AI to write -- while omitting two that do: Logistics and Playbook.
+ * NOTE_KINDS is the single source now, so the picker cannot drift again.
+ */
 
 const ENTITY_TYPE_LABEL: Record<TerritoryNoteEntityType, string> = {
   case: "Case",
@@ -186,17 +190,24 @@ export default function NoteDetail() {
       />
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        {TYPE_OPTIONS.map((t) => (
+        {NOTE_KINDS.map((k) => (
           <button
-            key={t}
-            onClick={() => patch({ note_type: t })}
+            key={k.value}
+            onClick={() => patch({ note_type: k.value })}
             className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${
-              note.note_type === t ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-400"
+              note.note_type === k.value ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-400"
             }`}
           >
-            {t.replace("_", " ")}
+            {k.label}
           </button>
         ))}
+        {/* A note already filed under a retired kind keeps a chip of its own,
+            so an old note never looks like it lost its category. */}
+        {!NOTE_KINDS.some((k) => k.value === note.note_type) && (
+          <span className="shrink-0 rounded-full bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-500">
+            {note.note_type.replace("_", " ")} (retired)
+          </span>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -224,14 +235,6 @@ export default function NoteDetail() {
         </button>
       </div>
 
-      {note.ai_summary && (
-        <div className="mt-4 rounded-xl border border-sky-800/60 bg-sky-950/20 p-3">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-sky-300">
-            <Sparkles className="h-3.5 w-3.5" /> AI summary
-          </p>
-          <p className="mt-1 text-sm text-sky-100">{note.ai_summary}</p>
-        </div>
-      )}
 
       <div className="mt-5">
         <div className="flex items-center justify-between">

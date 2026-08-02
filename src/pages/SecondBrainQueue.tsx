@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BrainCircuit, ArrowUpRight, Sparkles } from "lucide-react";
+import { BrainCircuit, ArrowUpRight } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { listSecondBrainQueue, promoteNoteToPage, setSecondBrainStatus } from "../lib/api";
 import type { SecondBrainStatus, TerritoryNote } from "../lib/types";
@@ -84,23 +84,6 @@ export default function SecondBrainQueue() {
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500">{noteKindLabel(n.note_type)}</p>
                 {n.body && <p className="mt-1 line-clamp-2 text-sm text-slate-300">{n.body}</p>}
-
-                {n.ai_summary && (
-                  <div className="mt-2 flex gap-2 rounded-lg border border-sky-800/60 bg-sky-950/20 p-2">
-                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-300" />
-                    <div>
-                      <p className="text-xs font-medium text-sky-300">AI summary</p>
-                      <p className="mt-0.5 text-sm text-sky-100">{n.ai_summary}</p>
-                    </div>
-                  </div>
-                )}
-                {Array.isArray(n.ai_action_items) && n.ai_action_items.length > 0 && (
-                  <ul className="mt-2 list-disc pl-4 text-sm text-slate-300">
-                    {n.ai_action_items.map((item, i) => (
-                      <li key={i}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
-                    ))}
-                  </ul>
-                )}
 
                 <p className="mt-1.5 text-xs text-slate-500">Updated {formatRelativeDay(n.updated_at)}</p>
 
