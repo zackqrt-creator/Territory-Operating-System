@@ -295,7 +295,10 @@ export default function LoanerIntake({
           });
         }
       } catch {
-        setPhotoError("Kit saved, but the photos did not upload. Add them from the loaner's page.");
+        setPhotoError(
+          "Kit and contents saved. The photos did not attach — if tray photos are new to this " +
+            "install, migration 049 has not been run yet. Add them from the loaner later.",
+        );
       }
       onCreated();
     } finally {

@@ -18,6 +18,10 @@ import type { AssetPhoto, AssetPhotoKind } from "../lib/types";
  * shoot; they photograph it in the moment and attach it later, so the file
  * inputs offer the library as readily as the lens, and layers can be attached
  * several at a time.
+ *
+ * Hides itself if migration 049 has not been run, matching TaskPhotos. A
+ * feature whose table does not exist yet should be absent, not an error the
+ * rep has to interpret in the middle of doing something else.
  */
 export default function TrayPhotos({
   inventoryItemId,
@@ -37,6 +41,7 @@ export default function TrayPhotos({
   const [photos, setPhotos] = useState<AssetPhoto[]>([]);
   const [zoomed, setZoomed] = useState<AssetPhoto | null>(null);
   const [busy, setBusy] = useState(false);
+  const [available, setAvailable] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const labelRef = useRef<HTMLInputElement>(null);
   const layerRef = useRef<HTMLInputElement>(null);
@@ -45,11 +50,16 @@ export default function TrayPhotos({
 
   function reload() {
     listAssetPhotos({ inventoryItemId, trackedAssetId })
-      .then(setPhotos)
-      .catch(() => setError("Could not load photos."));
+      .then((rows) => {
+        setPhotos(rows);
+        setAvailable(true);
+      })
+      .catch(() => setAvailable(false));
   }
 
   useEffect(reload, [inventoryItemId, trackedAssetId]);
+
+  if (!available) return null;
 
   /** Uploaded straight away: unlike intake, the tray already has a row. */
   async function onPicked(files: FileList | null, kind: AssetPhotoKind) {

@@ -24,7 +24,9 @@ export default function LoanerDetailSheet({
 
   useEffect(() => {
     listLoanerContents(tote.id).then(setContents);
-    listAssetPhotos({ inventoryItemId: tote.id }).then(setPhotos).catch(() => {});
+    // Silent: without migration 049 there are simply no layout photos, which
+    // is indistinguishable from a tray nobody photographed yet.
+    listAssetPhotos({ inventoryItemId: tote.id }).then(setPhotos).catch(() => setPhotos([]));
   }, [tote.id]);
 
   const asReceived = photos.filter((p) => p.as_received);
