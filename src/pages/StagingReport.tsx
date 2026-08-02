@@ -133,7 +133,10 @@ export default function StagingReport() {
               <div className="space-y-2">
                 {report.missing.map((m, i) => (
                   <div key={i} className="rounded-lg border border-red-800 bg-red-950/30 p-3">
-                    <p className="font-medium text-white">
+                    {/* text-white was invisible: the light ramp defines red-950
+                        as #fef2f2, so this was white on near-white. slate-100
+                        is the ink in this theme. */}
+                    <p className="font-medium text-slate-100">
                       {m.quantity}x {m.name}
                     </p>
                     <p className="text-xs text-slate-500">

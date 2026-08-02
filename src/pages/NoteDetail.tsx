@@ -369,7 +369,7 @@ export default function NoteDetail() {
             value={taskTitle}
             onChange={(e) => setTaskTitle(e.target.value)}
             placeholder="Add a task..."
-            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+            className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
           <button onClick={addTask} disabled={!taskTitle.trim()} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
             Add

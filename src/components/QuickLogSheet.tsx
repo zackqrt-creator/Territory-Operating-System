@@ -154,7 +154,7 @@ export default function QuickLogSheet({
 
         {result ? (
           <>
-            <h2 className="text-lg font-semibold text-white">Case logged ✓</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Case logged ✓</h2>
             {result.loanerDeadline && (
               <p className="mt-2 rounded-lg border border-sky-800 bg-sky-950/30 p-3 text-sm text-sky-200">
                 Return clock started — ship the loaner kit back to corporate by{" "}
@@ -169,7 +169,7 @@ export default function QuickLogSheet({
                 <div className="space-y-2">
                   {result.replenish.map((item, i) => (
                     <div key={i} className="rounded-lg border border-amber-800 bg-amber-950/20 p-3">
-                      <p className="text-sm text-white">
+                      <p className="text-sm text-slate-100">
                         {item.quantity}x {item.name}
                       </p>
                       <p className="text-xs text-slate-500">{CATEGORY_LABEL[item.category]}</p>

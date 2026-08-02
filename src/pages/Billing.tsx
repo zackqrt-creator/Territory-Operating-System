@@ -62,11 +62,11 @@ export default function Billing() {
         <>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-amber-800 bg-amber-950/20 p-3">
-              <p className="text-2xl font-bold text-white">{unpaid.length}</p>
+              <p className="text-2xl font-bold text-slate-100">{unpaid.length}</p>
               <p className="text-sm text-amber-300">not yet paid</p>
             </div>
             <div className="rounded-xl border border-emerald-800 bg-emerald-950/20 p-3">
-              <p className="text-2xl font-bold text-white">{paid.length}</p>
+              <p className="text-2xl font-bold text-slate-100">{paid.length}</p>
               <p className="text-sm text-emerald-300">paid</p>
             </div>
           </div>

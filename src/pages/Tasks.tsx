@@ -74,6 +74,28 @@ export default function Tasks() {
   const inTab = tasks.filter((t) => t.status === tab);
   const countFor = (s: TaskStatus) => tasks.filter((t) => t.status === s).length;
 
+  /*
+   * Done, grouped by the day the work actually happened.
+   *
+   * A flat list of thirteen finished tasks answers "how much have I ever done",
+   * which nobody asks. The question at the end of a shift is "did I get through
+   * today", and that needs today separated out and counted. Grouping is by
+   * done_at, not due_date -- a task for Wednesday's case that got done on Monday
+   * belongs under Monday.
+   *
+   * Tasks completed before done_at was rendered have the timestamp already, so
+   * nothing is stranded; only rows genuinely missing it fall into "Earlier".
+   */
+  const doneByDay = (() => {
+    const groups = new Map<string, PersonalTask[]>();
+    for (const t of tasks.filter((x) => x.status === "done")) {
+      const day = t.done_at ? t.done_at.slice(0, 10) : "";
+      groups.set(day, [...(groups.get(day) ?? []), t]);
+    }
+    return [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  })();
+  const todayISO = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
       <div className="flex items-center justify-between">
@@ -197,10 +219,79 @@ export default function Tasks() {
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : inTab.length === 0 ? (
         <p className="mt-8 text-slate-400">Nothing here.</p>
+      ) : tab === "done" ? (
+        <div className="mt-4 space-y-4">
+          {doneByDay.map(([day, group]) => (
+            <DoneDay
+              key={day || "undated"}
+              day={day}
+              tasks={group}
+              isToday={day === todayISO}
+              meId={profile?.id ?? ""}
+              territoryId={profile?.territory_id ?? ""}
+              nameOf={nameOf}
+              onChanged={refresh}
+            />
+          ))}
+        </div>
       ) : (
         <div className="mt-4 space-y-2">
           {inTab.map((t) => (
             <TaskCard key={t.id} task={t} meId={profile?.id ?? ""} territoryId={profile?.territory_id ?? ""} nameOf={nameOf} onChanged={refresh} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One day's finished work. Today is open on arrival and labelled as the day's
+ * summary -- that is the whole reason to open this tab. Older days collapse, so
+ * the history is reachable without burying what you came to check.
+ */
+function DoneDay({
+  day,
+  tasks,
+  isToday,
+  meId,
+  territoryId,
+  nameOf,
+  onChanged,
+}: {
+  day: string;
+  tasks: PersonalTask[];
+  isToday: boolean;
+  meId: string;
+  territoryId: string;
+  nameOf: (id: string) => string;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(isToday);
+  const label = !day ? "Earlier (no date recorded)" : isToday ? "Today" : formatDateShort(day);
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-left"
+      >
+        <span className={`text-sm font-semibold ${isToday ? "text-emerald-400" : "text-slate-400"}`}>
+          {label} · {tasks.length} done
+        </span>
+        <span className="text-xs text-slate-500">{open ? "hide" : "show"}</span>
+      </button>
+      {open && (
+        <div className="mt-1 space-y-2">
+          {tasks.map((t) => (
+            <TaskCard
+              key={t.id}
+              task={t}
+              meId={meId}
+              territoryId={territoryId}
+              nameOf={nameOf}
+              onChanged={onChanged}
+            />
           ))}
         </div>
       )}
@@ -324,11 +415,17 @@ function TaskCard({
           </p>
           {task.notes && <p className="mt-0.5 text-sm text-slate-400">{task.notes}</p>}
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-            {task.due_date && (
-              <span className={overdue ? "font-medium text-red-300" : ""}>
-                Due {formatDateShort(task.due_date)}
-                {overdue ? " · overdue" : ""}
+            {task.status === "done" && task.done_at ? (
+              <span className="font-medium text-emerald-400">
+                Completed {formatDateShort(task.done_at.slice(0, 10))}
               </span>
+            ) : (
+              task.due_date && (
+                <span className={overdue ? "font-medium text-red-300" : ""}>
+                  Due {formatDateShort(task.due_date)}
+                  {overdue ? " · overdue" : ""}
+                </span>
+              )
             )}
             {task.assigned_to === meId && !mine && (
               <span className="rounded-full bg-violet-900/50 px-2 py-0.5 font-medium text-violet-300">
@@ -370,7 +467,7 @@ function TaskCard({
                 disabled={busy}
                 className="rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-medium text-white"
               >
-                {task.status === "todo" ? "Start →" : "Complete ✓"}
+                {task.status === "todo" ? "Start →" : "Mark complete"}
               </button>
             )}
             {duplicating ? (
@@ -379,7 +476,7 @@ function TaskCard({
                   type="date"
                   value={dupDate}
                   onChange={(e) => setDupDate(e.target.value)}
-                  className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-white"
+                  className="min-h-0 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100"
                 />
                 <button onClick={onDuplicate} disabled={busy} className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-50">
                   Create copy
