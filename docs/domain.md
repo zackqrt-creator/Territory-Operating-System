@@ -111,10 +111,87 @@ and the readiness engine must never treat them as interchangeable.
    opened and swapped mid-case, and why the sticker-sheet flow has to be able
    to deduct something that was not on the original pack list.
 
-## 6. To verify with Zack
+## 6. What a total knee actually takes
+
+Dictated by Zack, 2026-08. **[territory]** — this is his haul, not a Medacta
+standard. The uncertain readings are marked; they are questions in §7, not
+things to build on.
+
+### The haul: what travels to the hospital
+
+This is now the TKA checklist, seeded in migration 050. Six lines for a given
+side:
+
+| Line | Qty | Side-specific |
+| --- | --- | --- |
+| Complete Tote | 1 | yes |
+| Extra Inserts Travel Tote **D-107** | 1 | yes |
+| Full Efficiency Tote | 1 | no |
+| General Efficiency Kit | 2 | no |
+| KA One Trays | 1 | no *(unconfirmed — see §7)* |
+| ReVLite Trays | 1 | no *(unconfirmed — see §7)* |
+
+Two General Efficiency Kits is deliberate: one to open, one that saves the
+case. Zack's phrasing was "general efficiency kit, an extra general efficiency
+kit."
+
+### The complete tote: what is inside one
+
+**This is the point.** When a complete tote is delivered somewhere, the whole
+size run is in it. That is why the checklist asks for the tote and not for
+"a femoral component" — the size question is answered by the tote's presence,
+and *which* size got used is settled afterwards by the sticker sheet.
+
+- **Femoral components** — 13 sizes:
+  `1, 1+, 2, 2+, 3, 3+, 4, 4+, 5, 5+, 6, 6+, 7`
+- **Tibial trays** — sizes `1`–`6`, plus one `5+`
+- **Tibial inserts (polys)** — sizes `1`–`6`, **each side**, at seven
+  thicknesses: `10, 11, 12, 13, 14, 17, 20` mm. That is 42 poly SKUs per side.
+- **MOTOPAT inserts** — sizes `1`–`6`
+- **Two sets of each side** *(reading uncertain — §7)*
+
+`T3i4` / `T4i3` appeared inside Zack's femoral list, but migration 034 already
+carries them as **tibial** components (`02.12.T3I4L`, `02.12.T4I3L` —
+"GMK-SPHERE Tibial component cemented"), i.e. hybrid tray/insert size
+combinations, not femoral sizes. Treated as tibial here. Worth one confirming
+question.
+
+### The full efficiency tote
+
+Zack described its contents as tibial trays `1`–`6` **left and right**, plus a
+femoral run. Because it carries both sides, it is not modelled as
+side-specific. Efficiency is single-use instrumentation (§2), so the trays in
+it are trials rather than implants.
+
+### Why the checklist is tote-level, not implant-level
+
+Migration 001 seeded the TKA template with five invented lines — `Femoral
+Component`, `Tibial Component`, `Poly Insert`, `GMK Total Knee Loaner Kit`,
+`Primary Knee Instrument Tray`. Readiness matches a template line to inventory
+by **exact name**, and no inventory row has ever carried any of those names, so
+every knee case reported "not found in inventory anywhere" on every line. That
+was a vocabulary bug being read as a stock problem.
+
+Naming convention set by migration 050: side-specific totes take a
+`(Left)` / `(Right)` suffix — `Complete Tote (Right)`. Inventory rows must use
+that exact string to match.
+
+## 7. To verify with Zack
 
 - Are Efficiency sets returned or consumed? (§2)
 - Is the `500` / `300` split a size line, a cementless-vs-cemented split, or
   something else?
 - Which surgeons are KA and which are MA, and should that be a field on
   `surgeons` rather than a note?
+- **Are KA One and ReVLite trays side-specific?** §4 lists `500KATRL` /
+  `500KATRR` as a left/right pair, which suggests yes, but Zack named them
+  without a side. Currently modelled as `ANY` — an over-broad line still shows
+  up and can be ticked, whereas an invented left/right pair would put a phantom
+  requirement on every case. (§6)
+- **"The complete tote should have two sets of each side"** — two of every poly
+  thickness? Two full left runs *and* two full right runs in a tote that is
+  itself side-specific? Not modelled either way. (§6)
+- **Is `D-107` a tote code, a shelf location, or a part number?** Modelled as
+  part of the name. (§6)
+- **Are `T3i4` / `T4i3` tibial (as migration 034 has them) or femoral (as
+  Zack's dictation grouped them)?** (§6)

@@ -180,6 +180,30 @@ export interface CaseTemplateItem {
   category: ItemCategory;
   name: string;
   quantity: number;
+  /**
+   * Which operative side this line applies to. 'ANY' is the default and means
+   * every case of this type needs it; 'LEFT'/'RIGHT' lines drop off cases for
+   * the other side, so a right knee never asks for the left complete tote.
+   */
+  applies_to_side: Side | "ANY";
+}
+
+/**
+ * A checklist line a rep ticked by hand because the item is genuinely there but
+ * the catalog does not know about it yet.
+ *
+ * Never inventory: marks clear one line on one case and nothing else. They do
+ * not create stock, deduct anything, or reach the pack list.
+ */
+export interface CaseChecklistMark {
+  id: string;
+  territory_id: string;
+  case_id: string;
+  /** The checklist line, as `category|name`. */
+  item_key: string;
+  note: string | null;
+  marked_by: string | null;
+  created_at: string;
 }
 
 export interface CaseTemplateWithItems extends CaseTemplate {

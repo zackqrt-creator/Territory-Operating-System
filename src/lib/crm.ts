@@ -54,7 +54,19 @@ export function scoreCase(
   if (!itemReadiness.applicable) {
     checks.push({ key: "items", label: "Required items", status: "untracked", detail: "No template for this case type." });
   } else if (itemReadiness.overallStatus === "ready") {
-    checks.push({ key: "items", label: "Required items", status: "pass", detail: "All required items at the case facility." });
+    // Lines the rep ticked by hand count as covered -- that is the point of the
+    // tick -- but they are not counted stock, and the summary says so rather
+    // than reporting them as inventory the app can actually see.
+    const byHand = itemReadiness.items.filter((i) => i.manuallyConfirmed).length;
+    checks.push({
+      key: "items",
+      label: "Required items",
+      status: "pass",
+      detail:
+        byHand > 0
+          ? `Covered — ${byHand} line${byHand === 1 ? "" : "s"} confirmed by hand, not from stock.`
+          : "All required items at the case facility.",
+    });
   } else if (itemReadiness.overallStatus === "gap") {
     checks.push({ key: "items", label: "Required items", status: "warn", detail: "Some items are at another facility — haul needed." });
   } else {

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
+  CaseChecklistMark,
   CaseItemPlan,
   CaseRow,
   CaseTemplateWithItems,
@@ -9,10 +10,14 @@ import type {
   QaQuestion,
 } from "../lib/types";
 import { computeReadiness, gapMessage } from "../lib/readiness";
+import { useAuth } from "../hooks/useAuth";
 import {
+  listCaseChecklistMarks,
   listCaseItemPlans,
   listQaAnswers,
   listQaQuestions,
+  markChecklistItem,
+  unmarkChecklistItem,
 } from "../lib/api";
 import { scoreCase, type CheckStatus } from "../lib/crm";
 import CaseCoverage from "./CaseCoverage";
@@ -62,6 +67,19 @@ export default function ReadinessSheet({
   const [scanningStickers, setScanningStickers] = useState(false);
   const [plans, setPlans] = useState<CaseItemPlan[]>([]);
   const [qa, setQa] = useState<{ q: QaQuestion; answers: QaAnswer[] }[]>([]);
+  const [marks, setMarks] = useState<CaseChecklistMark[]>([]);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const { profile } = useAuth();
+
+  // Silent on failure: without migration 050 there are simply no marks, which
+  // leaves the checklist reporting inventory exactly as it did before.
+  const refreshMarks = useCallback(() => {
+    listCaseChecklistMarks(caseRow.id)
+      .then(setMarks)
+      .catch(() => setMarks([]));
+  }, [caseRow.id]);
+
+  useEffect(refreshMarks, [refreshMarks]);
 
   useEffect(() => {
     listCaseItemPlans(caseRow.id).then(setPlans).catch(() => {});
@@ -78,8 +96,32 @@ export default function ReadinessSheet({
   }, [caseRow.id, caseRow.surgeon_id, caseRow.surgery_type]);
 
   const caseFacility = facilities.find((f) => f.id === caseRow.facility_id);
-  const readiness = computeReadiness(caseRow, templates, inventory, facilities);
+  const markedKeys = new Set(marks.map((m) => m.item_key));
+  const readiness = computeReadiness(caseRow, templates, inventory, facilities, markedKeys);
   const score = scoreCase(caseRow, readiness, inventory);
+
+  async function toggleMark(key: string, currentlyMarked: boolean) {
+    if (!profile) return;
+    setBusyKey(key);
+    try {
+      if (currentlyMarked) {
+        await unmarkChecklistItem(caseRow.id, key);
+      } else {
+        await markChecklistItem({
+          case_id: caseRow.id,
+          item_key: key,
+          territory_id: profile.territory_id,
+          marked_by: profile.id,
+        });
+      }
+      refreshMarks();
+    } catch {
+      // Leave the checkbox where it was rather than showing a state the
+      // database did not accept.
+    } finally {
+      setBusyKey(null);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-30 flex items-end bg-black/60" onClick={onClose}>
@@ -202,19 +244,21 @@ export default function ReadinessSheet({
             <>
               <h3 className="mb-2 text-sm font-medium text-slate-300">{readiness.templateName} checklist</h3>
               <div className="space-y-2">
-                {readiness.items.map((item, i) => (
+                {readiness.items.map((item) => (
                   <div
-                    key={i}
+                    key={item.key}
                     className={`rounded-lg border p-3 ${
-                      item.status === "ready"
-                        ? "border-slate-700 bg-slate-800/50"
-                        : "border-red-800 bg-red-950/30"
+                      item.manuallyConfirmed
+                        ? "border-sky-800 bg-sky-950/25"
+                        : item.status === "ready"
+                          ? "border-slate-700 bg-slate-800/50"
+                          : "border-red-800 bg-red-950/30"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <span className="font-medium text-slate-100">
-                          {STATUS_ICON[item.status]} {item.name}
+                          {item.manuallyConfirmed ? "☑️" : STATUS_ICON[item.status]} {item.name}
                         </span>
                         <p className="text-xs text-slate-500">
                           {CATEGORY_LABEL[item.category]} · need {item.requiredQty}, have{" "}
@@ -223,20 +267,46 @@ export default function ReadinessSheet({
                       </div>
                     </div>
 
-                    {item.status !== "ready" && (
-                      <div className="mt-2">
-                        <p className="text-sm text-red-300">{gapMessage(item, caseFacility)}</p>
-                        {item.status === "gap" && caseFacility && (
-                          <button
-                            onClick={() =>
-                              setMoving({ item: item.elsewhere[0].items[0], target: caseFacility })
-                            }
-                            className="mt-2 rounded-lg bg-red-900/60 px-3 py-2 text-sm font-medium text-red-100 active:bg-red-900"
-                          >
-                            Move to {caseFacility.name}
-                          </button>
-                        )}
-                      </div>
+                    {item.manuallyConfirmed ? (
+                      <p className="mt-1 text-xs text-sky-300">
+                        Confirmed by hand — not counted stock, so nothing was deducted.
+                      </p>
+                    ) : (
+                      item.status !== "ready" && (
+                        <div className="mt-2">
+                          <p className="text-sm text-red-300">{gapMessage(item, caseFacility)}</p>
+                          {item.status === "gap" && caseFacility && (
+                            <button
+                              onClick={() =>
+                                setMoving({ item: item.elsewhere[0].items[0], target: caseFacility })
+                              }
+                              className="mt-2 rounded-lg bg-red-900/60 px-3 py-2 text-sm font-medium text-red-100 active:bg-red-900"
+                            >
+                              Move to {caseFacility.name}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    )}
+
+                    {/*
+                      Only offered where inventory cannot already answer. A line
+                      backed by counted stock has nothing to override, and
+                      offering a tick there would invite a rep to paper over a
+                      real shortage.
+                    */}
+                    {item.inventoryStatus !== "ready" && (
+                      <button
+                        onClick={() => toggleMark(item.key, item.manuallyConfirmed)}
+                        disabled={busyKey === item.key || !profile}
+                        className={`mt-2 text-xs underline disabled:opacity-50 ${
+                          item.manuallyConfirmed ? "text-slate-500" : "text-sky-400"
+                        }`}
+                      >
+                        {item.manuallyConfirmed
+                          ? "Undo — it isn't here"
+                          : "I have this — it's just not in the app yet"}
+                      </button>
                     )}
                   </div>
                 ))}

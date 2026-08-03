@@ -12,6 +12,7 @@ import type {
   CalendarBlock,
   CaseAssignee,
   CaseAssigneeRole,
+  CaseChecklistMark,
   CaseItemPlan,
   CaseRow,
   CaseTemplateWithItems,
@@ -960,6 +961,52 @@ export async function listCaseItemPlans(caseId: string): Promise<CaseItemPlan[]>
     .order("category");
   if (error) throw error;
   return data as CaseItemPlan[];
+}
+
+// ---- Manual checklist check-off -------------------------------------------
+//
+// For the case where the tote is demonstrably sitting there but the catalog
+// has never heard of it. Marks clear a checklist line and nothing else -- no
+// stock is created, nothing is deducted, the pack list never sees them.
+
+export async function listCaseChecklistMarks(caseId: string): Promise<CaseChecklistMark[]> {
+  const { data, error } = await supabase
+    .from("case_checklist_marks")
+    .select("*")
+    .eq("case_id", caseId);
+  if (error) throw error;
+  return data as CaseChecklistMark[];
+}
+
+export async function markChecklistItem(input: {
+  case_id: string;
+  item_key: string;
+  note?: string | null;
+  territory_id: string;
+  marked_by: string;
+}): Promise<CaseChecklistMark> {
+  const { data, error } = await supabase
+    .from("case_checklist_marks")
+    .insert({
+      case_id: input.case_id,
+      item_key: input.item_key,
+      note: input.note ?? null,
+      territory_id: input.territory_id,
+      marked_by: input.marked_by,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as CaseChecklistMark;
+}
+
+export async function unmarkChecklistItem(caseId: string, itemKey: string): Promise<void> {
+  const { error } = await supabase
+    .from("case_checklist_marks")
+    .delete()
+    .eq("case_id", caseId)
+    .eq("item_key", itemKey);
+  if (error) throw error;
 }
 
 export async function listQaQuestions(): Promise<QaQuestion[]> {

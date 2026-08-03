@@ -8,6 +8,15 @@ import type {
 
 export type ReadinessStatus = "ready" | "gap" | "missing";
 
+/**
+ * Identifies a checklist line for manual check-off. Lines are computed from the
+ * template on every render rather than stored, so this is the only stable
+ * handle a mark can hold onto.
+ */
+export function checklistItemKey(category: ItemCategory, name: string): string {
+  return `${category}|${name}`;
+}
+
 export interface ElsewhereMatch {
   facility: Facility;
   items: InventoryItem[];
@@ -21,6 +30,17 @@ export interface ReadinessItem {
   availableAtCaseFacility: number;
   elsewhere: ElsewhereMatch[];
   status: ReadinessStatus;
+  /** Stable handle for this line, for manual check-off. */
+  key: string;
+  /**
+   * True when a rep ticked this line by hand. The line reads ready, but the
+   * distinction is preserved all the way to the UI: confirmed-by-a-person and
+   * confirmed-by-counted-stock are not the same claim, and collapsing them is
+   * how a checklist starts lying.
+   */
+  manuallyConfirmed: boolean;
+  /** What inventory says on its own, ignoring any manual mark. */
+  inventoryStatus: ReadinessStatus;
 }
 
 export interface CaseReadiness {
@@ -42,6 +62,8 @@ export function computeReadiness(
   templates: CaseTemplateWithItems[],
   inventory: InventoryItem[],
   facilities: Facility[],
+  /** Item keys the rep has ticked by hand for this case. */
+  markedKeys: ReadonlySet<string> = new Set(),
 ): CaseReadiness {
   if (caseRow.surgery_type === "INSTRUMENT" || !caseRow.facility_id) {
     return { applicable: false, templateName: null, items: [], overallStatus: "n/a" };
@@ -55,7 +77,18 @@ export function computeReadiness(
     return { applicable: false, templateName: null, items: [], overallStatus: "n/a" };
   }
 
-  const items: ReadinessItem[] = template.case_template_items.map((req) => {
+  // A right knee does not need the left complete tote. Lines default to 'ANY'
+  // in the database, so templates that never distinguished sides are unaffected.
+  const applicableLines = template.case_template_items.filter(
+    (req) =>
+      (req.applies_to_side ?? "ANY") === "ANY" ||
+      req.applies_to_side === caseRow.side ||
+      // A case with no side recorded shows every line rather than silently
+      // hiding half the haul -- an unanswered question, not an answered one.
+      caseRow.side === null,
+  );
+
+  const items: ReadinessItem[] = applicableLines.map((req) => {
     const matches = inventory.filter((i) => i.category === req.category && i.name === req.name);
     const atCase = matches
       .filter((i) => i.location_id === caseRow.facility_id)
@@ -77,8 +110,11 @@ export function computeReadiness(
       .filter((m) => m.facility)
       .sort((a, b) => b.quantity - a.quantity);
 
-    const status: ReadinessStatus =
+    const inventoryStatus: ReadinessStatus =
       atCase >= req.quantity ? "ready" : elsewhere.length > 0 ? "gap" : "missing";
+
+    const key = checklistItemKey(req.category, req.name);
+    const manuallyConfirmed = inventoryStatus !== "ready" && markedKeys.has(key);
 
     return {
       category: req.category,
@@ -86,7 +122,10 @@ export function computeReadiness(
       requiredQty: req.quantity,
       availableAtCaseFacility: atCase,
       elsewhere,
-      status,
+      status: manuallyConfirmed ? "ready" : inventoryStatus,
+      key,
+      manuallyConfirmed,
+      inventoryStatus,
     };
   });
 
