@@ -58,7 +58,7 @@ Pure functions in `src/lib/`, no I/O, all unit-testable.
 | `loaners.ts` | Ship-by countdowns and extension suggestions | done |
 | `labelParse.ts` | GS1 DataMatrix → REF, lot, expiry | done |
 | `stickerSheet.ts` | Post-case sticker sheet → usage + reorder | done |
-| `packingSlip.ts` | Packing slip → expected contents | done |
+| `packingSlip.ts` | Packing slip → expected contents, and a new REF → a catalog entry | done |
 | `inventoryReadiness.ts` | Do I have enough of this, and where from | done |
 | `crm.ts` | Case score, preference cards, credential door-check, expiring lots | done |
 | `runsheet.ts`, `activity.ts` | Day view; movements → plain English | done |
@@ -112,8 +112,10 @@ inputs — `cameraRef` and `uploadRef` — precisely so a rep who is logging at
 - **Tasks on the Home screen.** Home shows alerts, schedule and staging only.
 - **MyOps integration.** CSV paste-import exists (`parseMyopsCsv.ts`). Whether
   MyOps has an API is still unknown.
-- **Bulk inventory entry.** `createInventoryItem` inserts one row at a time.
-  There is no "receive this tote and create its 60 contents" path.
+- **Bulk inventory entry from a tote.** `createInventoryItem` inserts one row
+  at a time. A photographed slip now creates many rows at once and teaches the
+  catalog any REF it did not know, but there is still no "receive this tote and
+  create its 60 contents from the template" path.
 
 ---
 
@@ -128,6 +130,8 @@ a data problem to work around, it is the reason readiness reports missing on
 lines that are sitting in the trunk. Two pieces:
 
 - ~~Apply migration 050 so manual tick-off works as the stopgap.~~ Applied.
+- ~~Make a photographed delivery note create stock and teach the catalog.~~ Done —
+  every slip photographed now grows both the ledger and the dictionary.
 - Build **tote receipt**: scan or pick a tote template, say where it landed,
   and have the app create the inventory rows for its contents in one action.
   The `tote_template_items` data to do this already exists — 860 rows of it.
