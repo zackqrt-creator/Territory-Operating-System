@@ -1669,6 +1669,41 @@ export async function linkNoteToEntity(input: {
   if (error) throw error;
 }
 
+/** A link the model proposed, before anyone has agreed to it. */
+export interface SuggestedNoteLink {
+  entity_type: TerritoryNoteEntityType;
+  entity_id: string;
+  /** Human-readable name, so the UI never has to resolve the id itself. */
+  label: string;
+  relationship: NoteLinkRelationship;
+  confidence: "high" | "medium" | "low";
+  /** The words in the note that justify it, quoted. */
+  evidence: string;
+}
+
+/**
+ * Asks the `link-note` edge function which entities a note is about.
+ *
+ * Suggestions only -- nothing is written until the rep taps one. The call is
+ * server-side because the Anthropic key cannot exist in a client bundle; see
+ * supabase/functions/link-note/index.ts for the rest of that reasoning.
+ *
+ * Returns an empty list rather than throwing when the function is not deployed
+ * or the key is unset, so a territory that has not turned this on sees a note
+ * screen that behaves exactly as it did before.
+ */
+export async function suggestNoteLinks(note: string): Promise<SuggestedNoteLink[]> {
+  try {
+    const { data, error } = await supabase.functions.invoke("link-note", { body: { note } });
+    if (error) return [];
+    return ((data as { links?: SuggestedNoteLink[] })?.links ?? []).filter(
+      (l) => l.entity_id && l.entity_type,
+    );
+  } catch {
+    return [];
+  }
+}
+
 export async function unlinkNote(linkId: string): Promise<void> {
   const { error } = await supabase.from("territory_note_links").delete().eq("id", linkId);
   if (error) throw error;

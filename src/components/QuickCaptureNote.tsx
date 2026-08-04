@@ -1,7 +1,14 @@
 import { useState } from "react";
-import { ChevronDown, Link2, Lock, Users } from "lucide-react";
+import { Check, ChevronDown, Link2, Lock, Sparkles, Users } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { createNote, linkNoteToEntity, listFacilities, listUpcomingCases } from "../lib/api";
+import {
+  createNote,
+  linkNoteToEntity,
+  listFacilities,
+  listUpcomingCases,
+  suggestNoteLinks,
+  type SuggestedNoteLink,
+} from "../lib/api";
 import type { CaseRow, Facility, TerritoryNoteVisibility } from "../lib/types";
 import { formatDateShort } from "../utils/dates";
 
@@ -39,6 +46,13 @@ export default function QuickCaptureNote({
   const [linkCaseId, setLinkCaseId] = useState("");
   const [linkFacilityId, setLinkFacilityId] = useState("");
   const [saving, setSaving] = useState(false);
+  // Populated only after the note is safely written; the sheet then switches
+  // from "write it down" to "is it about any of these?".
+  const [savedId, setSaved] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestedNoteLink[]>([]);
+  const [accepted, setAccepted] = useState<Set<string>>(new Set());
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   function openMore() {
     setShowMore(true);
@@ -80,9 +94,36 @@ export default function QuickCaptureNote({
           created_by: profile.id,
         });
       }
-      onCreated();
+
+      // The note is saved and safe from here on. Suggestions are a bonus
+      // offered afterwards, never something the rep waits on -- the whole
+      // point of this screen is that capture is instant.
+      setSaved(note.id);
+      setLinking(true);
+      suggestNoteLinks(trimmed)
+        .then((s) => setSuggestions(s.filter((l) => l.entity_id !== linkCaseId)))
+        .catch(() => setSuggestions([]))
+        .finally(() => setLinking(false));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function accept(link: SuggestedNoteLink) {
+    if (!profile || !savedId) return;
+    setBusyId(link.entity_id);
+    try {
+      await linkNoteToEntity({
+        note_id: savedId,
+        entity_type: link.entity_type,
+        entity_id: link.entity_id,
+        relationship: link.relationship,
+        territory_id: profile.territory_id,
+        created_by: profile.id,
+      });
+      setAccepted((prev) => new Set(prev).add(link.entity_id));
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -95,6 +136,75 @@ export default function QuickCaptureNote({
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
 
+        {savedId ? (
+          /* Saved. Everything below is optional and the rep can walk away. */
+          <div>
+            <p className="flex items-center gap-1.5 text-sm font-medium text-emerald-400">
+              <Check className="h-4 w-4" /> Saved
+            </p>
+
+            {linking ? (
+              <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500">
+                <Sparkles className="h-3.5 w-3.5" /> Looking for what this is about…
+              </p>
+            ) : suggestions.length === 0 ? (
+              <p className="mt-4 text-xs text-slate-500">
+                Nothing obvious to link it to — it's in your Inbox.
+              </p>
+            ) : (
+              <>
+                <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-400">
+                  <Sparkles className="h-3.5 w-3.5" /> Is this about any of these?
+                </p>
+                <div className="mt-2 space-y-2">
+                  {suggestions.map((s) => {
+                    const done = accepted.has(s.entity_id);
+                    return (
+                      <button
+                        key={`${s.entity_type}:${s.entity_id}`}
+                        onClick={() => accept(s)}
+                        disabled={done || busyId === s.entity_id}
+                        className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left disabled:opacity-100 ${
+                          done
+                            ? "border-emerald-800 bg-emerald-950/25"
+                            : "border-slate-700 bg-slate-800/50"
+                        }`}
+                      >
+                        <span className="mt-0.5 shrink-0">
+                          {done ? (
+                            <Check className="h-4 w-4 text-emerald-400" />
+                          ) : (
+                            <Link2 className="h-4 w-4 text-sky-400" />
+                          )}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm text-slate-100">{s.label}</span>
+                          <span className="mt-0.5 block text-xs text-slate-500">
+                            {s.entity_type}
+                            {s.confidence !== "high" && ` · ${s.confidence} confidence`}
+                          </span>
+                          {/* The quote is the point: a link you can't check is
+                              a link you shouldn't trust. */}
+                          <span className="mt-1 block text-xs italic text-slate-400">
+                            “{s.evidence}”
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <button
+              onClick={onCreated}
+              className="mt-4 w-full rounded-lg bg-sky-600 py-3 text-center text-sm font-semibold text-white"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+        <>
         <textarea
           autoFocus
           value={text}
@@ -183,6 +293,8 @@ export default function QuickCaptureNote({
               ))}
             </select>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

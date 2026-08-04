@@ -104,9 +104,12 @@ inputs — `cameraRef` and `uploadRef` — precisely so a rep who is logging at
 
 ## Not built at all
 
-- **Any AI.** Zero LLM calls anywhere in the codebase, verified. OCR is
-  Tesseract, which is pattern matching, not a model. Everything in
-  `product_vision.md` that assumes an agent is unbuilt.
+- **Most of the AI.** One call now exists: `supabase/functions/link-note`
+  proposes which surgeon, facility or case a captured note is about. It is a
+  server function because an Anthropic key cannot live in a client bundle, and
+  it suggests rather than writes. Everything else in `product_vision.md` that
+  assumes an agent is still unbuilt. OCR remains Tesseract — pattern matching,
+  not a model.
 - **Notification delivery.** `tasks.assigned_to` exists and the UI shows who a
   task is assigned to. Nothing pings anyone. No web push, no email, no badge.
 - **Tasks on the Home screen.** Home shows alerts, schedule and staging only.
@@ -154,11 +157,12 @@ already registered, needs VAPID keys and a `push_subscriptions` table). The
 badge is the honest first move; push is worth it only once more than one person
 uses the app daily.
 
-**Then, and only then, AI.** The cheapest high-value call is entity-linking at
-note capture — one small-model call that reads "Sidhu wants the 3+ next
-Tuesday" and links it to the surgeon, the catalog item and the date. It costs
-fractions of a cent and it needs the data model underneath it to be right,
-which is exactly why it comes fourth and not first.
+**Then AI.** ~~The cheapest high-value call is entity-linking at note capture.~~
+Built — `link-note`, one Haiku call, a fraction of a cent per note. Needs
+`ANTHROPIC_API_KEY` set as a Supabase secret and the function deployed; until
+then it degrades to silence. The catalog is deliberately excluded from its
+candidate list on cost grounds; adding it back needs a pre-filter, not a bigger
+prompt.
 
 ## Known bugs
 
