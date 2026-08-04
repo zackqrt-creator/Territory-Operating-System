@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, Image, ScanLine, Trash2, X } from "lucide-react";
+import { Check, Image, ImageUp, ScanLine, Trash2, X } from "lucide-react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { ocrPage } from "../lib/ocr";
 import { parseGs1 } from "../lib/labelParse";
@@ -392,7 +392,10 @@ export default function PackingSlipScan({
             disabled={busy}
             className="flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-3 text-sm font-medium text-slate-200 disabled:opacity-40"
           >
-            <Camera size={15} /> Photo of a slip
+            {/* No `capture` attribute on the input behind this, so the phone
+                offers the library alongside the camera -- a slip photographed
+                at the dock gets logged that evening. */}
+            <ImageUp size={15} /> Slip photo or upload
           </button>
         </div>
         <p className="mt-1.5 text-center text-[11px] text-slate-600">

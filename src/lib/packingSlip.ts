@@ -20,14 +20,35 @@ import type { CatalogItem } from "./types";
  */
 
 /**
- * `02.07.1201R`, `02.12.KA01R`, `02.12.T3I4R`, `02.07.12055R`.
+ * `02.07.1201R`, `02.12.KA01R`, `02.12.T3I4R`, `02.07.12055R` -- and the
+ * four-segment instrument numbers, `02.07.10.4522`, `02.12.10.0324`.
  *
- * The dots are mandatory. Allowing them to be optional made every 7-digit lot
- * number ("2412611") and the FedEx tracking number parse as phantom items --
- * a page of fifteen real lines came back with nineteen. OCR does occasionally
- * drop a dot, but losing one line beats inventing one for every line.
+ * The third segment is optional and that matters more than it looks. Without
+ * it the pattern still matched a four-segment REF, just in the wrong place:
+ * `02.07.10.4522` failed at offset 0 (`10` is too short for the final group)
+ * and then succeeded at offset 3, yielding `07.10.4522`. Every instrument on a
+ * delivery note silently lost its leading segment and matched nothing, so a
+ * page of twelve real lines came back twelve-for-twelve unmatched. The catalog
+ * carries 648 four-segment numbers, so this was most of a whole slip type.
+ *
+ * The dots are still mandatory. Allowing them to be optional made every
+ * 7-digit lot number ("2412611") and the FedEx tracking number parse as
+ * phantom items. OCR does occasionally drop a dot, but losing one line beats
+ * inventing one for every line.
  */
-const ITEM_NO = /\b(\d{2})\.(\d{2})\.([A-Z0-9]{3,8})\b/gi;
+const ITEM_NO = /\b(\d{2})\.(\d{2})(?:\.(\d{2}))?\.([A-Z0-9]{3,8})\b/gi;
+
+/**
+ * A shipped quantity, always printed to two decimals: `1.00`, `3.00`.
+ *
+ * Only ever searched for in the window after a lot number, because an item
+ * number contains substrings of exactly this shape -- `02.07.10.4522` offers
+ * up "02.07" to a naive scan.
+ */
+const QTY = /\b(\d{1,3})\.(\d{2})\b/g;
+
+/** The position number in the left-hand column: `800`, `1700`, `2900`. */
+const POS_BEFORE = /(\d{3,5})\s+$/;
 
 /**
  * `GTIN 07630345710819` on a box label. A second way into the catalog when the
@@ -98,8 +119,12 @@ function normaliseSuffix(s: string): string {
   return s.toUpperCase().replace(/O/g, "0").replace(/\|/g, "1");
 }
 
-function normaliseItemNumber(a: string, b: string, c: string): string {
-  return `${digitsOnly(a).padStart(2, "0")}.${digitsOnly(b).padStart(2, "0")}.${normaliseSuffix(c)}`;
+function normaliseItemNumber(a: string, b: string, c: string | undefined, d: string): string {
+  const head = [a, b, c]
+    .filter((s): s is string => s !== undefined)
+    .map((s) => digitsOnly(s).padStart(2, "0"))
+    .join(".");
+  return `${head}.${normaliseSuffix(d)}`;
 }
 
 function parseHeader(text: string): PackingSlipHeader {
@@ -176,18 +201,33 @@ export function parsePackingSlip(text: string, catalog: CatalogItem[]): PackingS
 
   // Collect every item-number hit with its offset so descriptions and lots can
   // be attributed to the nearest preceding item.
-  const hits: { itemNumber: string; index: number; end: number }[] = [];
+  const hits: { itemNumber: string; index: number; end: number; pos: number | null }[] = [];
   for (const m of text.matchAll(ITEM_NO)) {
-    const itemNumber = normaliseItemNumber(m[1], m[2], m[3]);
     // A bare "1.00 2" quantity pair can look like an item number; require the
     // suffix to contain something other than pure punctuation.
-    if (!/[A-Z0-9]/.test(m[3])) continue;
-    hits.push({ itemNumber, index: m.index ?? 0, end: (m.index ?? 0) + m[0].length });
+    if (!/[A-Z0-9]/.test(m[4])) continue;
+    const index = m.index ?? 0;
+    const posMatch = text.slice(Math.max(0, index - 12), index).match(POS_BEFORE);
+    hits.push({
+      itemNumber: normaliseItemNumber(m[1], m[2], m[3], m[4]),
+      index,
+      end: index + m[0].length,
+      pos: posMatch ? parseInt(posMatch[1], 10) : null,
+    });
   }
 
-  const lots: { lot: string; index: number }[] = [];
+  const lots: { lot: string; index: number; end: number }[] = [];
   for (const m of text.matchAll(LOT)) {
-    lots.push({ lot: digitsOnly(m[1]), index: m.index ?? 0 });
+    lots.push({
+      lot: digitsOnly(m[1]),
+      index: m.index ?? 0,
+      end: (m.index ?? 0) + m[0].length,
+    });
+  }
+
+  const qtys: { qty: number; index: number }[] = [];
+  for (const m of text.matchAll(QTY)) {
+    qtys.push({ qty: parseInt(m[1], 10), index: m.index ?? 0 });
   }
 
   const gtins: { gtin: string; index: number }[] = [];
@@ -206,33 +246,62 @@ export function parsePackingSlip(text: string, catalog: CatalogItem[]): PackingS
   const seen = new Set<string>();
 
   hits.forEach((hit, i) => {
-    // The same REF can legitimately appear twice (two units, two lots), so
-    // dedupe on item number + lot rather than item number alone.
     const next = hits[i + 1]?.index ?? text.length;
-    const lot = lots.find((l) => l.index > hit.index && l.index < next)?.lot ?? null;
 
     // A box label prints its GTIN above the REF, so look either side of the
     // item rather than only after it.
     const gtin =
       gtins.find((g) => g.index > hit.index && g.index < next)?.gtin ??
       (hits.length === 1 ? (gtins[0]?.gtin ?? null) : null);
-    const expiry =
-      expiries.find((e) => e.index > hit.index && e.index < next)?.expiry ??
-      (hits.length === 1 ? (expiries[0]?.expiry ?? null) : null);
+    const match = findInCatalog(hit.itemNumber, gtin, catalog);
 
-    const key = `${hit.itemNumber}|${lot ?? ""}`;
-    if (seen.has(key)) return;
-    seen.add(key);
+    // One item can ship as several lots, each with its own count:
+    //
+    //   2300  02.07.10.4528  Fixed Trial baseplate # 4L        3
+    //                        Lot No. 2575123        2.00
+    //                        Lot No. 2577638        1.00
+    //
+    // Reading only the first lot lost both the second lot number and two of
+    // the three units. Lots are the traceability unit for an implant, so each
+    // becomes its own line rather than being summed into an untraceable 3.
+    const mine = lots.filter((l) => l.index > hit.index && l.index < next);
+    const description = descriptionNear(text, hit.end, mine[0]?.index ?? next);
 
-    lines.push({
-      pos: null,
-      itemNumber: hit.itemNumber,
-      description: descriptionNear(text, hit.end, next),
-      lot,
-      expiry,
-      quantity: 1,
-      match: findInCatalog(hit.itemNumber, gtin, catalog),
-    });
+    const parts =
+      mine.length === 0
+        ? [{ lot: null as string | null, quantity: 1, from: hit.end, to: next }]
+        : mine.map((l, j) => ({
+            lot: l.lot,
+            // The count sits after the lot number on the same printed line, so
+            // the search window ends at the next lot -- otherwise every lot in
+            // a block would claim the first quantity it could see.
+            quantity:
+              qtys.find((q) => q.index >= l.end && q.index < (mine[j + 1]?.index ?? next))?.qty ?? 1,
+            from: l.end,
+            to: mine[j + 1]?.index ?? next,
+          }));
+
+    for (const part of parts) {
+      // The same REF+lot can appear twice on a re-printed page; a second lot
+      // for the same REF is a real, separate line and must survive.
+      const key = `${hit.itemNumber}|${part.lot ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const expiry =
+        expiries.find((e) => e.index > part.from && e.index < part.to)?.expiry ??
+        (hits.length === 1 ? (expiries[0]?.expiry ?? null) : null);
+
+      lines.push({
+        pos: hit.pos,
+        itemNumber: hit.itemNumber,
+        description,
+        lot: part.lot,
+        expiry,
+        quantity: part.quantity,
+        match,
+      });
+    }
   });
 
   return {

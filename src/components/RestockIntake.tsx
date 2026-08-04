@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Camera, ScanLine, Trash2 } from "lucide-react";
+import { ImageUp, ScanLine, Trash2 } from "lucide-react";
 import { createConsignmentRestock, uploadItemPhoto } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { PackingSlipScan } from "./scanners";
@@ -96,7 +96,7 @@ export default function RestockIntake({
           onClick={() => photoRef.current?.click()}
           className="flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-3 text-sm font-medium text-slate-300"
         >
-          <Camera size={15} /> {photoFile ? "Replace photo" : "Photo only"}
+          <ImageUp size={15} /> {photoFile ? "Replace slip photo" : "Slip photo or upload"}
         </button>
         <input
           ref={photoRef}
