@@ -63,6 +63,8 @@ Pure functions in `src/lib/`, no I/O, all unit-testable.
 | `crm.ts` | Case score, preference cards, credential door-check, expiring lots | done |
 | `runsheet.ts`, `activity.ts` | Day view; movements → plain English | done |
 | `ocr.ts` | On-device Tesseract, rotation-scored, image never leaves the phone | done |
+| `markdownExport.ts` | Notes → Markdown vault, with a dependency-free zip writer | done |
+| `notesView.ts` | Which sidebar buckets exist and what falls in them | done |
 
 `readiness.ts` does **not** read `tote_template_items`. `packlist.ts` does. So
 the app knows what is inside a tote when it is planning a week's demand, and
@@ -79,6 +81,9 @@ movements), Scan, LoanerReturns, Sets, Surgeons, Tasks, ActivityFeed.
 
 **Second brain** — Notes, NoteDetail, SecondBrainQueue, Wiki, WikiPage, with
 wikilinks and note-kind routing. Notes and tasks attach to any entity.
+Capture is a single textarea (first line becomes the title); browsing is an
+OneNote-style sidebar listing only non-empty buckets; the whole notebook
+exports as a zip of Markdown files that opens directly as an Obsidian vault.
 
 **Team / ops** — TeamBoard, QaWall, Compliance, Billing.
 
