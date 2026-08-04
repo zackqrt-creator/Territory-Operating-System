@@ -112,10 +112,9 @@ inputs — `cameraRef` and `uploadRef` — precisely so a rep who is logging at
 - **Tasks on the Home screen.** Home shows alerts, schedule and staging only.
 - **MyOps integration.** CSV paste-import exists (`parseMyopsCsv.ts`). Whether
   MyOps has an API is still unknown.
-- **Bulk inventory entry from a tote.** `createInventoryItem` inserts one row
-  at a time. A photographed slip now creates many rows at once and teaches the
-  catalog any REF it did not know, but there is still no "receive this tote and
-  create its 60 contents from the template" path.
+- **Counting what is already on the shelf.** Receipt paths now exist for stock
+  arriving (slip photo, tote receipt), but nothing helps audit stock that is
+  already there and was never entered.
 
 ---
 
@@ -130,13 +129,14 @@ a data problem to work around, it is the reason readiness reports missing on
 lines that are sitting in the trunk. Two pieces:
 
 - ~~Apply migration 050 so manual tick-off works as the stopgap.~~ Applied.
-- ~~Make a photographed delivery note create stock and teach the catalog.~~ Done —
-  every slip photographed now grows both the ledger and the dictionary.
-- Build **tote receipt**: scan or pick a tote template, say where it landed,
-  and have the app create the inventory rows for its contents in one action.
-  The `tote_template_items` data to do this already exists — 860 rows of it.
+- ~~Make a photographed delivery note create stock and teach the catalog.~~ Done.
+- ~~Build **tote receipt**.~~ Done — Add inventory → *Whole tote* picks a
+  template, names the tote in the checklist's own vocabulary, and writes the
+  tote plus all its contents in one action. A KA One Complete Tote is 75 rows
+  from one button.
 
-This turns 931 catalog entries from a dictionary into a ledger.
+The paths are all built. What remains is the typing: someone has to receive the
+totes that are already on the shelves. That is an afternoon, not a feature.
 
 ### 2. Teach readiness to open a tote
 

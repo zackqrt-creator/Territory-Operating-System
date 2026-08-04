@@ -19,6 +19,7 @@ import type {
   CaseRow,
   CaseTemplateWithItems,
   CatalogItem,
+  AcquisitionType,
   CatalogJoint,
   CatalogSide,
   CementType,
@@ -364,6 +365,99 @@ export async function createLoanerTote(params: {
   }
 
   return toteRow;
+}
+
+/**
+ * Receives a whole tote: one stock row for the tote itself, plus a row for
+ * every item its template says is inside, in one action.
+ *
+ * This is the bulk path the ledger has been missing. `createInventoryItem`
+ * inserts one row at a time, so putting a KA One Complete Tote on the shelf
+ * meant 74 separate entries and nobody was ever going to do that -- which is
+ * why 931 catalog rows sat against 7 inventory rows.
+ *
+ * `toteName` is separate from the template name and it is the important
+ * argument. Readiness matches a checklist line to stock by **exact name**, and
+ * the checklist asks for "Complete Tote (Right)" while the template is called
+ * "KA One Complete Tote". Passing the name the checklist uses is what makes a
+ * received tote turn a case green off real stock instead of a manual tick.
+ */
+export async function receiveTote(params: {
+  template: ToteTemplateWithItems;
+  /** What the tote row is called. Should match the checklist line it satisfies. */
+  toteName: string;
+  locationId: string;
+  territoryId: string;
+  acquisitionType: AcquisitionType;
+  loanerCode?: string | null;
+  returnDeadline?: string | null;
+  movedBy?: string | null;
+  photoUrl?: string | null;
+  /** Template-item id -> quantity. Absent entries use quantity_per_tote; 0 skips. */
+  quantities?: Record<string, number>;
+}): Promise<{ tote: InventoryItem; contents: number }> {
+  const { template, toteName, locationId, territoryId, acquisitionType } = params;
+
+  const { data: tote, error: toteError } = await supabase
+    .from("inventory_items")
+    .insert({
+      name: toteName,
+      category: "loaner_kit",
+      location_id: locationId,
+      territory_id: territoryId,
+      acquisition_type: acquisitionType,
+      loaner_code: params.loanerCode ?? null,
+      contents_label: template.name,
+      // Only a loaner has somewhere to go back to. A consignment tote with a
+      // return deadline would start a countdown that never legitimately ends.
+      loaner_return_deadline: acquisitionType === "loaner" ? (params.returnDeadline ?? null) : null,
+      photo_url: params.photoUrl ?? null,
+      quantity: 1,
+    })
+    .select()
+    .single();
+  if (toteError) throw toteError;
+  const toteRow = tote as InventoryItem;
+
+  const rows = template.tote_template_items
+    .map((tti) => ({
+      tti,
+      quantity: params.quantities?.[tti.id] ?? tti.quantity_per_tote,
+    }))
+    .filter((r) => r.quantity > 0 && r.tti.catalog_item)
+    .map((r) => ({
+      name: r.tti.catalog_item.name,
+      category: r.tti.catalog_item.category,
+      catalog_item_id: r.tti.catalog_item_id,
+      location_id: locationId,
+      territory_id: territoryId,
+      acquisition_type: acquisitionType,
+      // The link back to the tote, so returning or moving it can find its
+      // contents. Set for consignment too -- the tote is still the container
+      // even when nothing is going back to Medacta.
+      loaner_tote_id: toteRow.id,
+      quantity: r.quantity,
+    }));
+
+  if (rows.length > 0) {
+    const { error } = await supabase.from("inventory_items").insert(rows);
+    if (error) throw error;
+  }
+
+  // One movement for the tote, not one per content row. Receiving a 74-line
+  // tote is a single thing that happened, and 75 rows in the activity feed
+  // would bury every other event of the day.
+  const { error: moveError } = await supabase.from("movements").insert({
+    territory_id: territoryId,
+    item_id: toteRow.id,
+    from_location: null,
+    to_location: locationId,
+    moved_by: params.movedBy ?? null,
+    note: `Received ${template.name} — ${rows.length} line${rows.length === 1 ? "" : "s"}`,
+  });
+  if (moveError) throw moveError;
+
+  return { tote: toteRow, contents: rows.length };
 }
 
 /** The individual content rows of a loaner tote. */

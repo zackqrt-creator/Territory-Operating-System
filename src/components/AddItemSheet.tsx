@@ -11,6 +11,7 @@ import type {
 } from "../lib/types";
 import LoanerIntake from "./LoanerIntake";
 import RestockIntake from "./RestockIntake";
+import ToteReceipt from "./ToteReceipt";
 import { ocrPage } from "../lib/ocr";
 import { catalogLabel, parseGs1, parseLabelText } from "../lib/labelParse";
 import { useFrequentCatalog } from "../hooks/useFrequentCatalog";
@@ -94,7 +95,7 @@ export default function AddItemSheet({
   onCreated: () => void;
 }) {
   const { profile } = useAuth();
-  const [mode, setMode] = useState<"consignment" | "loaner" | "restock">("consignment");
+  const [mode, setMode] = useState<"consignment" | "loaner" | "restock" | "tote">("consignment");
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [joint, setJoint] = useState<CatalogJoint>("KNEE");
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -341,7 +342,7 @@ export default function AddItemSheet({
         <h2 className="text-lg font-semibold text-slate-100">Add inventory</h2>
 
         <div className="mt-4 flex rounded-lg border border-slate-700 bg-slate-800/50 p-1">
-          {(["consignment", "loaner", "restock"] as const).map((a) => (
+          {(["consignment", "loaner", "restock", "tote"] as const).map((a) => (
             <button
               key={a}
               onClick={() => setMode(a)}
@@ -349,12 +350,26 @@ export default function AddItemSheet({
                 mode === a ? "bg-sky-600 text-white" : "text-slate-400"
               }`}
             >
-              {a === "consignment" ? "Consignment" : a === "loaner" ? "Loaner tote" : "Restock"}
+              {a === "consignment"
+                ? "Consignment"
+                : a === "loaner"
+                  ? "Loaner tote"
+                  : a === "restock"
+                    ? "Restock"
+                    : "Whole tote"}
             </button>
           ))}
         </div>
 
-        {mode === "restock" ? (
+        {mode === "tote" ? (
+          <ToteReceipt
+            facilities={facilities}
+            territoryId={profile?.territory_id ?? ""}
+            defaultLocationId={locationId}
+            onCreated={onCreated}
+            onCancel={onClose}
+          />
+        ) : mode === "restock" ? (
           <RestockIntake
             facilities={facilities}
             catalog={catalog}
