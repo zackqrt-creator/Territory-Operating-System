@@ -3,8 +3,16 @@ import { Check, Image, ImageUp, ScanLine, Trash2, X } from "lucide-react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { ocrPage } from "../lib/ocr";
 import { parseGs1 } from "../lib/labelParse";
-import { matchGtin, parsePackingSlip, scanScore } from "../lib/packingSlip";
-import type { CatalogItem } from "../lib/types";
+import {
+  inferCategory,
+  inferJoint,
+  inferSide,
+  inferSizeLabel,
+  matchGtin,
+  parsePackingSlip,
+  scanScore,
+} from "../lib/packingSlip";
+import type { CatalogItem, CatalogJoint, CatalogSide } from "../lib/types";
 
 const SCANNER_ID = "casetrack-slip-scanner";
 
@@ -30,6 +38,13 @@ export interface SlipContentLine {
   /** From a box label's hourglass date, when one was printed. */
   expiration_date: string | null;
   quantity: number;
+  /** REF off the slip, so an unknown item can be added to the catalog. */
+  item_number: string | null;
+  /** Rep left "add to catalog" on for this unmatched REF. */
+  learn: boolean;
+  side: CatalogSide | null;
+  joint: CatalogJoint;
+  size_label: string | null;
 }
 
 interface Row {
@@ -43,6 +58,14 @@ interface Row {
   quantity: number;
   match: CatalogItem | null;
   source: "barcode" | "text";
+  /**
+   * Whether to add this REF to the catalog on save. Defaults on for an
+   * unmatched line that has both a REF and a description -- that is a real
+   * product the catalog simply has not met, and making the rep opt in one row
+   * at a time is how the catalog stayed at 931 rows. Off when there is no
+   * description to name it with, because "REF 02.07.10.0292" is not a name.
+   */
+  learn: boolean;
 }
 
 function rowName(r: Row): string {
@@ -207,6 +230,9 @@ export default function PackingSlipScan({
       quantity: 1,
       match,
       source: "barcode",
+      // A barcode carries no description, so there is nothing to name a new
+      // catalog entry with. The rep names it, then turns this on.
+      learn: false,
     };
     setRows((prev) => [...prev, row]);
     say(match ? `Added ${match.name}` : "Scanned — not in the catalog, name it below");
@@ -279,6 +305,7 @@ export default function PackingSlipScan({
             quantity: l.quantity,
             match: l.match,
             source: "text" as const,
+            learn: !l.match && !!l.itemNumber && !!l.description,
           })),
       ]);
       if (scan.header.shipmentNo) setShipmentNo(scan.header.shipmentNo);
@@ -311,10 +338,15 @@ export default function PackingSlipScan({
         // An unmatched line still gets saved -- the REF or GTIN is better than
         // nothing, and a kit missing items is worse than one with an odd name.
         name: rowName(r),
-        category: r.match?.category ?? "implant",
+        category: r.match?.category ?? inferCategory(r.description),
         lot_number: r.lot,
         expiration_date: r.expiry,
         quantity: r.quantity,
+        item_number: r.itemNumber,
+        learn: r.learn && !r.match && !!r.itemNumber,
+        side: inferSide(r.description),
+        joint: inferJoint(r.description),
+        size_label: inferSizeLabel(r.description),
       })),
       shipmentNo,
       photo,
@@ -450,11 +482,26 @@ export default function PackingSlipScan({
                       {r.itemNumber ?? r.gtin ?? "—"}
                       {r.expiry && <span className="ml-2 text-slate-500">Exp {r.expiry}</span>}
                     </p>
-                    {!r.match && (
-                      <p className="mt-0.5 text-[11px] text-amber-400">
-                        Not in the catalog — saved as-is
-                      </p>
-                    )}
+                    {!r.match &&
+                      (r.itemNumber ? (
+                        <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
+                          <input
+                            type="checkbox"
+                            checked={r.learn}
+                            onChange={(e) => update(r.key, { learn: e.target.checked })}
+                            className="min-h-0 h-3.5 w-3.5 shrink-0 accent-sky-500"
+                          />
+                          <span className={r.learn ? "text-sky-400" : undefined}>
+                            {r.learn
+                              ? `Add ${r.itemNumber} to the catalog`
+                              : "Not in the catalog — saved as a one-off"}
+                          </span>
+                        </label>
+                      ) : (
+                        <p className="mt-0.5 text-[11px] text-amber-400">
+                          No REF read — saved as-is
+                        </p>
+                      ))}
                   </div>
                   <span
                     className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${

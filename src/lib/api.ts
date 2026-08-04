@@ -229,6 +229,81 @@ export interface LoanerContentLine {
   lot_number?: string | null;
   /** Box labels print an expiry; slips do not. Feeds the expiring-lot warnings. */
   expiration_date?: string | null;
+  /** REF read off the slip. Needed to teach the catalog an item it has not met. */
+  item_number?: string | null;
+  /** Rep asked for this REF to be added to the catalog on save. */
+  learn?: boolean;
+  side?: CatalogSide | null;
+  joint?: CatalogJoint;
+  size_label?: string | null;
+}
+
+/**
+ * Creates catalog rows for slip lines carrying a REF the catalog has never
+ * seen, and returns them keyed by REF.
+ *
+ * Without this a new item still reaches inventory, but as an orphan: no side,
+ * no joint, no product line, so it cannot sit in a tote template or answer a
+ * side-aware readiness line -- and the next slip carrying the same REF arrives
+ * just as unmatched. The catalog only ever grew by hand, which is why it has
+ * 931 rows and the territory has more products than that.
+ *
+ * Re-checks the database rather than trusting the caller's snapshot: two slips
+ * photographed back to back would otherwise each create the same REF.
+ */
+export async function learnCatalogItems(
+  lines: LoanerContentLine[],
+  territoryId: string,
+): Promise<Map<string, string>> {
+  const wanted = lines.filter((l) => l.learn && !l.catalog_item_id && l.item_number);
+  const byRef = new Map<string, string>();
+  if (wanted.length === 0) return byRef;
+
+  const refs = [...new Set(wanted.map((l) => l.item_number as string))];
+  const { data: existing } = await supabase
+    .from("catalog_items")
+    .select("id,item_number")
+    .in("item_number", refs);
+  for (const row of (existing ?? []) as { id: string; item_number: string }[]) {
+    byRef.set(row.item_number, row.id);
+  }
+
+  const toCreate = refs.filter((r) => !byRef.has(r));
+  if (toCreate.length === 0) return byRef;
+
+  const seen = new Set<string>();
+  const rows = wanted
+    .filter((l) => {
+      const ref = l.item_number as string;
+      if (byRef.has(ref) || seen.has(ref)) return false;
+      seen.add(ref);
+      return true;
+    })
+    .map((l) => ({
+      territory_id: territoryId,
+      item_number: l.item_number as string,
+      name: l.name,
+      category: l.category,
+      side: l.side ?? "NA",
+      joint: l.joint ?? "NA",
+      size_label: l.size_label ?? null,
+      // Left blank rather than guessed. A wrong product line is invisible in
+      // the editor; a blank one reads as "someone should fill this in".
+      product_line: null,
+      cement_type: null,
+      device_type: null,
+      gtin: null,
+    }));
+
+  const { data: created, error } = await supabase
+    .from("catalog_items")
+    .insert(rows)
+    .select("id,item_number");
+  if (error) throw error;
+  for (const row of (created ?? []) as { id: string; item_number: string }[]) {
+    byRef.set(row.item_number, row.id);
+  }
+  return byRef;
 }
 
 /**
@@ -1882,12 +1957,17 @@ export async function createConsignmentRestock(params: {
   movedBy?: string | null;
   lines: LoanerContentLine[];
 }): Promise<number> {
+  // Teach the catalog first, so the stock rows below can point at real entries
+  // rather than landing as orphans that the next slip will fail to match too.
+  const learned = await learnCatalogItems(params.lines, params.territoryId);
+
   const rows = params.lines
     .filter((l) => l.quantity > 0)
     .map((l) => ({
       name: l.name,
       category: l.category,
-      catalog_item_id: l.catalog_item_id,
+      catalog_item_id:
+        l.catalog_item_id ?? (l.item_number ? (learned.get(l.item_number) ?? null) : null),
       lot_number: l.lot_number ?? null,
       expiration_date: l.expiration_date ?? null,
       location_id: params.locationId,

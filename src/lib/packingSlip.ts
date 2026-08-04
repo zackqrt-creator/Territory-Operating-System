@@ -1,4 +1,4 @@
-import type { CatalogItem } from "./types";
+import type { CatalogItem, CatalogSide, ItemCategory } from "./types";
 
 /**
  * Parses the paper packing slip that ships inside a Medacta loaner kit.
@@ -309,6 +309,95 @@ export function parsePackingSlip(text: string, catalog: CatalogItem[]): PackingS
     lines,
     matchedCount: lines.filter((l) => l.match).length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Learning a new item from the slip that delivered it.
+//
+// A REF the catalog has never seen still lands in inventory, but as a stray row
+// with no side, no joint and no product line -- so it cannot join a tote
+// template, cannot answer a side-aware readiness line, and comes back unmatched
+// on the next slip carrying the same REF. The catalog only ever grew by hand.
+//
+// These read what the slip already printed. Every one is deliberately
+// conservative: a wrong guess is worse than a null, because a null is visibly
+// blank in the editor and a wrong side is a phantom requirement on every case.
+// ---------------------------------------------------------------------------
+
+/**
+ * Trials, guides and templates are instruments; anything that says insert,
+ * poly, cement or efficiency is not. Everything else stays an implant, which
+ * is what the majority of slip lines are.
+ */
+export function inferCategory(description: string | null): ItemCategory {
+  const d = (description ?? "").toLowerCase();
+  if (!d) return "implant";
+  // Note what is NOT here: a bare "tray". In this catalog a *Tibial Tray* is an
+  // implant -- migration 039 seeds "Rev. Tibial Tray Left S1" as one -- so
+  // matching /tray/ filed the tibial baseplates, some of the most-used implants
+  // in the territory, as instruments. Only "instrument tray" spelled out counts.
+  if (/\btrial\b|cutting guide|\bguide\b|template|instrument|impactor|broach|rasp|caliper/.test(d)) {
+    return "instrument_tray";
+  }
+  // `\bcement\b` and not merely /cement/: "Rev. Femur P.S. Cemented Left S1" is
+  // an implant that happens to be cemented, and the loose form filed every
+  // cemented implant in the catalog -- hundreds of them -- as a consumable.
+  if (/\bcement\b|efficiency|\bkit\b|drape|glove|suture|disposable|single[- ]use/.test(d)) {
+    return "consumable";
+  }
+  return "implant";
+}
+
+/**
+ * `Fixed Trial baseplate # 3R` is right, `# 1L` is left.
+ *
+ * Only a side letter immediately after a size token, or a standalone Left/Right
+ * word, counts. A description like "MIS Tibial Cutting Guide R/L +2 Slope"
+ * names both and is correctly read as NA -- it fits either side, and calling it
+ * RIGHT because an R appears would put it on the wrong half of the territory.
+ */
+export function inferSide(description: string | null): CatalogSide {
+  const d = description ?? "";
+  if (!d) return "NA";
+  // Both sides named: R/L, L/R, "Left and Right", "L & R".
+  if (/\b[RL]\s*\/\s*[LR]\b/i.test(d) || /\b(left|right)\b[^.]{0,12}\b(and|&|\/)\b[^.]{0,12}\b(left|right)\b/i.test(d)) {
+    return "NA";
+  }
+  const suffix = d.match(/#?\s*\d\+?\s*([LR])\b/);
+  if (suffix) return suffix[1].toUpperCase() === "L" ? "LEFT" : "RIGHT";
+  const hasLeft = /\bleft\b/i.test(d);
+  const hasRight = /\bright\b/i.test(d);
+  if (hasLeft && !hasRight) return "LEFT";
+  if (hasRight && !hasLeft) return "RIGHT";
+  return "NA";
+}
+
+/**
+ * Knee and hip vocabulary are almost disjoint on these slips -- but not
+ * entirely. "Femoral" belongs to both: a femoral component is a knee, a femoral
+ * stem is a hip. So a description drawing on both vocabularies returns NA
+ * rather than picking, and the rep fills it in.
+ *
+ * `femur` is listed alongside `femor` because they do not share a stem --
+ * "Rev. Femur P.S. Cemented Left S1" matches neither `femor` nor `femoral`.
+ */
+export function inferJoint(description: string | null): "KNEE" | "HIP" | "NA" {
+  const d = (description ?? "").toLowerCase();
+  const knee = /tibia|femur|femor|patell|knee|poly|meniscal|condyl/.test(d);
+  const hip = /acetabul|\bcup\b|\bstem\b|\bhip\b|bipolar|liner/.test(d);
+  if (knee && hip) return "NA";
+  if (knee) return "KNEE";
+  if (hip) return "HIP";
+  return "NA";
+}
+
+/**
+ * The size token printed after a `#`, when there is one: `# 3L` -> "3",
+ * `# Tibia 4 Insert 3 L` -> "4". Left null when nothing obvious is there.
+ */
+export function inferSizeLabel(description: string | null): string | null {
+  const m = (description ?? "").match(/#\s*(?:[A-Za-z]+\s+)?(\d\+?)/);
+  return m ? m[1] : null;
 }
 
 /**
