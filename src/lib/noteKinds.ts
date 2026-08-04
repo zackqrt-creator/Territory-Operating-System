@@ -13,10 +13,15 @@ import {
 import type { TerritoryNoteType } from "./types";
 
 /**
- * The eight capture kinds a rep picks from. These are the user-facing
- * "Team Memory" note types; the underlying territory_notes.note_type stores
- * the `value`. Anything not in this list (legacy loaner/meeting/idea/etc.)
- * falls back to the generic note icon.
+ * How a note can be filed -- **after** it is written, never before.
+ *
+ * These were once the eight buttons on the capture sheet, which meant picking
+ * a category was the price of writing anything down. Capture now always
+ * creates 'general', shown as Inbox; NoteDetail offers this list for filing,
+ * and the Notes sidebar lists only the kinds that hold something.
+ *
+ * The underlying territory_notes.note_type stores `value`. Anything not in
+ * this list (legacy loaner/meeting/idea/etc.) falls back to the generic icon.
  */
 export interface NoteKind {
   value: TerritoryNoteType;
