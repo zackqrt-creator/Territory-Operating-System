@@ -135,6 +135,26 @@ Two General Efficiency Kits is deliberate: one to open, one that saves the
 case. Zack's phrasing was "general efficiency kit, an extra general efficiency
 kit."
 
+### The day, not the case
+
+Three things travel **once per surgery day**, however many cases are on it.
+Seeded in migration 051 as `day_requirements`, kept separate from
+`case_template_items` precisely so they are not multiplied by the case count:
+
+| Line | Qty | Why |
+| --- | --- | --- |
+| Revision Tote (Left) | 1 | Backup for a primary that becomes a revision |
+| Revision Tote (Right) | 1 | Same |
+| General Efficiency Kit | 2 | Spares for the day, **on top of** the two each case asks for |
+
+Both revision totes go in the car on every knee day. A three-knee Tuesday needs
+two revision totes, not six — which is exactly what a per-case model would have
+demanded, and why this list is keyed to the date instead.
+
+The GMK Revision system already has left/right femoral lines in the catalog
+(`GRFEML` / `GRFEMR`, migrations 039–040), so "both revision totes" reads
+cleanly as one per side.
+
 ### The complete tote: what is inside one
 
 **This is the point.** When a complete tote is delivered somewhere, the whole
@@ -195,3 +215,9 @@ that exact string to match.
   part of the name. (§6)
 - **Are `T3i4` / `T4i3` tibial (as migration 034 has them) or femoral (as
   Zack's dictation grouped them)?** (§6)
+- **"Two extra efficiency General kits" — two in total for the day, or two on
+  top of the two each case already asks for?** Read as *on top of*, since he
+  said "extra," so a one-knee day totals four. Correcting it is a quantity
+  change on one row of `day_requirements`. (§6)
+- **Are the revision totes knee-only, or do hip days carry an equivalent?**
+  Seeded as `surgery_type = 'KNEE'`. (§6)

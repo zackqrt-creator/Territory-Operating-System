@@ -13,6 +13,8 @@ import type {
   CaseAssignee,
   CaseAssigneeRole,
   CaseChecklistMark,
+  DayChecklistMark,
+  DayRequirement,
   CaseItemPlan,
   CaseRow,
   CaseTemplateWithItems,
@@ -1005,6 +1007,60 @@ export async function unmarkChecklistItem(caseId: string, itemKey: string): Prom
     .from("case_checklist_marks")
     .delete()
     .eq("case_id", caseId)
+    .eq("item_key", itemKey);
+  if (error) throw error;
+}
+
+// ---- Day-level requirements ------------------------------------------------
+//
+// The short list that goes in the car on any surgery day, independent of how
+// many cases are on it. Read-only here; editing is a Sets-page job.
+
+export async function listDayRequirements(): Promise<DayRequirement[]> {
+  const { data, error } = await supabase
+    .from("day_requirements")
+    .select("*")
+    .order("sort_order");
+  if (error) throw error;
+  return data as DayRequirement[];
+}
+
+export async function listDayChecklistMarks(onDate: string): Promise<DayChecklistMark[]> {
+  const { data, error } = await supabase
+    .from("day_checklist_marks")
+    .select("*")
+    .eq("on_date", onDate);
+  if (error) throw error;
+  return data as DayChecklistMark[];
+}
+
+export async function markDayItem(input: {
+  on_date: string;
+  item_key: string;
+  note?: string | null;
+  territory_id: string;
+  marked_by: string;
+}): Promise<DayChecklistMark> {
+  const { data, error } = await supabase
+    .from("day_checklist_marks")
+    .insert({
+      on_date: input.on_date,
+      item_key: input.item_key,
+      note: input.note ?? null,
+      territory_id: input.territory_id,
+      marked_by: input.marked_by,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DayChecklistMark;
+}
+
+export async function unmarkDayItem(onDate: string, itemKey: string): Promise<void> {
+  const { error } = await supabase
+    .from("day_checklist_marks")
+    .delete()
+    .eq("on_date", onDate)
     .eq("item_key", itemKey);
   if (error) throw error;
 }

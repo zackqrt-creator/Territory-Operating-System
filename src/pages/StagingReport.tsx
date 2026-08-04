@@ -1,14 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   listCasesInRange,
   listCaseTemplatesWithItems,
+  listDayChecklistMarks,
+  listDayRequirements,
   listFacilities,
   listInventory,
+  markDayItem,
+  unmarkDayItem,
 } from "../lib/api";
-import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem } from "../lib/types";
-import { buildStagingReport, type HaulItem, type LoanerReturn } from "../lib/staging";
+import type {
+  CaseRow,
+  CaseTemplateWithItems,
+  DayChecklistMark,
+  DayRequirement,
+  Facility,
+  InventoryItem,
+} from "../lib/types";
+import {
+  buildStagingReport,
+  type DayHaulItem,
+  type HaulItem,
+  type LoanerReturn,
+} from "../lib/staging";
 import MoveItemSheet from "../components/MoveItemSheet";
+import { useAuth } from "../hooks/useAuth";
 import { addDays, daysUntil, formatDateShort, tomorrow } from "../utils/dates";
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -27,6 +44,10 @@ export default function StagingReport() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [moving, setMoving] = useState<{ item: InventoryItem; target: Facility } | null>(null);
+  const [dayReqs, setDayReqs] = useState<DayRequirement[]>([]);
+  const [dayMarks, setDayMarks] = useState<DayChecklistMark[]>([]);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const { profile } = useAuth();
 
   function refresh() {
     setLoading(true);
@@ -49,15 +70,59 @@ export default function StagingReport() {
       .finally(() => setLoading(false));
   }
 
+  // Separate from refresh() and silent on failure: before migration 051 these
+  // tables do not exist, and the right behaviour then is a staging report with
+  // no day section rather than a page that will not load.
+  const refreshDay = useCallback(() => {
+    listDayRequirements()
+      .then(setDayReqs)
+      .catch(() => setDayReqs([]));
+    listDayChecklistMarks(date)
+      .then(setDayMarks)
+      .catch(() => setDayMarks([]));
+  }, [date]);
+
   useEffect(() => {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
+  useEffect(refreshDay, [refreshDay]);
+
   const report = useMemo(
-    () => buildStagingReport(date, cases, templates, inventory, facilities, daysUntil),
-    [date, cases, templates, inventory, facilities],
+    () =>
+      buildStagingReport(
+        date,
+        cases,
+        templates,
+        inventory,
+        facilities,
+        daysUntil,
+        dayReqs,
+        new Set(dayMarks.map((m) => m.item_key)),
+      ),
+    [date, cases, templates, inventory, facilities, dayReqs, dayMarks],
   );
+
+  async function toggleDayMark(key: string, currentlyMarked: boolean) {
+    if (!profile) return;
+    setBusyKey(key);
+    try {
+      if (currentlyMarked) {
+        await unmarkDayItem(date, key);
+      } else {
+        await markDayItem({
+          on_date: date,
+          item_key: key,
+          territory_id: profile.territory_id,
+          marked_by: profile.id,
+        });
+      }
+      refreshDay();
+    } finally {
+      setBusyKey(null);
+    }
+  }
 
   function onMoveDone() {
     setMoving(null);
@@ -86,6 +151,26 @@ export default function StagingReport() {
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : (
         <div className="mt-5 space-y-6">
+          {report.dayItems.length > 0 && (
+            <section>
+              <h2 className="mb-1 text-sm font-medium text-slate-300">Every surgery day</h2>
+              <p className="mb-2 text-xs text-slate-500">
+                Goes in the car once, however many cases are on the day.
+              </p>
+              <div className="space-y-2">
+                {report.dayItems.map((item) => (
+                  <DayLine
+                    key={item.key}
+                    item={item}
+                    busy={busyKey === item.key}
+                    canMark={!!profile}
+                    onToggle={() => toggleDayMark(item.key, item.manuallyConfirmed)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           <section>
             <h2 className="mb-2 text-sm font-medium text-slate-300">
               Haul list {report.cases.length > 0 && `· ${report.cases.length} case${report.cases.length === 1 ? "" : "s"}`}
@@ -180,6 +265,56 @@ export default function StagingReport() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A day line, ticked by hand rather than deducted from stock. It is deliberately
+ * never green off the back of inventory: these are things the rep confirms are
+ * in the car, and the catalog has no way to know whether they were loaded.
+ */
+function DayLine({
+  item,
+  busy,
+  canMark,
+  onToggle,
+}: {
+  item: DayHaulItem;
+  busy: boolean;
+  canMark: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={busy || !canMark}
+      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left disabled:opacity-50 ${
+        item.manuallyConfirmed
+          ? "border-sky-800 bg-sky-950/25"
+          : "border-slate-700 bg-slate-800/50"
+      }`}
+    >
+      <span
+        className={`mt-0.5 flex h-5 w-5 min-h-0 shrink-0 items-center justify-center rounded border text-xs ${
+          item.manuallyConfirmed
+            ? "border-sky-600 bg-sky-900/60 text-sky-200"
+            : "border-slate-600 text-transparent"
+        }`}
+      >
+        ✓
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm text-slate-100">
+          {item.quantity}x {item.name}
+        </span>
+        <span className="mt-0.5 block text-xs text-slate-500">
+          {CATEGORY_LABEL[item.category]}
+          {item.locations.length > 0 &&
+            ` · last seen at ${item.locations[0].facility.name}`}
+        </span>
+        {item.note && <span className="mt-1 block text-xs text-slate-400">{item.note}</span>}
+      </span>
+    </button>
   );
 }
 

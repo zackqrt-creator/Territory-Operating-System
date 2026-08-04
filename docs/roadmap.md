@@ -5,7 +5,7 @@ Kept in the repo on purpose: this project has lost its thread to context limits
 and stale branches more than once, and a roadmap that lives in a chat window is
 a roadmap that gets rebuilt from scratch every time.
 
-Counts as of commit `483a55e`: **50 migrations, 36 tables, 24 screens,
+Counts as of commit `483a55e`: **51 migrations, 38 tables, 24 screens,
 30 components, 19 library modules.**
 
 ---
@@ -38,6 +38,7 @@ operation, not a rewrite.
 | `tote_templates` / `tote_template_items` — named kits and their contents, 860 rows, with `pack_layer` ordering | done |
 | `movements` — the audit trail every engine derives from | done |
 | `case_checklist_marks` — manual tick-off | **written, not applied to live DB** |
+| `day_requirements` / `day_checklist_marks` — what travels per *day*, not per case | **written, not applied to live DB** |
 | Single-use vs. returnable instrumentation | **not modelled** |
 
 **The gap that matters: 931 catalog rows against 6 inventory rows.** The
@@ -53,7 +54,7 @@ Pure functions in `src/lib/`, no I/O, all unit-testable.
 | --- | --- | --- |
 | `readiness.ts` | Is this case covered, and if not, where is the missing thing | done — now side-aware and tote-level |
 | `packlist.ts` | Aggregate demand across a week, ordered by pack layer | done — reads tote BOMs via surgeon preferences |
-| `staging.ts` | What goes in the car tonight | done |
+| `staging.ts` | What goes in the car tonight, per-case haul plus the day's constants | done |
 | `loaners.ts` | Ship-by countdowns and extension suggestions | done |
 | `labelParse.ts` | GS1 DataMatrix → REF, lot, expiry | done |
 | `stickerSheet.ts` | Post-case sticker sheet → usage + reorder | done |

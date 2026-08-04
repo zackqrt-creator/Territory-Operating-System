@@ -210,6 +210,36 @@ export interface CaseTemplateWithItems extends CaseTemplate {
   case_template_items: CaseTemplateItem[];
 }
 
+/**
+ * Something that travels on a surgery day regardless of how many cases are on
+ * it -- the revision totes, spare efficiency kits. Counted once per day, not
+ * once per case, which is the whole reason it is not a `CaseTemplateItem`.
+ */
+export interface DayRequirement {
+  id: string;
+  territory_id: string;
+  /** 'ANY' means every surgery day, whatever the joint. */
+  surgery_type: "KNEE" | "HIP" | "INSTRUMENT" | "ANY";
+  category: ItemCategory;
+  name: string;
+  quantity: number;
+  note: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface DayChecklistMark {
+  id: string;
+  territory_id: string;
+  /** ISO date the line was ticked for. */
+  on_date: string;
+  /** The line, as `category|name`. */
+  item_key: string;
+  note: string | null;
+  marked_by: string | null;
+  created_at: string;
+}
+
 export type CatalogSide = "LEFT" | "RIGHT" | "NA";
 export type CementType = "cemented" | "cementless" | "NA";
 export type CatalogJoint = "KNEE" | "HIP" | "NA";

@@ -1,5 +1,12 @@
-import type { CaseRow, CaseTemplateWithItems, Facility, InventoryItem, ItemCategory } from "./types";
-import { computeReadiness } from "./readiness";
+import type {
+  CaseRow,
+  CaseTemplateWithItems,
+  DayRequirement,
+  Facility,
+  InventoryItem,
+  ItemCategory,
+} from "./types";
+import { checklistItemKey, computeReadiness } from "./readiness";
 import { formatTime } from "../utils/dates";
 
 export function caseLabel(c: CaseRow): string {
@@ -37,6 +44,23 @@ export interface LoanerReturn {
   daysLeft: number;
 }
 
+/**
+ * A line that goes in the car once for the whole day, however many cases are
+ * on it. Deliberately not folded into the per-case haul: counting the revision
+ * totes once per knee would ask a three-knee Tuesday for six of them.
+ */
+export interface DayHaulItem {
+  /** `category|name`, matching checklistItemKey(). */
+  key: string;
+  category: ItemCategory;
+  name: string;
+  quantity: number;
+  note: string | null;
+  /** Everywhere the app can see one, best-stocked first. Empty means nowhere on record. */
+  locations: { facility: Facility; count: number }[];
+  manuallyConfirmed: boolean;
+}
+
 export interface StagingReport {
   date: string;
   cases: CaseRow[];
@@ -44,6 +68,8 @@ export interface StagingReport {
   readyCount: number;
   missing: MissingItem[];
   loanerReturns: LoanerReturn[];
+  /** Empty when nothing is scheduled, or before migration 051 has run. */
+  dayItems: DayHaulItem[];
 }
 
 /**
@@ -59,6 +85,10 @@ export function buildStagingReport(
   inventory: InventoryItem[],
   facilities: Facility[],
   daysUntilFn: (iso: string) => number,
+  /** What goes in the car on any day of this kind. Empty is a valid, quiet state. */
+  dayRequirements: DayRequirement[] = [],
+  /** Day lines the rep has ticked by hand for this date. */
+  dayMarkedKeys: ReadonlySet<string> = new Set(),
 ): StagingReport {
   const cases = allCases.filter((c) => c.surgery_date === date && c.status === "scheduled");
 
@@ -133,6 +163,42 @@ export function buildStagingReport(
     .filter((r) => r.facility)
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
+  // Day-level lines. A requirement applies if the day has at least one case of
+  // its kind, or if it is marked 'ANY', in which case any scheduled case
+  // triggers it. No cases, no day list: there is nothing to bring.
+  const kindsToday = new Set(cases.map((c) => c.surgery_type));
+  const dayItems: DayHaulItem[] =
+    cases.length === 0
+      ? []
+      : dayRequirements
+          .filter((r) => r.surgery_type === "ANY" || kindsToday.has(r.surgery_type))
+          .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+          .map((r) => {
+            const byFacility = new Map<string, number>();
+            for (const i of inventory) {
+              if (i.category !== r.category || i.name !== r.name) continue;
+              byFacility.set(i.location_id, (byFacility.get(i.location_id) ?? 0) + i.quantity);
+            }
+            const locations = [...byFacility.entries()]
+              .map(([facilityId, count]) => ({
+                facility: facilities.find((f) => f.id === facilityId)!,
+                count,
+              }))
+              .filter((l) => l.facility)
+              .sort((a, b) => b.count - a.count);
+
+            const key = checklistItemKey(r.category, r.name);
+            return {
+              key,
+              category: r.category,
+              name: r.name,
+              quantity: r.quantity,
+              note: r.note,
+              locations,
+              manuallyConfirmed: dayMarkedKeys.has(key),
+            };
+          });
+
   return {
     date,
     cases,
@@ -140,5 +206,6 @@ export function buildStagingReport(
     readyCount,
     missing: [...missingMap.values()],
     loanerReturns,
+    dayItems,
   };
 }
