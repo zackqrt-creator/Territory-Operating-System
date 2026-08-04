@@ -32,16 +32,16 @@ operation, not a rewrite.
 | | |
 | --- | --- |
 | `catalog_items` — the dictionary. 931 rows, GTIN, joint, side, device type | done |
-| `inventory_items` — physical stock at a location. **6 rows** | schema done, **empty** |
+| `inventory_items` — physical stock at a location. **7 rows** | schema done, **empty** |
 | `facilities` — 11 real ones, typed (storage / surgical / trunk) | done |
 | `cases`, `surgeons`, `case_templates`, `case_template_items` | done |
 | `tote_templates` / `tote_template_items` — named kits and their contents, 860 rows, with `pack_layer` ordering | done |
 | `movements` — the audit trail every engine derives from | done |
-| `case_checklist_marks` — manual tick-off | **written, not applied to live DB** |
-| `day_requirements` / `day_checklist_marks` — what travels per *day*, not per case | **written, not applied to live DB** |
+| `case_checklist_marks` — manual tick-off | done, live |
+| `day_requirements` / `day_checklist_marks` — what travels per *day*, not per case | done, live |
 | Single-use vs. returnable instrumentation | **not modelled** |
 
-**The gap that matters: 931 catalog rows against 6 inventory rows.** The
+**The gap that matters: 931 catalog rows against 7 inventory rows.** The
 dictionary is rich and the stock ledger is empty. Every engine downstream reads
 `inventory_items`, so every engine is currently answering questions about a
 territory that, as far as the database knows, holds six objects.
@@ -127,7 +127,7 @@ Nothing else matters until `inventory_items` reflects reality. Six rows is not
 a data problem to work around, it is the reason readiness reports missing on
 lines that are sitting in the trunk. Two pieces:
 
-- Apply migration 050 so manual tick-off works as the stopgap.
+- ~~Apply migration 050 so manual tick-off works as the stopgap.~~ Applied.
 - Build **tote receipt**: scan or pick a tote template, say where it landed,
   and have the app create the inventory rows for its contents in one action.
   The `tote_template_items` data to do this already exists — 860 rows of it.
