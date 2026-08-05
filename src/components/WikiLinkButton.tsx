@@ -32,7 +32,11 @@ export default function WikiLinkButton({
     setOpening(true);
     try {
       const page = await ensureCanonicalPage(profile.territory_id, entityType, entityId, title, profile.id);
-      navigate(`/notes/${page.id}`);
+      // A page lives in `pages` and is rendered by /pages/:id. /notes/:id is a
+      // different table (territory_notes) and a different screen -- sending a
+      // page id there looked up a note that does not exist and rendered an
+      // empty screen, which is what every Wiki button in the app did.
+      navigate(`/pages/${page.id}`);
     } finally {
       setOpening(false);
     }
