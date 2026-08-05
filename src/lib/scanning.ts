@@ -11,17 +11,27 @@ import type { Html5QrcodeCameraScanConfig, Html5QrcodeFullConfig } from "html5-q
  * camera looked like it was working, which is the worst possible failure --
  * there is nothing to report to support, so it reads as "the app is broken."
  *
- * The two settings that actually matter:
+ * READ THIS BEFORE TUNING THE LIVE CAMERA, because the obvious lever does not
+ * work. html5-qrcode decodes the live stream from a canvas sized to the qrbox
+ * in CSS pixels, not in camera pixels (html5-qrcode.js: the scan canvas is
+ * created at qrRegion.width/height, and each frame is drawn down into it).
+ * Requesting a 1080p stream therefore does NOT hand the decoder more pixels --
+ * it only makes the downscale steeper. The size of the scan box is the real
+ * resolution knob, which is why the box below is as large as the viewfinder
+ * allows rather than a tidy square.
  *
- * 1. RESOLUTION. Without videoConstraints a browser hands back roughly
- *    640x480. A GS1 data-matrix on an implant box is a few millimetres across,
- *    so at that resolution its modules land inside a single pixel and it never
- *    decodes, no matter how long you hold the box there. 1080p is the
- *    difference between working and not.
+ * The video constraints still earn their place: a sharper source downsamples
+ * better, and `focusMode: continuous` genuinely matters, because at the
+ * distance you hold a box from a phone a fixed focus puts the label outside
+ * the depth of field. Neither makes the live camera reliable on a data-matrix
+ * a few millimetres across.
  *
- * 2. FOCUS. At the distance you hold a box from a phone, fixed focus lands
- *    the label outside the depth of field. `focusMode: continuous` is not in
- *    the standard constraint typings but mobile browsers honour it.
+ * The path that IS reliable is a still photo. scanFileV2 decodes the image at
+ * its native size -- 12 megapixels off an iPhone rather than a few hundred
+ * CSS pixels -- and runs the robust decoder rather than the single-pass one.
+ * Any screen offering a live scanner must also offer the photo, above the
+ * fold, or it is offering the path that mostly fails and hiding the one that
+ * works.
  *
  * The format list is a narrowing, not an enabling: html5-qrcode already
  * defaults to every format it knows. Naming the six that appear on medical
@@ -50,16 +60,18 @@ export const SCANNER_CONFIG: Html5QrcodeFullConfig = {
 /**
  * Passed as the second argument to `scanner.start()`.
  *
- * The scan box is wide and short on purpose. A GS1-128 on a box is a long thin
- * barcode; framing it inside a 250px square means backing away until the whole
- * thing fits, and at that distance the data-matrix beside it is too small to
- * resolve. Wide box, close hold, both codes readable.
+ * The box takes essentially the whole viewfinder. Every CSS pixel of it is a
+ * pixel the decoder gets (see above), so the old 420x260 cap was throwing away
+ * the only resolution that reaches the decoder at all. It is still wider than
+ * tall because a GS1-128 is a long thin barcode and a square box makes you
+ * back away until it fits -- at which distance the data-matrix beside it is
+ * smaller again.
  */
 export const CAMERA_CONFIG: Html5QrcodeCameraScanConfig = {
   fps: 10,
   qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
-    width: Math.floor(Math.min(viewfinderWidth * 0.92, 420)),
-    height: Math.floor(Math.min(viewfinderHeight * 0.65, 260)),
+    width: Math.floor(viewfinderWidth * 0.98),
+    height: Math.floor(viewfinderHeight * 0.8),
   }),
   videoConstraints: {
     facingMode: "environment",

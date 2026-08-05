@@ -22,6 +22,7 @@ export default function Scan() {
   const [batchMode, setBatchMode] = useState(false);
   const [decoding, setDecoding] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
+  const fileScannerRef = useRef<Html5Qrcode | null>(null);
 
   // Scan callbacks are registered once with the camera; a ref (not state)
   // lets them see the latest "is a sheet open" value without restarting the camera.
@@ -71,8 +72,10 @@ export default function Scan() {
     setError(null);
     setDecoding(true);
     try {
-      const fileScanner = new Html5Qrcode(FILE_SCANNER_ID, SCANNER_CONFIG);
-      const result = await fileScanner.scanFileV2(file, false);
+      // Reused: scanFileV2 appends canvases to its element, so a fresh
+      // instance per photo would pile them up for as long as the page lives.
+      fileScannerRef.current ??= new Html5Qrcode(FILE_SCANNER_ID, SCANNER_CONFIG);
+      const result = await fileScannerRef.current.scanFileV2(file, false);
       await onDetected(result.decodedText);
     } catch {
       setError(
@@ -113,23 +116,41 @@ export default function Scan() {
         </button>
       </div>
 
-      <div id={SCANNER_ID} className="mt-4 overflow-hidden rounded-xl" />
-      {/* Never visible: html5-qrcode needs a mounted element to attach a
-          file-decode instance to. */}
-      <div id={FILE_SCANNER_ID} className="hidden" />
-
+      {/*
+       * Above the camera, deliberately.
+       *
+       * This was under the viewfinder, and on a phone the viewfinder is tall
+       * enough that everything below it sits off the bottom of the screen --
+       * so the only reliable way to read a label was the one control nobody
+       * could see. It leads now because it is the path that works: a still is
+       * decoded at full sensor resolution, where the live preview is decoded
+       * from a canvas the size of the scan box.
+       */}
       <button
         onClick={() => photoRef.current?.click()}
         disabled={decoding}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 py-2.5 font-medium text-slate-300 disabled:opacity-50"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-3 font-semibold text-white disabled:opacity-50"
       >
-        <Camera size={16} aria-hidden />
-        <span className="text-sm">{decoding ? "Reading photo…" : "Take a photo instead"}</span>
+        <Camera size={17} aria-hidden />
+        {decoding ? "Reading photo…" : "Take a photo of the label"}
       </button>
       <p className="mt-1.5 text-xs text-slate-500">
-        A photo uses the full camera resolution, so it reads small data-matrix codes the live
-        preview can miss.
+        Most reliable for the small square data-matrix code. The live camera below works for
+        larger tray and kit barcodes.
       </p>
+
+      {/*
+       * Capped, so the controls under it stay on screen. A portrait stream
+       * renders about 1.8x its own width, which on a phone is the entire
+       * viewport on its own.
+       */}
+      <div
+        id={SCANNER_ID}
+        className="mt-4 max-h-[38vh] overflow-hidden rounded-xl [&_video]:!max-h-[38vh] [&_video]:!object-cover"
+      />
+      {/* Never visible: html5-qrcode needs a mounted element to attach a
+          file-decode instance to. */}
+      <div id={FILE_SCANNER_ID} className="hidden" />
 
       <input
         ref={photoRef}

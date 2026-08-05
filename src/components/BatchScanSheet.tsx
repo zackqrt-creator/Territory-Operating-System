@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import { Camera } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { createInventoryItem, linkCatalogItemGtin, listCatalogItems } from "../lib/api";
 import { catalogLabel, parseGs1 } from "../lib/labelParse";
@@ -7,6 +8,7 @@ import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage } from "../lib/scanni
 import type { CatalogItem, Facility, ItemCategory } from "../lib/types";
 
 const SCANNER_ID = "casetrack-batch-scanner";
+const FILE_SCANNER_ID = "casetrack-batch-scanner-file";
 const CATEGORY_OPTIONS: { value: ItemCategory; label: string }[] = [
   { value: "implant", label: "Implant" },
   { value: "consumable", label: "Efficiency" },
@@ -51,6 +53,9 @@ export default function BatchScanSheet({
   const [locationId, setLocationId] = useState(profile?.last_facility_id ?? facilities[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [decoding, setDecoding] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const fileScannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const rowsRef = useRef<BatchRow[]>([]);
@@ -84,6 +89,20 @@ export default function BatchScanSheet({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function onPhoto(file: File) {
+    setError(null);
+    setDecoding(true);
+    try {
+      fileScannerRef.current ??= new Html5Qrcode(FILE_SCANNER_ID, SCANNER_CONFIG);
+      const result = await fileScannerRef.current.scanFileV2(file, false);
+      onDetected(result.decodedText);
+    } catch {
+      setError("No barcode found in that photo. Fill the frame with the barcode and try again.");
+    } finally {
+      setDecoding(false);
+    }
+  }
 
   function onDetected(code: string) {
     // Ignore the same code re-decoded within 2.5s — the camera holds on a
@@ -192,7 +211,40 @@ export default function BatchScanSheet({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-32 pt-3">
-        <div id={SCANNER_ID} className="overflow-hidden rounded-xl" />
+        {/*
+         * The photo leads here for the same reason it leads on the Scan page:
+         * a still is decoded at full sensor resolution, while the live stream
+         * is decoded from a canvas the size of the scan box. On the small
+         * data-matrix codes on implant boxes that is the whole difference.
+         */}
+        <button
+          onClick={() => photoRef.current?.click()}
+          disabled={decoding}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-3 font-semibold text-white disabled:opacity-50"
+        >
+          <Camera size={17} aria-hidden />
+          {decoding ? "Reading photo\u2026" : "Add a box by photo"}
+        </button>
+        <p className="mt-1.5 text-xs text-slate-500">
+          Adds one box per photo, and reads the small square data-matrix the live camera misses.
+        </p>
+
+        <div
+          id={SCANNER_ID}
+          className="mt-3 max-h-[34vh] overflow-hidden rounded-xl [&_video]:!max-h-[34vh] [&_video]:!object-cover"
+        />
+        <div id={FILE_SCANNER_ID} className="hidden" />
+        <input
+          ref={photoRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0] ?? null;
+            e.target.value = "";
+            if (file) void onPhoto(file);
+          }}
+        />
 
         {error && (
           <p className="mt-3 rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-300">{error}</p>
