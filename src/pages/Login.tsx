@@ -1,65 +1,31 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import {
-  Boxes,
-  CalendarClock,
-  ListChecks,
-  NotebookPen,
-  ScanLine,
-  ShieldCheck,
-} from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { Check } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { hardReset } from "../lib/pwa";
 import BrandMark from "../components/BrandMark";
 
 /**
- * The front door.
+ * The front door, built as a board.
  *
- * Two jobs, in this order. First, get a rep who is standing in a hospital
- * corridor into the app -- so the sign-in panel is above the fold on a phone
- * and password is the default, because the emailed link depends on a mailer
- * that allows a couple of sends a day and had already locked someone out of
- * their own inventory mid-workday. Second, say what this is, for the times it
- * gets opened by someone who is not Zack.
+ * Everyone who reaches this screen already knows what Territory OS is, so it
+ * stopped being a pitch. What replaced the five capability blurbs is the one
+ * claim that distinguishes this from a spreadsheet: counts and knowledge live
+ * on the same record. That claim is made structurally -- two columns of one
+ * board, joined by a rule -- rather than asserted in a paragraph.
  *
- * The build stamp and the reset link at the bottom are not decoration. A
- * cached service worker can pin a device to an old build, and the sign-in
- * screen is the one screen you can always reach when that happens.
+ * The grammar is the OR schedule board: flat, ruled, legible at arm's length
+ * in a bright corridor. No cards, no panels, no shadows. Three graded rule
+ * weights do every job those would have: 3px ink top and bottom for the
+ * board's own edges, 1px for the column divider, hairline everywhere else.
+ * If you are tempted to add a container here, add a rule instead.
+ *
+ * Two things are load-bearing rather than decorative. Password is the default
+ * because the emailed link depends on a mailer that allows a couple of sends a
+ * day and had already locked someone out of their own inventory mid-workday.
+ * The build stamp and reset link at the bottom stay because a cached service
+ * worker can pin a device to an old build, and this is the one screen you can
+ * always reach when that happens.
  */
-
-/*
- * Two halves, deliberately equal. Counting boxes is only half the job -- what
- * you know about a tray and what you still owe on it carry the same weight,
- * so notes and tasks get their own entries here rather than one line tacked on
- * at the end.
- */
-const CAPABILITIES = [
-  {
-    icon: ScanLine,
-    title: "Scan the box, not the paperwork",
-    body: "Point the camera at a GS1 label and the GTIN, lot and expiry come off it in one pass — no typing a 14-digit number off a curved surface.",
-  },
-  {
-    icon: Boxes,
-    title: "Know what is in every tote",
-    body: "Sets, on-hand counts and every movement between facilities, editable down to the individual line.",
-  },
-  {
-    icon: NotebookPen,
-    title: "A note on anything, kept where you'll find it",
-    body: "A surgeon's preference, a tray that came back short, why that transfer was really Wednesday — written on the record itself, editable later, not buried in your phone.",
-  },
-  {
-    icon: ListChecks,
-    title: "Follow-ups that come find you",
-    body: "Tasks hang off the same records as the notes and carry due dates, so the thing you promised on Monday shows up on the screen you open Thursday.",
-  },
-  {
-    icon: CalendarClock,
-    title: "Walk in ready",
-    body: "Each case checked against the stock you actually hold, so shortages surface the night before instead of in the sterile core.",
-  },
-];
-
 export default function Login() {
   const { signInWithEmail, signInWithPassword } = useAuth();
   const [mode, setMode] = useState<"password" | "link">("password");
@@ -103,222 +69,175 @@ export default function Login() {
   }
 
   const field =
-    "mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-[15px] font-normal text-slate-100 placeholder:text-slate-600";
+    "w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-slate-100 placeholder:text-slate-600";
+
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
   return (
-    <div className="relative min-h-full overflow-hidden">
-      <Backdrop />
+    <div className="mx-auto flex min-h-full w-full max-w-[30rem] flex-col justify-center px-5 py-8 sm:py-12">
+      {/* The board's top edge. */}
+      <div className="h-[3px] bg-slate-100" />
+
+      <div className="mt-5 flex items-center gap-3">
+        <BrandMark className="h-9 w-9" />
+        <h1 className="text-[34px] font-bold leading-[0.98] tracking-[-0.045em] text-slate-100">
+          Territory OS
+        </h1>
+      </div>
+
+      <div className="mt-2.5 flex items-baseline justify-between border-b border-slate-700 pb-3 text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500">
+        <span>{today}</span>
+        <span>{sent ? "Link sent" : "Signed out"}</span>
+      </div>
 
       {/*
-       * One grid, two arrangements. On a phone it is a single column in source
-       * order -- brand, sign-in, then what the thing does -- so the panel is
-       * reachable without scrolling. On a wide screen the pitch stacks down
-       * the left and the panel sits beside it, spanning both rows.
+       * The claim, made as structure. Two columns of one board is the argument;
+       * the band underneath only names what the reader can already see.
        */}
-      <div className="relative mx-auto grid w-full max-w-5xl grid-cols-1 items-center gap-y-12 px-5 py-12 lg:min-h-screen lg:grid-cols-[1.05fr_minmax(340px,380px)] lg:grid-rows-[auto_auto] lg:content-center lg:items-start lg:gap-x-16 lg:gap-y-0 lg:py-20">
-        {/* Row 1 / left column: who this is. */}
-        <header className="lg:col-start-1 lg:row-start-1">
-          <div className="flex items-center gap-3">
-            <BrandMark className="h-11 w-11 shrink-0" />
-            <div className="leading-tight">
-              <p className="text-lg font-semibold tracking-tight text-slate-100">Territory OS</p>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400/80">
-                Field operations
-              </p>
-            </div>
-          </div>
-
-          <h1 className="mt-8 text-[1.85rem] font-semibold leading-[1.12] text-slate-100 sm:text-4xl lg:text-[2.6rem]">
-            Every tray, every case,
-            <br className="hidden sm:block" /> every lot accounted for.
-          </h1>
-        </header>
-
-        {/* Mobile row 2 / desktop right column: the reason anyone is here. */}
-        <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-center">
-          {sent ? (
-            <Panel>
-              <p className="text-2xl">📬</p>
-              <h2 className="mt-2 text-base font-semibold text-slate-100">Check your email</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                A one-tap sign-in link is on its way to {email}.
-              </p>
-              <button
-                onClick={() => {
-                  setSent(false);
-                  setMode("password");
-                }}
-                className="mt-5 w-full rounded-xl border border-slate-700 bg-slate-800/60 py-3 text-sm font-medium text-slate-200"
-              >
-                Use a password instead
-              </button>
-            </Panel>
-          ) : (
-            <Panel>
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-base font-semibold text-slate-100">Sign in</h2>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                  {mode === "password" ? "Password" : "Email link"}
-                </span>
-              </div>
-
-              <form onSubmit={onSubmit} className="mt-4 space-y-3">
-                <label className="block text-[13px] font-medium text-slate-400">
-                  Work email
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    autoComplete="username"
-                    inputMode="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={field}
-                  />
-                </label>
-
-                {mode === "password" && (
-                  <label className="block text-[13px] font-medium text-slate-400">
-                    Password
-                    <input
-                      type="password"
-                      required
-                      autoComplete="current-password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className={field}
-                    />
-                  </label>
-                )}
-
-                {error && (
-                  <p className="rounded-lg border border-red-900/60 bg-red-950/40 px-3 py-2 text-[13px] leading-snug text-red-300">
-                    {error}
-                  </p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="w-full rounded-xl bg-gradient-to-b from-sky-500 to-sky-700 px-4 py-3 text-[15px] font-semibold text-white shadow-lg shadow-sky-600/25 disabled:opacity-50"
-                >
-                  {busy
-                    ? mode === "password"
-                      ? "Signing in…"
-                      : "Sending…"
-                    : mode === "password"
-                      ? "Sign in"
-                      : "Email me a link"}
-                </button>
-              </form>
-
-              <div className="mt-4 flex items-center gap-3">
-                <span className="h-px flex-1 bg-slate-800" />
-                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                  or
-                </span>
-                <span className="h-px flex-1 bg-slate-800" />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode(mode === "password" ? "link" : "password");
-                  setError(null);
-                }}
-                className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-800/40 py-2.5 text-[13px] font-medium text-slate-300"
-              >
-                {mode === "password" ? "Email me a sign-in link" : "Sign in with a password"}
-              </button>
-
-              <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-600">
-                {mode === "password"
-                  ? "No password yet? Use the email link once, then set one from More."
-                  : "Sign-in emails are limited to a couple a day. A password has no limit."}
-              </p>
-            </Panel>
-          )}
-
-          <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-slate-600">
-            <ShieldCheck size={12} className="shrink-0" />
-            Private to your territory. Installs to your home screen.
+      <div className="grid grid-cols-2">
+        <div className="py-3.5 pr-4">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500">
+            Counts
+          </h2>
+          <p className="mt-2 text-[13.5px] leading-snug text-slate-300">
+            Every set, tote and tray — where it is, and when it's free.
           </p>
         </div>
-
-        {/* Mobile row 3 / desktop below the headline: what it actually does. */}
-        {/*
-         * On a wide screen this sits directly under the headline, in the same
-         * column -- exactly where it reads as the sub-head. On a phone it falls
-         * below the sign-in panel instead, because six lines of prose above the
-         * panel pushed the Sign in button off a 664px-tall screen.
-         */}
-        <div className="lg:col-start-1 lg:row-start-2 lg:pt-6">
-          <p className="max-w-lg border-t border-slate-800/80 pt-8 text-[15px] leading-relaxed text-slate-400 lg:border-0 lg:pt-0">
-            The field system for orthopedic device reps. Consignment inventory and case logistics on
-            one side; on the other, every note and follow-up filed against the tray, the surgeon or
-            the shipment it belongs to — because what you know about a tray counts for as much as
-            what you counted in it.
-          </p>
-
-          <ul className="mt-8 space-y-5">
-            {CAPABILITIES.map(({ icon: Icon, title, body }) => (
-              <li key={title} className="flex gap-3.5">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-sky-900/70 bg-sky-950/50 text-sky-400">
-                  <Icon size={16} />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[14px] font-semibold text-slate-100">{title}</p>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500">{body}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <p className="mt-9 text-center text-[11px] leading-relaxed text-slate-600 lg:text-left">
-            Build {__BUILD_ID__}
-            {" · "}
-            <button
-              onClick={hardReset}
-              className="min-h-0 p-0 align-baseline underline decoration-slate-700 underline-offset-2"
-            >
-              not seeing recent changes?
-            </button>
+        <div className="border-l border-slate-700 py-3.5 pl-4">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500">
+            Knowledge
+          </h2>
+          <p className="mt-2 text-[13.5px] leading-snug text-slate-300">
+            Why it came back short. Written on the tray itself.
           </p>
         </div>
       </div>
-    </div>
-  );
-}
 
-function Panel({ children }: { children: ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-2xl shadow-slate-900/[0.06] backdrop-blur-sm sm:p-6">
-      {children}
-    </div>
-  );
-}
+      <p className="flex items-center gap-2 border-b-[3px] border-t border-b-slate-100 border-t-slate-700 py-2.5 text-[12.5px] font-semibold text-slate-400">
+        <Check size={15} strokeWidth={2.2} className="shrink-0 text-emerald-400" aria-hidden />
+        One record holds both
+      </p>
 
-/**
- * A faint instrument-panel grid behind everything, fading out downward so it
- * never competes with the text sitting on top of it.
- */
-function Backdrop() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(22,35,60,0.055) 1px, transparent 1px)," +
-            "linear-gradient(90deg, rgba(22,35,60,0.055) 1px, transparent 1px)",
-          backgroundSize: "56px 56px",
-          maskImage: "radial-gradient(115% 70% at 50% 0%, #000 20%, transparent 78%)",
-          WebkitMaskImage: "radial-gradient(115% 70% at 50% 0%, #000 20%, transparent 78%)",
-        }}
-      />
-      <div className="absolute -top-40 left-1/2 h-[26rem] w-[46rem] -translate-x-1/2 rounded-full bg-sky-600/[0.07] blur-[110px]" />
+      {/*
+       * The roster slot. Pinning this to the bottom of the viewport for thumb
+       * reach opened a 330px hole under the board on a 844px phone, which read
+       * as broken rather than as deliberate space. Centring the whole board
+       * instead still lands the primary action in the lower third.
+       */}
+      <div className="mt-9">
+        {sent ? (
+          <div>
+            <h2 className="text-base font-semibold text-slate-100">Check your email</h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
+              A one-tap sign-in link is on its way to {email}.
+            </p>
+            <button
+              onClick={() => {
+                setSent(false);
+                setMode("password");
+              }}
+              className="mt-4 w-full rounded-lg border border-slate-700 py-2.5 font-medium text-slate-400"
+            >
+              <span className="text-sm">Use a password instead</span>
+            </button>
+          </div>
+        ) : (
+          <>
+            <form onSubmit={onSubmit} className="space-y-2.5">
+              <label className="block">
+                <span className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">
+                  Work email
+                </span>
+                <input
+                  type="email"
+                  required
+                  autoFocus
+                  autoComplete="username"
+                  inputMode="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`mt-1.5 ${field}`}
+                />
+              </label>
+
+              {mode === "password" && (
+                <label className="block">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">
+                    Password
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`mt-1.5 ${field}`}
+                  />
+                </label>
+              )}
+
+              {error && (
+                <p
+                  role="alert"
+                  className="border-l border-red-400 bg-red-950 px-3 py-2 text-[13px] leading-snug text-red-300"
+                >
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full rounded-lg bg-sky-600 py-3 font-semibold text-white disabled:opacity-50"
+              >
+                {busy
+                  ? mode === "password"
+                    ? "Signing in…"
+                    : "Sending…"
+                  : mode === "password"
+                    ? "Sign in"
+                    : "Email me a link"}
+              </button>
+            </form>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "password" ? "link" : "password");
+                setError(null);
+              }}
+              className="mt-2.5 w-full rounded-lg border border-slate-700 py-2.5 font-medium text-slate-400"
+            >
+              <span className="text-sm">
+                {mode === "password" ? "Email me a link instead" : "Sign in with a password"}
+              </span>
+            </button>
+
+            <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+              {mode === "password"
+                ? "No password yet? Use the email link once, then set one from More."
+                : "Sign-in emails are limited to a couple a day. A password has no limit."}
+            </p>
+          </>
+        )}
+
+        <p className="mt-6 border-t border-slate-700 pt-3 text-[11px] text-slate-500">
+          Private to your territory · Build {__BUILD_ID__}
+          {" · "}
+          <button
+            onClick={hardReset}
+            className="min-h-0 p-0 align-baseline text-slate-500 underline decoration-slate-700 underline-offset-2"
+          >
+            not seeing recent changes?
+          </button>
+        </p>
+      </div>
     </div>
   );
 }
