@@ -229,10 +229,10 @@ export default function BatchScanSheet({
           Adds one box per photo, and reads the small square data-matrix the live camera misses.
         </p>
 
-        <div
-          id={SCANNER_ID}
-          className="mt-3 max-h-[34vh] overflow-hidden rounded-xl [&_video]:!max-h-[34vh] [&_video]:!object-cover"
-        />
+        {/* No height cap on this: html5-qrcode maps the scan box onto the
+            source frame via videoHeight / clientHeight, so CSS-cropping the
+            video makes it scan somewhere other than where the box is drawn. */}
+        <div id={SCANNER_ID} className="mt-3 overflow-hidden rounded-xl" />
         <div id={FILE_SCANNER_ID} className="hidden" />
         <input
           ref={photoRef}

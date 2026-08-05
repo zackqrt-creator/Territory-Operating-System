@@ -154,14 +154,26 @@ export async function listInventory(): Promise<InventoryItem[]> {
   return data as InventoryItem[];
 }
 
+/**
+ * Look up a scanned item.
+ *
+ * Deliberately not maybeSingle(). barcode_value holds a GTIN, and a GTIN
+ * identifies a *product*, not a unit -- two boxes of the same implant in
+ * different lots are two rows carrying the same barcode_value, which is normal
+ * and expected. maybeSingle() treats that as an error (PGRST116) and threw, so
+ * scanning the one product you happen to hold two of failed while scanning
+ * everything else worked. Newest first, because a rep scanning a box is far
+ * more often handling the one that arrived most recently.
+ */
 export async function findItemByBarcode(barcode: string): Promise<InventoryItem | null> {
   const { data, error } = await supabase
     .from("inventory_items")
     .select("*")
     .eq("barcode_value", barcode)
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(1);
   if (error) throw error;
-  return data as InventoryItem | null;
+  return (data?.[0] as InventoryItem | undefined) ?? null;
 }
 
 export interface NewItemInput {

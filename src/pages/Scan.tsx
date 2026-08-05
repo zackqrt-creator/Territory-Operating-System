@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Boxes, Camera } from "lucide-react";
 import { findItemByBarcode, listFacilities } from "../lib/api";
+import { parseGs1 } from "../lib/labelParse";
 import type { Facility, InventoryItem } from "../lib/types";
 import MoveItemSheet from "../components/MoveItemSheet";
 import AddItemSheet from "../components/AddItemSheet";
@@ -86,10 +87,30 @@ export default function Scan() {
     }
   }
 
+  /**
+   * A scan yields a whole GS1 element string -- "(01)07630971260993(17)310311
+   * (10)2604455" -- but inventory_items.barcode_value holds the bare GTIN,
+   * which is what the intake flows write. Looking the raw string up verbatim
+   * therefore missed every single time, and every scan of a box already in
+   * stock came back "unknown" and offered to create a duplicate. Reduce to the
+   * GTIN first, and only fall back to the raw text for rows saved before this.
+   */
   async function onDetected(code: string) {
-    const item = await findItemByBarcode(code);
-    if (item) setFound(item);
-    else setUnknownBarcode(code);
+    const bare = code.replace(/\s/g, "");
+    // A bare 12-14 digit code is already a plain GTIN/UPC with no application
+    // identifiers; handing it to the GS1 walker reads its digits as a lot.
+    const gtin = /^\d{12,14}$/.test(bare) ? bare : (parseGs1(code)?.gtin ?? null);
+
+    try {
+      const item = (gtin ? await findItemByBarcode(gtin) : null) ?? (await findItemByBarcode(bare));
+      if (item) setFound(item);
+      // Prefill with the GTIN so the new row is findable by the next scan.
+      else setUnknownBarcode(gtin ?? bare);
+    } catch {
+      // This ran unguarded, so a failed lookup rejected into nothing and the
+      // screen simply did not respond -- indistinguishable from a dead scanner.
+      setError(`Read ${gtin ?? bare}, but couldn't reach the inventory to look it up.`);
+    }
   }
 
   async function onManualLookup() {
@@ -140,14 +161,19 @@ export default function Scan() {
       </p>
 
       {/*
-       * Capped, so the controls under it stay on screen. A portrait stream
-       * renders about 1.8x its own width, which on a phone is the entire
-       * viewport on its own.
+       * Deliberately NOT height-capped, and do not add one.
+       *
+       * html5-qrcode maps the scan box onto the source frame with
+       * videoHeight / videoElement.clientHeight, then drawImage()s that source
+       * rectangle. That arithmetic assumes the element displays the whole
+       * frame. Shrink the video with max-height and object-fit and the element
+       * shows a centre crop while the ratio still divides by the shrunken
+       * clientHeight, so the region actually scanned drifts away from the
+       * region drawn on screen -- it aims somewhere other than where you point
+       * it. Reachability of the controls is solved by putting them above this,
+       * which is where they now are.
        */}
-      <div
-        id={SCANNER_ID}
-        className="mt-4 max-h-[38vh] overflow-hidden rounded-xl [&_video]:!max-h-[38vh] [&_video]:!object-cover"
-      />
+      <div id={SCANNER_ID} className="mt-4 overflow-hidden rounded-xl" />
       {/* Never visible: html5-qrcode needs a mounted element to attach a
           file-decode instance to. */}
       <div id={FILE_SCANNER_ID} className="hidden" />
@@ -166,7 +192,9 @@ export default function Scan() {
 
       {error && (
         <p className="mt-3 rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-300">
-          {error}. You can still look up an item manually below.
+          {/* The messages are whole sentences already; appending another one
+              here produced "…try again.. You can still…". */}
+          {error} You can still enter the code by hand below.
         </p>
       )}
 
