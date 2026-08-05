@@ -83,7 +83,19 @@ export function parseGs1(input: string): Gs1Fields | null {
    * leading-digits test below, parseGs1 returns null, and the app tells the rep
    * "not a recognized barcode" about a barcode it read perfectly.
    */
-  const raw = input.replace(/^\][A-Za-z]\d/, "");
+  /*
+   * ...and then strip a leading FNC1. A GS1 data-matrix encodes FNC1 in the
+   * first position, and decoders surface that as ASCII 29 at the head of the
+   * payload: a real code off an implant box decodes to "\x1d0107630971260993
+   * 17310311102604455", not to "0107...". The AI walker below starts with a
+   * `/^\d{2}/` guard, so that leading separator made parseGs1 return null for
+   * every correctly-read data-matrix in the app -- the primary symbol on
+   * Medacta packaging -- and the rep was told "not a recognized barcode" about
+   * a barcode that had just been decoded perfectly.
+   */
+  const SEPARATOR = String.fromCharCode(29);
+  let raw = input.replace(/^\][A-Za-z]\d/, "");
+  while (raw.startsWith(SEPARATOR)) raw = raw.slice(1);
   const out: Gs1Fields = { gtin: null, lot: null, expiration: null };
   const setAI = (ai: string, value: string) => {
     const v = value.trim();
