@@ -72,7 +72,7 @@ export default function Knowledge() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search or create a note…"
+          placeholder="Search or create a page…"
           className="w-full rounded-lg border border-slate-700 bg-slate-800 py-3 pl-9 pr-4 text-slate-100 placeholder:text-slate-500"
         />
       </div>
@@ -91,7 +91,7 @@ export default function Knowledge() {
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : filtered.length === 0 ? (
         <p className="mt-8 text-slate-400">
-          {pages.length === 0 ? "No notes yet — create the first one above." : "No notes match."}
+          {pages.length === 0 ? "No pages yet — create the first one above." : "No pages match."}
         </p>
       ) : (
         <div className="mt-4 space-y-2">

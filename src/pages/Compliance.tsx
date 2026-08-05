@@ -225,7 +225,7 @@ function FacilityEditor({ facility, onSaved }: { facility: Facility; onSaved: ()
           {facility.address && <p className="truncate text-xs text-slate-500">{facility.address}</p>}
         </div>
         <span className="flex shrink-0 items-center gap-2">
-          <WikiLinkButton entityType="facility" entityId={facility.id} title={facility.name} label="Wiki" />
+          <WikiLinkButton entityType="facility" entityId={facility.id} title={facility.name} label="Page" />
           <button
             onClick={() => setEditing(true)}
             className="min-h-0 shrink-0 text-xs text-sky-400 underline"

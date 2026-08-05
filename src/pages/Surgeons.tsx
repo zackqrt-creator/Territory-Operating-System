@@ -157,7 +157,7 @@ function SurgeonCard({
             onSaved();
           }}
         />
-        <WikiLinkButton entityType="surgeon" entityId={surgeon.id} title={surgeon.name} label="Wiki" className="shrink-0" />
+        <WikiLinkButton entityType="surgeon" entityId={surgeon.id} title={surgeon.name} label="Page" className="shrink-0" />
       </div>
 
       {done.length > 0 && (

@@ -95,7 +95,7 @@ export default function Sets() {
             Set definitions
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            What's in each set, and who it goes to — rename here, edit the rules on its wiki page.
+            What's in each set, and who it goes to — rename here, edit the rules on its page.
           </p>
           <div className="mt-2 space-y-2">
             {templates.map((t) => (
@@ -121,7 +121,7 @@ export default function Sets() {
                   entityType="tote_template"
                   entityId={t.id}
                   title={t.name}
-                  label="Wiki"
+                  label="Page"
                   className="shrink-0"
                 />
               </div>

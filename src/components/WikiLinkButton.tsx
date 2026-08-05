@@ -6,15 +6,17 @@ import { ensureCanonicalPage } from "../lib/api";
 import type { PageEntityType } from "../lib/types";
 
 /**
- * Opens (or creates on first tap) the canonical wiki page for a record —
+ * Opens (or creates on first tap) the canonical Knowledge page for a record —
  * the same button shape everywhere so surgeons, facilities, and sets all
- * reach the same linked-note graph the same way.
+ * reach the same linked-page graph the same way.
  */
 export default function WikiLinkButton({
   entityType,
   entityId,
   title,
-  label = "Open note",
+  // "Page", not "note". They are different tables and different screens, and
+  // calling a page a note is what made the wrong route look right for months.
+  label = "Page",
   className = "",
 }: {
   entityType: PageEntityType;
