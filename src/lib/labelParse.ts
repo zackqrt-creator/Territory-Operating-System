@@ -74,7 +74,16 @@ function gs1Date(yymmdd: string): string | null {
  *    optional FNC1/GS (\x1d) separators after variable-length fields.
  * Returns null if it doesn't look like a GS1 string at all.
  */
-export function parseGs1(raw: string): Gs1Fields | null {
+export function parseGs1(input: string): Gs1Fields | null {
+  /*
+   * Strip a leading AIM symbology identifier: "]" plus a letter plus a digit.
+   * Decoders are free to prefix the decoded text with one, and the two that
+   * appear on implant packaging are exactly the ones that do it -- "]d2" for a
+   * GS1 data-matrix and "]C1" for a GS1-128. Left in place the prefix fails the
+   * leading-digits test below, parseGs1 returns null, and the app tells the rep
+   * "not a recognized barcode" about a barcode it read perfectly.
+   */
+  const raw = input.replace(/^\][A-Za-z]\d/, "");
   const out: Gs1Fields = { gtin: null, lot: null, expiration: null };
   const setAI = (ai: string, value: string) => {
     const v = value.trim();

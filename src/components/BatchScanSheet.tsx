@@ -3,6 +3,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { useAuth } from "../hooks/useAuth";
 import { createInventoryItem, linkCatalogItemGtin, listCatalogItems } from "../lib/api";
 import { catalogLabel, parseGs1 } from "../lib/labelParse";
+import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage } from "../lib/scanning";
 import type { CatalogItem, Facility, ItemCategory } from "../lib/types";
 
 const SCANNER_ID = "casetrack-batch-scanner";
@@ -66,17 +67,17 @@ export default function BatchScanSheet({
   }, []);
 
   useEffect(() => {
-    const scanner = new Html5Qrcode(SCANNER_ID);
+    const scanner = new Html5Qrcode(SCANNER_ID, SCANNER_CONFIG);
     const startPromise = scanner
       .start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 260, height: 260 } },
+        CAMERA_CONFIG,
         (decodedText) => onDetected(decodedText),
         () => {
           /* per-frame no-match noise, ignore */
         },
       )
-      .catch((err) => setError(err?.message ?? "Could not start camera"));
+      .catch((err) => setError(cameraErrorMessage(err)));
 
     return () => {
       startPromise.then(() => scanner.stop().catch(() => {})).catch(() => {});

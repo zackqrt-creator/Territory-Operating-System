@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Image, ImageUp, ScanLine, Trash2, X } from "lucide-react";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { ocrPage } from "../lib/ocr";
 import { parseGs1 } from "../lib/labelParse";
+import { CAMERA_CONFIG, SCANNER_CONFIG } from "../lib/scanning";
 import {
   inferCategory,
   inferJoint,
@@ -21,14 +22,6 @@ const SCANNER_ID = "casetrack-slip-scanner";
  * linear one. Naming the formats explicitly keeps the decoder from spending
  * every frame on formats that never appear on medical packaging.
  */
-const FORMATS = [
-  Html5QrcodeSupportedFormats.DATA_MATRIX,
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.QR_CODE,
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.ITF,
-];
 
 export interface SlipContentLine {
   catalog_item_id: string | null;
@@ -127,41 +120,13 @@ export default function PackingSlipScan({
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
 
   useEffect(() => {
-    const scanner = new Html5Qrcode(SCANNER_ID, {
-      formatsToSupport: FORMATS,
-      // Uses the platform's own barcode decoder where there is one, which is
-      // dramatically better at small data-matrix codes than the JS fallback.
-      useBarCodeDetectorIfSupported: true,
-      verbose: false,
-    });
+    const scanner = new Html5Qrcode(SCANNER_ID, SCANNER_CONFIG);
     scannerRef.current = scanner;
 
     const started = scanner
       .start(
         { facingMode: "environment" },
-        {
-          fps: 10,
-          // A GS1-128 on a box is wide and short; a square box makes the rep
-          // hold the label at arm's length to fit it in.
-          qrbox: (w, h) => ({
-            width: Math.floor(Math.min(w * 0.92, 420)),
-            height: Math.floor(Math.min(h * 0.65, 260)),
-          }),
-          // The default capture resolution is around 640x480, and a GS1
-          // data-matrix on an implant box is only a few millimetres across --
-          // at that resolution its modules land inside a single pixel and it
-          // simply never decodes. Asking for 1080p with continuous autofocus is
-          // the difference between this working and the rep standing there
-          // holding a box at the camera.
-          videoConstraints: {
-            facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            // Not in the standard constraint typings, but honoured by mobile
-            // browsers and essential this close to the subject.
-            advanced: [{ focusMode: "continuous" }],
-          } as unknown as MediaTrackConstraints,
-        },
+        CAMERA_CONFIG,
         (text) => onDetected(text),
         () => {
           /* per-frame no-match noise, ignore */
