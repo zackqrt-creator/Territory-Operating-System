@@ -4,7 +4,7 @@ import { Camera } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { createInventoryItem, linkCatalogItemGtin, listCatalogItems } from "../lib/api";
 import { catalogLabel, parseGs1 } from "../lib/labelParse";
-import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage } from "../lib/scanning";
+import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage, decodePhoto } from "../lib/scanning";
 import type { CatalogItem, Facility, ItemCategory } from "../lib/types";
 
 const SCANNER_ID = "casetrack-batch-scanner";
@@ -95,10 +95,14 @@ export default function BatchScanSheet({
     setDecoding(true);
     try {
       fileScannerRef.current ??= new Html5Qrcode(FILE_SCANNER_ID, SCANNER_CONFIG);
-      const result = await fileScannerRef.current.scanFileV2(file, false);
-      onDetected(result.decodedText);
+      const text = await decodePhoto(file, fileScannerRef.current);
+      if (text) onDetected(text);
+      else
+        setError(
+          "No barcode found in that photo. Blur is what usually beats it -- tap the label on screen to focus before you shoot.",
+        );
     } catch {
-      setError("No barcode found in that photo. Fill the frame with the barcode and try again.");
+      setError("Something went wrong reading that photo. Try taking it again.");
     } finally {
       setDecoding(false);
     }

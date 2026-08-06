@@ -7,7 +7,7 @@ import type { Facility, InventoryItem } from "../lib/types";
 import MoveItemSheet from "../components/MoveItemSheet";
 import AddItemSheet from "../components/AddItemSheet";
 import { BatchScanSheet } from "../components/scanners";
-import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage } from "../lib/scanning";
+import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage, decodePhoto } from "../lib/scanning";
 
 const SCANNER_ID = "casetrack-scanner";
 /** A second, camera-less instance: html5-qrcode cannot decode a file on an
@@ -76,12 +76,14 @@ export default function Scan() {
       // Reused: scanFileV2 appends canvases to its element, so a fresh
       // instance per photo would pile them up for as long as the page lives.
       fileScannerRef.current ??= new Html5Qrcode(FILE_SCANNER_ID, SCANNER_CONFIG);
-      const result = await fileScannerRef.current.scanFileV2(file, false);
-      await onDetected(result.decodedText);
+      const text = await decodePhoto(file, fileScannerRef.current);
+      if (text) await onDetected(text);
+      else
+        setError(
+          "No barcode found in that photo. Blur is what usually beats it — tap the label on screen to focus before you shoot, and keep the camera square to it.",
+        );
     } catch {
-      setError(
-        "No barcode found in that photo. Get closer to the barcode under the GTIN, hold steady, and try again.",
-      );
+      setError("Something went wrong reading that photo. Try taking it again.");
     } finally {
       setDecoding(false);
     }
