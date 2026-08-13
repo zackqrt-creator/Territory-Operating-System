@@ -146,11 +146,12 @@ export default function Scan() {
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-3 font-semibold text-white disabled:opacity-50"
       >
         <Camera size={17} aria-hidden />
-        {decoding ? "Reading photo…" : "Take a photo of the label"}
+        {decoding ? "Reading photo…" : "Photo of the label"}
       </button>
       <p className="mt-1.5 text-xs text-slate-500">
-        Most reliable for the small square data-matrix code. The live camera below works for
-        larger tray and kit barcodes.
+        Take one now or pick an existing photo — either reads the GTIN, lot and expiry off the
+        box. This is the reliable route for the small square data-matrix; the live camera below
+        suits larger tray and kit barcodes.
       </p>
 
       {/*

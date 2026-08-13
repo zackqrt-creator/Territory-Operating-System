@@ -227,7 +227,8 @@ export default function BatchScanSheet({
           {decoding ? "Reading photo\u2026" : "Add a box by photo"}
         </button>
         <p className="mt-1.5 text-xs text-slate-500">
-          Adds one box per photo, and reads the small square data-matrix the live camera misses.
+          Take one or pick from your library — one box per photo. Reads the small square
+          data-matrix the live camera misses.
         </p>
 
         {/* No height cap on this: html5-qrcode maps the scan box onto the

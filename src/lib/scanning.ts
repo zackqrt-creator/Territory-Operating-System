@@ -1,5 +1,6 @@
 import { Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { readBarcodes, prepareZXingModule } from "zxing-wasm/reader";
+import type { ReaderOptions } from "zxing-wasm/reader";
 // Vite emits the wasm as a hashed asset and hands us its URL, so it is served
 // from our own origin. Left to itself zxing-wasm fetches from a CDN, which
 // would put the scanner behind a third party and break it offline -- and this
@@ -34,12 +35,11 @@ import type { Html5QrcodeCameraScanConfig, Html5QrcodeFullConfig } from "html5-q
  * the depth of field. Neither makes the live camera reliable on a data-matrix
  * a few millimetres across.
  *
- * The path that IS reliable is a still photo. scanFileV2 decodes the image at
- * its native size -- 12 megapixels off an iPhone rather than a few hundred
- * CSS pixels -- and runs the robust decoder rather than the single-pass one.
- * Any screen offering a live scanner must also offer the photo, above the
- * fold, or it is offering the path that mostly fails and hiding the one that
- * works.
+ * The path that IS reliable is a still photo through decodePhoto() below,
+ * which runs zxing-cpp over the image at its native size -- 12 megapixels off
+ * an iPhone rather than a few hundred CSS pixels. Any screen offering a live
+ * scanner must also offer the photo, above the fold, or it is offering the
+ * path that mostly fails and hiding the one that works.
  *
  * The format list is a narrowing, not an enabling: html5-qrcode already
  * defaults to every format it knows. Naming the six that appear on medical
@@ -108,15 +108,56 @@ export const CAMERA_CONFIG: Html5QrcodeCameraScanConfig = {
  * tryHarder / tryRotate / tryInvert are what buy the tilt and the dark-on-light
  * tolerance; they cost tens of milliseconds, not hundreds.
  */
+const READ_OPTIONS: ReaderOptions = {
+  formats: ["DataMatrix", "Code128", "Code39", "QRCode", "EAN-13", "ITF"],
+  tryHarder: true,
+  tryRotate: true,
+  tryInvert: true,
+  maxNumberOfSymbols: 1,
+};
+
 export async function decodePhoto(file: Blob): Promise<string | null> {
-  const results = await readBarcodes(file, {
-    formats: ["DataMatrix", "Code128", "Code39", "QRCode", "EAN-13", "ITF"],
-    tryHarder: true,
-    tryRotate: true,
-    tryInvert: true,
-    maxNumberOfSymbols: 1,
-  });
-  return results.length ? results[0].text : null;
+  try {
+    const results = await readBarcodes(file, READ_OPTIONS);
+    if (results.length) return results[0].text;
+  } catch {
+    // Fall through to the re-encode below rather than giving up: the most
+    // likely reason readBarcodes rejects a file outright is a container it
+    // cannot parse, not an image it cannot read.
+  }
+
+  /*
+   * Second attempt, via the browser's own image decoder.
+   *
+   * A photo picked from the library rather than taken live can arrive as HEIC,
+   * which is what an iPhone stores by default. The browser can decode it even
+   * where the wasm cannot, so re-encoding to PNG through a canvas turns "this
+   * file format is unsupported" into an ordinary decode. It also normalises
+   * EXIF rotation, which a library photo carries and a barcode cares about.
+   */
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(
+    () => null,
+  );
+  if (!bitmap) return null;
+
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0);
+
+    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!png) return null;
+
+    const results = await readBarcodes(png, READ_OPTIONS);
+    return results.length ? results[0].text : null;
+  } catch {
+    return null;
+  } finally {
+    bitmap.close?.();
+  }
 }
 
 /**
