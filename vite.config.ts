@@ -47,7 +47,12 @@ export default defineConfig({
         // whether anything newer existed. Navigations now go to the network
         // first and fall back to the last good copy, so being offline still
         // works but being online always wins.
-        globPatterns: ["**/*.{js,css,png,svg,ico,woff2}"],
+        // `wasm` is here for the barcode decoder (zxing-cpp, ~1.1MB). Without
+        // it the scanner works online and silently fails in a hospital
+        // basement, which is where it is most needed. It is also why the
+        // precache limit below is raised past Workbox's 2MB default.
+        globPatterns: ["**/*.{js,css,png,svg,ico,woff2,wasm}"],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // Workbox otherwise registers a NavigationRoute that answers every
         // navigation straight out of the precache -- which is exactly the
         // freeze. It also has to be off because index.html is no longer in

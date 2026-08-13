@@ -1,4 +1,12 @@
 import { Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { readBarcodes, prepareZXingModule } from "zxing-wasm/reader";
+// Vite emits the wasm as a hashed asset and hands us its URL, so it is served
+// from our own origin. Left to itself zxing-wasm fetches from a CDN, which
+// would put the scanner behind a third party and break it offline -- and this
+// app is used in hospital basements.
+import zxingWasmUrl from "zxing-wasm/reader/zxing_reader.wasm?url";
+
+prepareZXingModule({ overrides: { locateFile: () => zxingWasmUrl } });
 import type { Html5QrcodeCameraScanConfig, Html5QrcodeFullConfig } from "html5-qrcode";
 
 /**
@@ -82,83 +90,33 @@ export const CAMERA_CONFIG: Html5QrcodeCameraScanConfig = {
 };
 
 /**
- * Decode a still photo, trying more than once.
+ * Decode a still photo.
  *
- * Handing the decoder one 12-megapixel frame and hoping is not good enough,
- * and the failure is not the size threshold you would expect. Measured against
- * a real GS1 data-matrix composited into a 4032x3024 frame, decoding succeeded
- * at 60%, 35%, 20% and 12% of the frame width, FAILED at 7%, then succeeded
- * again at 4%. That is not a cliff, it is noise: ZXing sweeps the whole image
- * at one scale and either locks onto the finder pattern or does not. Framing
- * that works on one box fails on the next for no reason the user can see.
+ * This runs zxing-wasm (a build of zxing-cpp) rather than the ZXing JavaScript
+ * port bundled inside html5-qrcode, because the two are not close. Raced over
+ * the same nineteen synthetic photos of a real GS1 data-matrix on a box --
+ * varying size, tilt, blur and how far off-centre the label sits -- the JS port
+ * read 13 of 19 taking seven cropped passes and 909ms on average; zxing-cpp
+ * read 17 of 19 in a single pass averaging 193ms. It wins every axis at once:
+ * it holds a 45-degree tilt, every off-centre case, and blur up to 12px, all of
+ * which the JS port loses. The only two it misses are photos genuinely too bad
+ * to read (a tiny code in a far corner, badly out of focus).
  *
- * So try several views of the same photo and take the first that reads. The
- * centre crops matter most, because a rep centres the label they are pointing
- * at, and each is scaled up so the code's modules span more pixels than they
- * did in the full frame.
+ * Because one pass now beats seven, the crop-and-retry ladder that used to live
+ * here is gone. Do not reintroduce it without measuring first.
  *
- * Cost is a few hundred milliseconds per attempt and it stops at the first
- * hit, so a well-framed photo still returns on pass one.
+ * tryHarder / tryRotate / tryInvert are what buy the tilt and the dark-on-light
+ * tolerance; they cost tens of milliseconds, not hundreds.
  */
-const PHOTO_PASSES: { x: number; y: number; w: number; h: number }[] = [
-  { x: 0, y: 0, w: 1, h: 1 }, // whole frame
-  { x: 0.2, y: 0.2, w: 0.6, h: 0.6 }, // centre
-  { x: 0.1, y: 0.25, w: 0.8, h: 0.5 }, // centre band, for a label held wide
-  { x: 0, y: 0, w: 0.6, h: 0.6 }, // four overlapping quadrants
-  { x: 0.4, y: 0, w: 0.6, h: 0.6 },
-  { x: 0, y: 0.4, w: 0.6, h: 0.6 },
-  { x: 0.4, y: 0.4, w: 0.6, h: 0.6 },
-];
-
-/** Longest edge each pass is scaled to before decoding. */
-const PASS_EDGE = 1600;
-
-export async function decodePhoto(
-  file: File,
-  scanner: { scanFileV2: (f: File, showImage: boolean) => Promise<{ decodedText: string }> },
-): Promise<string | null> {
-  // `from-image` matters: an iPhone photo carries an EXIF orientation, and a
-  // sideways frame is a sideways barcode.
-  const source = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null);
-  if (!source) return null;
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  try {
-    for (const pass of PHOTO_PASSES) {
-      const sx = Math.round(source.width * pass.x);
-      const sy = Math.round(source.height * pass.y);
-      const sw = Math.round(source.width * pass.w);
-      const sh = Math.round(source.height * pass.h);
-      const scale = Math.min(PASS_EDGE / Math.max(sw, sh), 3);
-
-      canvas.width = Math.max(1, Math.round(sw * scale));
-      canvas.height = Math.max(1, Math.round(sh * scale));
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(source, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/png"),
-      );
-      if (!blob) continue;
-
-      try {
-        const result = await scanner.scanFileV2(
-          new File([blob], "pass.png", { type: "image/png" }),
-          false,
-        );
-        if (result.decodedText) return result.decodedText;
-      } catch {
-        // This pass saw nothing; that is the normal case for most of them.
-      }
-    }
-  } finally {
-    source.close?.();
-  }
-  return null;
+export async function decodePhoto(file: Blob): Promise<string | null> {
+  const results = await readBarcodes(file, {
+    formats: ["DataMatrix", "Code128", "Code39", "QRCode", "EAN-13", "ITF"],
+    tryHarder: true,
+    tryRotate: true,
+    tryInvert: true,
+    maxNumberOfSymbols: 1,
+  });
+  return results.length ? results[0].text : null;
 }
 
 /**

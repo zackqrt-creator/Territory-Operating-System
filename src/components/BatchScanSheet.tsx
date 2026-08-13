@@ -8,7 +8,6 @@ import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage, decodePhoto } from "
 import type { CatalogItem, Facility, ItemCategory } from "../lib/types";
 
 const SCANNER_ID = "casetrack-batch-scanner";
-const FILE_SCANNER_ID = "casetrack-batch-scanner-file";
 const CATEGORY_OPTIONS: { value: ItemCategory; label: string }[] = [
   { value: "implant", label: "Implant" },
   { value: "consumable", label: "Efficiency" },
@@ -55,7 +54,6 @@ export default function BatchScanSheet({
   const [flash, setFlash] = useState<string | null>(null);
   const [decoding, setDecoding] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
-  const fileScannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const rowsRef = useRef<BatchRow[]>([]);
@@ -94,8 +92,7 @@ export default function BatchScanSheet({
     setError(null);
     setDecoding(true);
     try {
-      fileScannerRef.current ??= new Html5Qrcode(FILE_SCANNER_ID, SCANNER_CONFIG);
-      const text = await decodePhoto(file, fileScannerRef.current);
+      const text = await decodePhoto(file);
       if (text) onDetected(text);
       else
         setError(
@@ -237,7 +234,6 @@ export default function BatchScanSheet({
             source frame via videoHeight / clientHeight, so CSS-cropping the
             video makes it scan somewhere other than where the box is drawn. */}
         <div id={SCANNER_ID} className="mt-3 overflow-hidden rounded-xl" />
-        <div id={FILE_SCANNER_ID} className="hidden" />
         <input
           ref={photoRef}
           type="file"

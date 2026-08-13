@@ -10,9 +10,6 @@ import { BatchScanSheet } from "../components/scanners";
 import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage, decodePhoto } from "../lib/scanning";
 
 const SCANNER_ID = "casetrack-scanner";
-/** A second, camera-less instance: html5-qrcode cannot decode a file on an
- *  instance that is currently driving a video stream. */
-const FILE_SCANNER_ID = "casetrack-scanner-file";
 
 export default function Scan() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -23,7 +20,6 @@ export default function Scan() {
   const [batchMode, setBatchMode] = useState(false);
   const [decoding, setDecoding] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
-  const fileScannerRef = useRef<Html5Qrcode | null>(null);
 
   // Scan callbacks are registered once with the camera; a ref (not state)
   // lets them see the latest "is a sheet open" value without restarting the camera.
@@ -63,20 +59,15 @@ export default function Scan() {
   /**
    * Decode from a still photo.
    *
-   * The live preview is capped by whatever the browser hands the video track;
-   * a photo comes off the full sensor. On a label the camera cannot hold focus
-   * on -- a curved foil pouch, a box at arm's length in a dim corridor -- this
-   * is the path that actually works, so it is a peer of the live camera here,
-   * not a hidden fallback.
+   * A still comes off the full sensor and goes to zxing-cpp, which reads a
+   * data-matrix far better than the live path can. This is the reliable route,
+   * so it is a peer of the camera here, not a hidden fallback.
    */
   async function onPhoto(file: File) {
     setError(null);
     setDecoding(true);
     try {
-      // Reused: scanFileV2 appends canvases to its element, so a fresh
-      // instance per photo would pile them up for as long as the page lives.
-      fileScannerRef.current ??= new Html5Qrcode(FILE_SCANNER_ID, SCANNER_CONFIG);
-      const text = await decodePhoto(file, fileScannerRef.current);
+      const text = await decodePhoto(file);
       if (text) await onDetected(text);
       else
         setError(
@@ -176,9 +167,6 @@ export default function Scan() {
        * which is where they now are.
        */}
       <div id={SCANNER_ID} className="mt-4 overflow-hidden rounded-xl" />
-      {/* Never visible: html5-qrcode needs a mounted element to attach a
-          file-decode instance to. */}
-      <div id={FILE_SCANNER_ID} className="hidden" />
 
       <input
         ref={photoRef}
