@@ -311,6 +311,16 @@ export default function Home() {
             <Link to="/cases" className="mt-2 flex items-center gap-1 text-sm text-sky-400">
               Open calendar <ArrowRight className="h-3.5 w-3.5" />
             </Link>
+            <Link
+              to="/readiness"
+              className="mt-3 flex items-center justify-between rounded-xl border border-sky-800/70 bg-sky-950/25 px-3 py-3 active:bg-sky-950/40"
+            >
+              <span>
+                <span className="block text-sm font-semibold text-sky-200">Inventory coverage</span>
+                <span className="block text-xs text-slate-500">Surgeries, shortages, and recent usage · 7 days</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-sky-400" />
+            </Link>
           </section>
 
           {/* ── What goes in the car tonight ────────────────── */}
