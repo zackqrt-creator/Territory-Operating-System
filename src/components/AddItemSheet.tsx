@@ -355,7 +355,7 @@ export default function AddItemSheet({
                 : a === "loaner"
                   ? "Loaner tote"
                   : a === "restock"
-                    ? "Restock"
+                    ? "Receive"
                     : "Whole tote"}
             </button>
           ))}

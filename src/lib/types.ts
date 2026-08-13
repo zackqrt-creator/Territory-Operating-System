@@ -151,6 +151,27 @@ export interface InventoryItem {
 export type SterilizationStatus = "sterile" | "processing" | "expired" | "unknown";
 export type DeliveryStatus = "ordered" | "in_transit" | "delivered";
 
+export type InventoryReceiptStatus = "draft" | "posted" | "voided";
+export type InventoryReceiptSource = "company_shipment" | "loaner" | "transfer" | "return" | "other";
+
+export interface InventoryReceipt {
+  id: string;
+  territory_id: string;
+  receiving_location_id: string;
+  status: InventoryReceiptStatus;
+  source_type: InventoryReceiptSource;
+  vendor_name: string | null;
+  packing_slip_number: string | null;
+  tracking_number: string | null;
+  received_at: string;
+  received_by: string;
+  notes: string | null;
+  posted_at: string | null;
+  posted_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Movement {
   id: string;
   territory_id: string;

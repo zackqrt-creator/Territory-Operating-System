@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { ImageUp, ScanLine, Trash2 } from "lucide-react";
-import { createConsignmentRestock, uploadItemPhoto } from "../lib/api";
-import { useAuth } from "../hooks/useAuth";
+import { receiveInventoryShipment } from "../lib/api";
 import { PackingSlipScan } from "./scanners";
 import type { SlipContentLine } from "./PackingSlipScan";
 import type { CatalogItem, Facility } from "../lib/types";
@@ -30,14 +29,17 @@ export default function RestockIntake({
   onCreated: () => void;
   onCancel: () => void;
 }) {
-  const { profile } = useAuth();
   const [locationId, setLocationId] = useState(defaultLocationId || facilities[0]?.id || "");
   const [lines, setLines] = useState<SlipContentLine[]>([]);
   const [shipmentNo, setShipmentNo] = useState<string | null>(null);
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [vendorName, setVendorName] = useState("Medacta");
+  const [notes, setNotes] = useState("");
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
   function onPhotoSelected(file: File | null) {
@@ -51,13 +53,16 @@ export default function RestockIntake({
   async function save() {
     if (!territoryId || !locationId || lines.length === 0) return;
     setSaving(true);
+    setError(null);
     try {
-      await createConsignmentRestock({
+      await receiveInventoryShipment({
         territoryId,
         locationId,
-        shipmentNo,
-        movedBy: profile?.id ?? null,
-        photoUrl: photoFile ? await uploadItemPhoto(photoFile, territoryId) : null,
+        packingSlipNumber: shipmentNo,
+        trackingNumber,
+        vendorName,
+        notes,
+        attachment: photoFile,
         lines: lines.map((l) => ({
           catalog_item_id: l.catalog_item_id,
           name: l.name,
@@ -68,6 +73,8 @@ export default function RestockIntake({
         })),
       });
       onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't receive this shipment.");
     } finally {
       setSaving(false);
     }
@@ -78,9 +85,8 @@ export default function RestockIntake({
   return (
     <div className="mt-4 space-y-4">
       <p className="text-xs text-slate-500">
-        Scanning opens the camera and reads box barcodes as you point at them — one
-        after another, with the lot and expiry exactly as printed. Photo only
-        attaches an image without reading it.
+        Scan the boxes or packing sheet, verify the lines, then post the receipt.
+        Inventory changes only after the complete shipment is saved.
       </p>
 
       <div className="grid grid-cols-2 gap-2">
@@ -101,7 +107,7 @@ export default function RestockIntake({
         <input
           ref={photoRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.pdf,.csv,.xls,.xlsx"
           className="hidden"
           onChange={(e) => {
             onPhotoSelected(e.target.files?.[0] ?? null);
@@ -110,12 +116,18 @@ export default function RestockIntake({
         />
       </div>
 
-      {photoPreview && (
+      {photoPreview && photoFile?.type.startsWith("image/") && (
         <img
           src={photoPreview}
           alt="Shipment"
           className="h-28 w-full rounded-lg border border-slate-700 object-cover"
         />
+      )}
+      {photoFile && !photoFile.type.startsWith("image/") && (
+        <div className="rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2">
+          <p className="truncate text-sm text-slate-200">{photoFile.name}</p>
+          <p className="text-xs text-slate-500">Attached to this receipt</p>
+        </div>
       )}
 
       <div>
@@ -131,6 +143,38 @@ export default function RestockIntake({
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm text-slate-400">Sender</label>
+          <input
+            value={vendorName}
+            onChange={(e) => setVendorName(e.target.value)}
+            placeholder="Medacta"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100 placeholder:text-slate-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm text-slate-400">Tracking number</label>
+          <input
+            value={trackingNumber}
+            onChange={(e) => setTrackingNumber(e.target.value)}
+            placeholder="Optional"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100 placeholder:text-slate-500"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm text-slate-400">Receiving notes</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          placeholder="Damage, shortages, or anything to follow up"
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-slate-100 placeholder:text-slate-500"
+        />
       </div>
 
       {shipmentNo && (
@@ -191,9 +235,15 @@ export default function RestockIntake({
           disabled={saving || lines.length === 0 || !locationId}
           className="flex-1 rounded-lg bg-sky-600 px-4 py-3 font-medium text-white disabled:opacity-50"
         >
-          {saving ? "Saving..." : `Stock ${totalUnits} unit${totalUnits === 1 ? "" : "s"}`}
+          {saving ? "Posting receipt..." : `Receive ${totalUnits} unit${totalUnits === 1 ? "" : "s"}`}
         </button>
       </div>
+
+      {error && (
+        <p className="rounded-lg border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+          {error}
+        </p>
+      )}
 
       {scanning && (
         <PackingSlipScan

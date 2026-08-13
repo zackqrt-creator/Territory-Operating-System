@@ -27,6 +27,7 @@ import type {
   Facility,
   FacilityCredential,
   InventoryItem,
+  InventoryReceipt,
   ItemCategory,
   Movement,
   NoteEntityType,
@@ -2082,71 +2083,91 @@ export async function deleteTaskPhoto(id: string): Promise<void> {
 }
 
 /**
- * Consignment restock from a shipment slip.
+ * Receives a multi-line shipment through the auditable receipt ledger.
  *
- * The same paper slip that ships inside a loaner kit also arrives with
- * consignment replenishment -- stock sent to refill what earlier surgeries
- * consumed. The document looks identical; only the destination differs. A
- * loaner slip builds one tote with contents hanging off it, while a restock
- * slip becomes plain consignment rows that roll straight into on-hand totals.
+ * The receipt stays a draft until every line and attachment has been saved.
+ * The final RPC posts it once and creates both inventory and movement history
+ * in one database transaction, so a dropped connection cannot leave half a
+ * shipment on hand.
  */
-export async function createConsignmentRestock(params: {
+export async function receiveInventoryShipment(params: {
   territoryId: string;
   locationId: string;
-  photoUrl?: string | null;
-  shipmentNo?: string | null;
-  movedBy?: string | null;
+  packingSlipNumber?: string | null;
+  trackingNumber?: string | null;
+  vendorName?: string | null;
+  notes?: string | null;
+  attachment?: File | null;
   lines: LoanerContentLine[];
-}): Promise<number> {
-  // Teach the catalog first, so the stock rows below can point at real entries
-  // rather than landing as orphans that the next slip will fail to match too.
+}): Promise<InventoryReceipt> {
   const learned = await learnCatalogItems(params.lines, params.territoryId);
-
-  const rows = params.lines
-    .filter((l) => l.quantity > 0)
-    .map((l) => ({
-      name: l.name,
-      category: l.category,
-      catalog_item_id:
-        l.catalog_item_id ?? (l.item_number ? (learned.get(l.item_number) ?? null) : null),
-      lot_number: l.lot_number ?? null,
-      expiration_date: l.expiration_date ?? null,
-      location_id: params.locationId,
+  const { data: receipt, error: receiptError } = await supabase
+    .from("inventory_receipts")
+    .insert({
       territory_id: params.territoryId,
-      acquisition_type: "consignment" as const,
-      // The shipment number is the paper trail back to this delivery.
-      loaner_code: params.shipmentNo ?? null,
-      photo_url: params.photoUrl ?? null,
-      quantity: l.quantity,
+      receiving_location_id: params.locationId,
+      source_type: "company_shipment",
+      vendor_name: params.vendorName?.trim() || null,
+      packing_slip_number: params.packingSlipNumber?.trim() || null,
+      tracking_number: params.trackingNumber?.trim() || null,
+      notes: params.notes?.trim() || null,
+    })
+    .select()
+    .single();
+  if (receiptError) throw receiptError;
+  const draft = receipt as InventoryReceipt;
+
+  const lines = params.lines
+    .filter((line) => line.quantity > 0)
+    .map((line, index) => ({
+      receipt_id: draft.id,
+      territory_id: params.territoryId,
+      line_number: index + 1,
+      catalog_item_id:
+        line.catalog_item_id ??
+        (line.item_number ? (learned.get(line.item_number) ?? null) : null),
+      item_number: line.item_number ?? null,
+      item_name: line.name,
+      category: line.category,
+      quantity_expected: line.quantity,
+      quantity_received: line.quantity,
+      lot_number: line.lot_number ?? null,
+      expiration_date: line.expiration_date ?? null,
+      acquisition_type: "consignment",
     }));
 
-  if (rows.length === 0) return 0;
-  const { data, error } = await supabase.from("inventory_items").insert(rows).select();
-  if (error) throw error;
+  const { error: linesError } = await supabase.from("inventory_receipt_lines").insert(lines);
+  if (linesError) throw linesError;
 
-  // Log the restock as movements so it shows up in today's activity. Without
-  // this the stock silently appears on hand and there is no record that this
-  // is the shipment replacing what last week's cases used.
-  const created = (data ?? []) as InventoryItem[];
-  if (created.length > 0) {
-    const note = params.shipmentNo ? `Restocked ${params.shipmentNo}` : "Restocked";
-    const { error: moveError } = await supabase.from("movements").insert(
-      created.map((item) => ({
+  if (params.attachment) {
+    const original = params.attachment;
+    const upload = original.type.startsWith("image/") ? await downscaleImage(original) : original;
+    const safeName = original.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+    const path = `${params.territoryId}/${draft.id}/${Date.now()}-${safeName}`;
+    const { error: uploadError } = await supabase.storage
+      .from("receipt-attachments")
+      .upload(path, upload);
+    if (uploadError) throw uploadError;
+
+    const { error: attachmentError } = await supabase
+      .from("inventory_receipt_attachments")
+      .insert({
+        receipt_id: draft.id,
         territory_id: params.territoryId,
-        item_id: item.id,
-        // Null origin = arrived from Medacta rather than moved between our own
-        // locations. The activity feed reads this as "received".
-        from_location: null,
-        to_location: params.locationId,
-        moved_by: params.movedBy ?? null,
-        note,
-      })),
-    );
-    // The stock is already in; a missing log line should not fail the intake.
-    if (moveError) console.warn("Restock logged to inventory but not to movements", moveError);
+        kind: "packing_slip",
+        storage_path: path,
+        original_filename: original.name,
+        mime_type: upload.type || original.type || null,
+        file_size_bytes: upload.size,
+      });
+    if (attachmentError) throw attachmentError;
   }
 
-  return created.length;
+  const { data: posted, error: postError } = await supabase
+    .rpc("post_inventory_receipt", { p_receipt_id: draft.id })
+    .single();
+  if (postError) throw postError;
+  return posted as InventoryReceipt;
 }
 
 /**
