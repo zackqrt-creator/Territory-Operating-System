@@ -13,7 +13,7 @@ import LoanerIntake from "./LoanerIntake";
 import RestockIntake from "./RestockIntake";
 import ToteReceipt from "./ToteReceipt";
 import { ocrPage } from "../lib/ocr";
-import { catalogLabel, parseGs1, parseLabelText } from "../lib/labelParse";
+import { catalogLabel, parseLabelText, prefillFromScan } from "../lib/labelParse";
 import { useFrequentCatalog } from "../hooks/useFrequentCatalog";
 
 const CATEGORIES: { value: ItemCategory; label: string }[] = [
@@ -97,13 +97,16 @@ export default function AddItemSheet({
   const { profile } = useAuth();
   const [mode, setMode] = useState<"consignment" | "loaner" | "restock" | "tote">("consignment");
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [joint, setJoint] = useState<CatalogJoint>("KNEE");
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogItemId, setCatalogItemId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<ItemCategory>("loaner_kit");
   const [lot, setLot] = useState("");
-  const [barcode, setBarcode] = useState(prefillBarcode ?? "");
+  const [barcode, setBarcode] = useState(() =>
+    prefillBarcode ? prefillFromScan(prefillBarcode).barcode : "",
+  );
   const [locationId, setLocationId] = useState(profile?.last_facility_id ?? facilities[0]?.id ?? "");
   const [returnDeadline, setReturnDeadline] = useState("");
   const [expiration, setExpiration] = useState("");
@@ -128,24 +131,59 @@ export default function AddItemSheet({
   const [creatingCatalogItem, setCreatingCatalogItem] = useState(false);
 
   useEffect(() => {
-    listCatalogItems().then(setCatalog);
+    listCatalogItems()
+      .then(setCatalog)
+      .finally(() => setCatalogLoaded(true));
   }, []);
 
-  // A scanned data-matrix barcode is a GS1 UDI string, not a plain code — pull
-  // lot (AI 10) and expiration (AI 17) straight out of it, since those AIs are
-  // defined by the standard. Store the GTIN as the barcode value (cleaner and
-  // stable) rather than the whole raw element string.
+  /*
+   * A scanned data-matrix is a GS1 UDI string, not a plain code — lot (AI 10)
+   * and expiry (AI 17) are encoded in it alongside the GTIN, so read all three.
+   * The GTIN alone goes in the barcode field: it is stable and it is what the
+   * lookup matches on.
+   *
+   * Waits for the catalog, because a GTIN we have seen before names the product
+   * too — the same match Batch add already makes. Without it, a scan of a known
+   * box still left the rep typing the name.
+   *
+   * Applied once per code (the ref), so re-rendering after the rep creates a
+   * catalog item cannot overwrite what they have since typed.
+   */
+  const appliedScanRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!prefillBarcode) return;
-    const gs1 = parseGs1(prefillBarcode);
-    if (!gs1) return;
-    if (gs1.lot) setLot((prev) => prev || gs1.lot!);
-    if (gs1.expiration) setExpiration((prev) => prev || gs1.expiration!);
-    if (gs1.gtin) setBarcode(gs1.gtin);
+    if (!prefillBarcode || !catalogLoaded) return;
+    if (appliedScanRef.current === prefillBarcode) return;
+    appliedScanRef.current = prefillBarcode;
+
+    const scan = prefillFromScan(prefillBarcode);
+    const filled: string[] = [];
+
+    setBarcode((prev) => prev || scan.barcode);
+    if (scan.lot) {
+      setLot((prev) => prev || scan.lot!);
+      filled.push(`lot ${scan.lot}`);
+    }
+    if (scan.expiration) {
+      setExpiration((prev) => prev || scan.expiration!);
+      filled.push(`exp ${scan.expiration}`);
+    }
+
+    const match = catalog.find((c) => c.gtin === scan.barcode) ?? null;
+    if (match) {
+      setCatalogItemId(match.id);
+      setName(match.name);
+      setCategory(match.category);
+      if (match.joint) setJoint(match.joint);
+      setCatalogSearch(catalogLabel(match));
+      filled.unshift(match.name);
+    }
+
     setScanNote(
-      `Read from barcode — lot ${gs1.lot ?? "?"}${gs1.expiration ? `, exp ${gs1.expiration}` : ""}. Pick the product and verify before saving.`,
+      filled.length > 0
+        ? `Read from barcode: ${filled.join(", ")}. Verify before saving.`
+        : "That code carries a GTIN and nothing else — no lot or expiry is encoded in it, and it doesn't match the catalog yet. Fill those in below, or use “Scan label to auto-fill” to read the printed label.",
     );
-  }, [prefillBarcode]);
+  }, [prefillBarcode, catalog, catalogLoaded]);
 
   const frequent = useFrequentCatalog();
   // Same ordering as the tray picker: what we actually stock, first.

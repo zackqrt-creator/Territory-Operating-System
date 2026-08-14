@@ -145,6 +145,55 @@ export function parseGs1(input: string): Gs1Fields | null {
   return out.gtin || out.lot || out.expiration ? out : null;
 }
 
+export interface ScanPrefill {
+  /** What belongs in the item's barcode field: the GTIN when there is one. */
+  barcode: string;
+  lot: string | null;
+  expiration: string | null; // YYYY-MM-DD
+}
+
+/**
+ * Everything a single scanned code can fill in, derived in one place.
+ *
+ * This exists because the caller must not reduce the code before handing it
+ * on. A GS1 element string carries the GTIN, the lot (AI 10) and the expiry
+ * (AI 17) together; reduce it to its GTIN first -- which the lookup wants --
+ * and the other two are gone for good, and parseGs1 called on what is left
+ * returns null because a bare GTIN is not an element string. That is precisely
+ * how the Add-item sheet came to fill the barcode and nothing else off a label
+ * that had all three printed on it.
+ *
+ * So: pass the raw decoded text here, and take the reduction from the result.
+ */
+export function prefillFromScan(code: string): ScanPrefill {
+  // The decoded text with the decoder's own AIM prefix and any FNC1
+  // separators taken off — what to show when there are no AIs to read. The
+  // separator goes via fromCharCode, as everywhere else here: a control
+  // character inside a regex reads as a smudge and the linter objects to it.
+  const plain = code
+    .replace(/^\][A-Za-z]\d/, "")
+    .split(String.fromCharCode(29))
+    .join("")
+    .replace(/\s/g, "");
+
+  /*
+   * A bare 12-14 digit run is a plain UPC/EAN/GTIN carrying no application
+   * identifiers, and it must not reach the AI walker: that would read the
+   * leading "01" as the GTIN AI and take the next 14 characters as the GTIN --
+   * of which a 12-digit UPC has only 10 -- yielding a barcode value that was
+   * never printed on anything and matches nothing. A real element string
+   * carrying just a GTIN is 16 characters, so nothing genuine is caught here.
+   */
+  if (/^\d{12,14}$/.test(plain)) return { barcode: plain, lot: null, expiration: null };
+
+  const gs1 = parseGs1(code);
+  return {
+    barcode: gs1?.gtin ?? plain,
+    lot: gs1?.lot ?? null,
+    expiration: gs1?.expiration ?? null,
+  };
+}
+
 /** Human-readable label for a catalog item in pickers/search — name plus side/size when set. */
 export function catalogLabel(c: CatalogItem): string {
   const label = [c.name];

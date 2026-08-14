@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Boxes, Camera } from "lucide-react";
 import { findItemByBarcode, listFacilities } from "../lib/api";
-import { parseGs1 } from "../lib/labelParse";
+import { prefillFromScan } from "../lib/labelParse";
 import type { Facility, InventoryItem } from "../lib/types";
 import MoveItemSheet from "../components/MoveItemSheet";
 import AddItemSheet from "../components/AddItemSheet";
@@ -90,19 +90,24 @@ export default function Scan() {
    */
   async function onDetected(code: string) {
     const bare = code.replace(/\s/g, "");
-    // A bare 12-14 digit code is already a plain GTIN/UPC with no application
-    // identifiers; handing it to the GS1 walker reads its digits as a lot.
-    const gtin = /^\d{12,14}$/.test(bare) ? bare : (parseGs1(code)?.gtin ?? null);
+    // One reduction, shared with the Add-item sheet: the GTIN when the code is
+    // a GS1 element string, the code itself when it is a plain UPC.
+    const gtin = prefillFromScan(code).barcode;
 
     try {
-      const item = (gtin ? await findItemByBarcode(gtin) : null) ?? (await findItemByBarcode(bare));
+      const item = (await findItemByBarcode(gtin)) ?? (await findItemByBarcode(bare));
       if (item) setFound(item);
-      // Prefill with the GTIN so the new row is findable by the next scan.
-      else setUnknownBarcode(gtin ?? bare);
+      // Hand the sheet the code as it was decoded, NOT the GTIN we just reduced
+      // it to. The lot (AI 10) and expiry (AI 17) live in the rest of the
+      // element string, so passing the GTIN threw them away before the sheet
+      // ever saw them -- which is why a scan filled the barcode field and left
+      // lot and expiration blank on a box that had both encoded in it. The
+      // sheet does its own reduction for the barcode field.
+      else setUnknownBarcode(code);
     } catch {
       // This ran unguarded, so a failed lookup rejected into nothing and the
       // screen simply did not respond -- indistinguishable from a dead scanner.
-      setError(`Read ${gtin ?? bare}, but couldn't reach the inventory to look it up.`);
+      setError(`Read ${gtin}, but couldn't reach the inventory to look it up.`);
     }
   }
 
