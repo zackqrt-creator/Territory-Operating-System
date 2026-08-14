@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-import { Camera } from "lucide-react";
+import { Camera, Images } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { createInventoryItem, linkCatalogItemGtin, listCatalogItems } from "../lib/api";
 import { catalogLabel, parseGs1 } from "../lib/labelParse";
-import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage, decodePhoto } from "../lib/scanning";
+import { cameraErrorMessage, decodePhoto } from "../lib/scanning";
+import { startLiveScan, type LiveScanHandle } from "../lib/liveScan";
 import type { CatalogItem, Facility, ItemCategory } from "../lib/types";
-
-const SCANNER_ID = "casetrack-batch-scanner";
 const CATEGORY_OPTIONS: { value: ItemCategory; label: string }[] = [
   { value: "implant", label: "Implant" },
   { value: "consumable", label: "Efficiency" },
@@ -54,6 +52,9 @@ export default function BatchScanSheet({
   const [flash, setFlash] = useState<string | null>(null);
   const [decoding, setDecoding] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const liveHandleRef = useRef<LiveScanHandle | null>(null);
+  const [cameraLive, setCameraLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const rowsRef = useRef<BatchRow[]>([]);
@@ -69,28 +70,53 @@ export default function BatchScanSheet({
     listCatalogItems().then(setCatalog);
   }, []);
 
+  /*
+   * Same live scanner as the Scan page: full-resolution frames through
+   * zxing-cpp, because html5-qrcode decoded from a canvas the size of the scan
+   * box and could not read an implant box's data-matrix at all. Batch add is
+   * where that hurt most — the whole point of the screen is scanning boxes one
+   * after another, and it was the screen where scanning worked least.
+   */
   useEffect(() => {
-    const scanner = new Html5Qrcode(SCANNER_ID, SCANNER_CONFIG);
-    const startPromise = scanner
-      .start(
-        { facingMode: "environment" },
-        CAMERA_CONFIG,
-        (decodedText) => onDetected(decodedText),
-        () => {
-          /* per-frame no-match noise, ignore */
-        },
-      )
+    const video = videoRef.current;
+    if (!video) return;
+    let handle: LiveScanHandle | null = null;
+    let cancelled = false;
+
+    startLiveScan(video, (decodedText) => onDetected(decodedText))
+      .then((h) => {
+        handle = h;
+        liveHandleRef.current = h;
+        if (cancelled) h.stop();
+        else setCameraLive(true);
+      })
       .catch((err) => setError(cameraErrorMessage(err)));
 
     return () => {
-      startPromise.then(() => scanner.stop().catch(() => {})).catch(() => {});
+      cancelled = true;
+      setCameraLive(false);
+      handle?.stop();
+      liveHandleRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Grab the current frame off the preview — no system camera, no camera roll. */
+  async function onCapture() {
+    const file = await liveHandleRef.current?.capture();
+    if (!file) {
+      setError("The camera isn't ready yet. Give it a moment and try again.");
+      return;
+    }
+    await onPhoto(file);
+  }
+
   async function onPhoto(file: File) {
     setError(null);
     setDecoding(true);
+    // The 2.5s same-code guard in onDetected already stops a capture and a
+    // live read of the same box double-counting, since both decode the same
+    // text from the same frame.
     try {
       const text = await decodePhoto(file);
       if (text) onDetected(text);
@@ -212,29 +238,32 @@ export default function BatchScanSheet({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-32 pt-3">
-        {/*
-         * The photo leads here for the same reason it leads on the Scan page:
-         * a still is decoded at full sensor resolution, while the live stream
-         * is decoded from a canvas the size of the scan box. On the small
-         * data-matrix codes on implant boxes that is the whole difference.
-         */}
         <button
-          onClick={() => photoRef.current?.click()}
-          disabled={decoding}
+          onClick={() => void onCapture()}
+          disabled={decoding || !cameraLive}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-3 font-semibold text-white disabled:opacity-50"
         >
           <Camera size={17} aria-hidden />
-          {decoding ? "Reading photo\u2026" : "Add a box by photo"}
+          {decoding ? "Reading label\u2026" : cameraLive ? "Capture this box" : "Starting camera\u2026"}
         </button>
         <p className="mt-1.5 text-xs text-slate-500">
-          Take one or pick from your library — one box per photo. Reads the small square
-          data-matrix the live camera misses.
+          Just hold each box up — the camera reads it on its own and adds a row. Capture forces a
+          read of the frame you are looking at. Nothing is saved to your camera roll.
         </p>
 
-        {/* No height cap on this: html5-qrcode maps the scan box onto the
-            source frame via videoHeight / clientHeight, so CSS-cropping the
-            video makes it scan somewhere other than where the box is drawn. */}
-        <div id={SCANNER_ID} className="mt-3 overflow-hidden rounded-xl" />
+        {/* What is decoded is the whole frame at its native size, so the
+            preview is shown uncropped: what you see is what is being read. */}
+        <div className="relative mt-3 overflow-hidden rounded-xl bg-black">
+          <video ref={videoRef} className="w-full" playsInline muted autoPlay />
+        </div>
+        <button
+          onClick={() => photoRef.current?.click()}
+          disabled={decoding}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 py-2.5 text-sm text-slate-300 disabled:opacity-50"
+        >
+          <Images size={15} aria-hidden />
+          Use a photo I already have
+        </button>
         <input
           ref={photoRef}
           type="file"

@@ -42,6 +42,29 @@ console.log("\nprefillFromScan");
   check("AIM prefix → lot", p.lot === "2604455", String(p.lot));
 }
 
+/*
+ * The same code as zxing-cpp actually hands it over from a live frame.
+ *
+ * The reader escapes the FNC1 as the four literal characters "<GS>" when it
+ * has flagged the symbol as GS1 — verified in Chromium, character codes
+ * 60,71,83,62. The AI walker's leading-digit guard rejects that exactly as it
+ * once rejected a raw FNC1, so without normalising it parseGs1 returns null
+ * for a barcode that decoded perfectly and the lot and expiry vanish.
+ */
+{
+  const p = prefillFromScan("<GS>010763097126253917310504102609637");
+  check("escaped <GS> → GTIN", p.barcode === "07630971262539", p.barcode);
+  check("escaped <GS> → lot", p.lot === "2609637", String(p.lot));
+  check("escaped <GS> → expiry", p.expiration === "2031-05-04", String(p.expiration));
+}
+
+// A separator between variable-length fields, escaped the same way.
+{
+  const p = prefillFromScan("<GS>0107630971262539<GS>102609637<GS>17310504");
+  check("escaped separators mid-string → lot", p.lot === "2609637", String(p.lot));
+  check("escaped separators mid-string → expiry", p.expiration === "2031-05-04", String(p.expiration));
+}
+
 // The printed UDI line, which OCR reads in parenthesized form.
 {
   const p = prefillFromScan("(01)07630345716248(17)301014(10)2520862");

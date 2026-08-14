@@ -1,0 +1,128 @@
+<!doctype html>
+<!--
+  Browser probe for the live-scan pipeline.
+
+  Driven by scripts/test-live-scan.mjs through Playwright. It exists because
+  the thing worth proving here cannot be proved in node: that a frame taken off
+  a <video> element, at videoWidth x videoHeight, decodes as ImageData through
+  zxing-wasm. That is the whole claim the live scanner rests on, and it touches
+  canvas, ImageData and the wasm together.
+
+  The barcode is generated rather than fixtured, with the same library's writer,
+  so the test carries no binary and cannot rot against a stale PNG.
+-->
+<meta charset="utf-8" />
+<title>live scan probe</title>
+<body>
+  <script type="module">
+    import {
+      writeBarcode,
+      prepareZXingModule as prepareWriter,
+    } from "/node_modules/zxing-wasm/dist/es/writer/index.js";
+    import {
+      readBarcodes,
+      prepareZXingModule as prepareReader,
+    } from "/node_modules/zxing-wasm/dist/es/reader/index.js";
+
+    // Serve both wasm binaries from this origin, the way the app does via its
+    // vite ?url import. Without this they are fetched from a CDN, which this
+    // probe has no business depending on.
+    prepareReader({
+      overrides: { locateFile: () => "/node_modules/zxing-wasm/dist/reader/zxing_reader.wasm" },
+    });
+    prepareWriter({
+      overrides: { locateFile: () => "/node_modules/zxing-wasm/dist/writer/zxing_writer.wasm" },
+    });
+
+    // A real GS1 element string off a Medacta box: GTIN, expiry, lot.
+    const GS = String.fromCharCode(29);
+    const PAYLOAD = `${GS}010763097126253917310504102609637`;
+
+    const results = [];
+    const check = (name, cond, extra = "") => results.push({ name, pass: !!cond, extra });
+
+    async function run() {
+      // 1. Encode a DataMatrix and get it onto a canvas the size a phone frame
+      //    would be, with the code occupying a realistic slice of it.
+      const written = await writeBarcode(PAYLOAD, { format: "DataMatrix", scale: 4 });
+      if (written.error) throw new Error(`writeBarcode: ${written.error}`);
+      if (!written.image) throw new Error("writeBarcode returned no raster image");
+      const bitmap = await createImageBitmap(written.image);
+
+      const frame = document.createElement("canvas");
+      frame.width = 1920;
+      frame.height = 1080;
+      const ctx = frame.getContext("2d", { willReadFrequently: true });
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, frame.width, frame.height);
+      // Draw it off-centre and modest in size, the way a label sits in a frame.
+      const side = 260;
+      ctx.drawImage(bitmap, 1180, 240, side, side);
+
+      // 2. Decode straight from ImageData — no toBlob, no re-encode. This is
+      //    exactly what the scan loop does with each frame.
+      const image = ctx.getImageData(0, 0, frame.width, frame.height);
+      const opts = {
+        formats: ["DataMatrix", "Code128", "Code39", "QRCode", "EAN-13", "ITF"],
+        tryHarder: true,
+        tryRotate: true,
+        tryInvert: true,
+        maxNumberOfSymbols: 1,
+      };
+      const found = await readBarcodes(image, opts);
+      check("decodes a 1080p frame straight from ImageData", found.length === 1, String(found.length));
+      const text = found[0]?.text ?? "";
+      // zxing-cpp escapes the FNC1 as the literal characters "<GS>" when it has
+      // flagged the symbol as GS1, so the decoded text is not byte-identical to
+      // what was encoded. Normalising that is parseGs1's job; asserting it here
+      // pins the behaviour, because if the library ever stops escaping, the
+      // normalisation stops being exercised and nobody would notice.
+      check(
+        "the separator comes back escaped as <GS>, not as a control character",
+        text.startsWith("<GS>"),
+        `${JSON.stringify(text)} codes=${[...text.slice(0, 6)].map((c) => c.charCodeAt(0)).join(",")}`,
+      );
+      check(
+        "the payload is otherwise intact",
+        text.split("<GS>").join("") === PAYLOAD.split(GS).join(""),
+        JSON.stringify(text),
+      );
+
+      // 3. The same frame at the resolution html5-qrcode actually handed the
+      //    decoder: a canvas the size of the scan box in CSS pixels. This is
+      //    the comparison that explains why the live camera never worked.
+      const small = document.createElement("canvas");
+      small.width = 400;
+      small.height = 300;
+      const sctx = small.getContext("2d", { willReadFrequently: true });
+      sctx.drawImage(frame, 0, 0, small.width, small.height);
+      const downscaled = await readBarcodes(
+        sctx.getImageData(0, 0, small.width, small.height),
+        opts,
+      );
+      check(
+        "the same code is unreadable once downscaled to a CSS-pixel scan box",
+        downscaled.length === 0,
+        `${downscaled.length} found — if this now passes, the premise changed`,
+      );
+
+      // 4. A frame with nothing in it must yield nothing, not a phantom read.
+      const blank = document.createElement("canvas");
+      blank.width = 1280;
+      blank.height = 720;
+      const bctx = blank.getContext("2d", { willReadFrequently: true });
+      bctx.fillStyle = "#888";
+      bctx.fillRect(0, 0, blank.width, blank.height);
+      const nothing = await readBarcodes(bctx.getImageData(0, 0, blank.width, blank.height), opts);
+      check("an empty frame decodes to nothing", nothing.length === 0, String(nothing.length));
+
+      window.__probeResults = results;
+      window.__probeDone = true;
+    }
+
+    run().catch((e) => {
+      window.__probeResults = [{ name: "probe threw", pass: false, extra: String(e) }];
+      window.__probeDone = true;
+    });
+  </script>
+</body>

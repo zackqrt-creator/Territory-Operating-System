@@ -108,7 +108,7 @@ export const CAMERA_CONFIG: Html5QrcodeCameraScanConfig = {
  * tryHarder / tryRotate / tryInvert are what buy the tilt and the dark-on-light
  * tolerance; they cost tens of milliseconds, not hundreds.
  */
-const READ_OPTIONS: ReaderOptions = {
+export const READ_OPTIONS: ReaderOptions = {
   formats: ["DataMatrix", "Code128", "Code39", "QRCode", "EAN-13", "ITF"],
   tryHarder: true,
   tryRotate: true,

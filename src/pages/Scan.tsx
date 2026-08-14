@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-import { Boxes, Camera } from "lucide-react";
+import { Boxes, Camera, Images } from "lucide-react";
 import { findItemByBarcode, listFacilities } from "../lib/api";
 import { prefillFromScan } from "../lib/labelParse";
 import type { Facility, InventoryItem } from "../lib/types";
 import MoveItemSheet from "../components/MoveItemSheet";
 import AddItemSheet from "../components/AddItemSheet";
 import { BatchScanSheet } from "../components/scanners";
-import { CAMERA_CONFIG, SCANNER_CONFIG, cameraErrorMessage, decodePhoto } from "../lib/scanning";
-
-const SCANNER_ID = "casetrack-scanner";
+import { cameraErrorMessage, decodePhoto } from "../lib/scanning";
+import { startLiveScan, type LiveScanHandle } from "../lib/liveScan";
 
 export default function Scan() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -26,45 +24,88 @@ export default function Scan() {
    * live camera or was typed, because there is no still to hand on.
    */
   const [scannedPhoto, setScannedPhoto] = useState<File | null>(null);
+  const [cameraLive, setCameraLive] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const liveHandleRef = useRef<LiveScanHandle | null>(null);
 
-  // Scan callbacks are registered once with the camera; a ref (not state)
-  // lets them see the latest "is a sheet open" value without restarting the camera.
+  /*
+   * The decode callback is registered once with the camera, so it cannot read
+   * state — hence a ref. It is set the instant a code is read, not when the
+   * resulting sheet opens: the loop runs several times a second and would
+   * otherwise fire again during the lookup, opening a second sheet over the
+   * first. Cleared when the sheets close.
+   */
   const pausedRef = useRef(false);
   useEffect(() => {
-    pausedRef.current = found !== null || unknownBarcode !== null;
-  }, [found, unknownBarcode]);
+    if (found === null && unknownBarcode === null && !decoding) pausedRef.current = false;
+  }, [found, unknownBarcode, decoding]);
 
   useEffect(() => {
     listFacilities().then(setFacilities);
   }, []);
 
-  // Batch mode owns its own camera full-screen — stop this one while it's open
-  // instead of running two scanners against the same device at once.
+  /*
+   * The live camera, decoding full-resolution frames through zxing-cpp.
+   *
+   * Batch mode owns its own camera full-screen — stop this one while it is
+   * open rather than running two scanners against one device.
+   *
+   * A decode here keeps the frame it decoded from, so the Add-item sheet can
+   * read the printed words off the very same image. That is what makes a live
+   * scan fill in as much as a photo does: the barcode carries GTIN, lot and
+   * expiry, and everything else is text sitting next to it in the frame we
+   * already have.
+   */
   useEffect(() => {
     if (batchMode) return;
-    const scanner = new Html5Qrcode(SCANNER_ID, SCANNER_CONFIG);
-    const startPromise = scanner
-      .start(
-        { facingMode: "environment" },
-        CAMERA_CONFIG,
-        (decodedText) => {
-          if (!pausedRef.current) {
-            setScannedPhoto(null);
-            void onDetected(decodedText);
-          }
-        },
-        () => {
-          /* per-frame no-match noise, ignore */
-        },
-      )
+    const video = videoRef.current;
+    if (!video) return;
+
+    let handle: LiveScanHandle | null = null;
+    let cancelled = false;
+
+    startLiveScan(video, (decodedText) => {
+      if (pausedRef.current) return;
+      pausedRef.current = true; // stop the loop firing again mid-lookup
+      void (async () => {
+        setScannedPhoto((await handle?.capture()) ?? null);
+        await onDetected(decodedText);
+      })();
+    })
+      .then((h) => {
+        handle = h;
+        liveHandleRef.current = h;
+        if (cancelled) h.stop();
+        else setCameraLive(true);
+      })
       .catch((err) => setError(cameraErrorMessage(err)));
 
     return () => {
-      startPromise.then(() => scanner.stop().catch(() => {})).catch(() => {});
+      cancelled = true;
+      setCameraLive(false);
+      handle?.stop();
+      liveHandleRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchMode]);
+
+  /**
+   * Grab the frame the camera is showing and run it as a still.
+   *
+   * This replaces the old "take a photo" file input, which handed the job to
+   * the system camera and left the shot behind in the photo library. A canvas
+   * grab off the existing preview never involves the photo library at all, so
+   * a day of receiving no longer fills the camera roll with pictures of boxes.
+   */
+  async function onCapture() {
+    const file = await liveHandleRef.current?.capture();
+    if (!file) {
+      setError("The camera isn't ready yet. Give it a moment and try again.");
+      return;
+    }
+    await onPhoto(file);
+  }
 
   /**
    * Decode from a still photo.
@@ -75,6 +116,11 @@ export default function Scan() {
    */
   async function onPhoto(file: File) {
     setError(null);
+    // Hold the live loop off for the duration. It runs several times a second
+    // against the same camera, so without this a capture and an ordinary live
+    // read can both land and open two sheets over each other. Released by the
+    // effect below once the sheets are closed and decoding has finished.
+    pausedRef.current = true;
     setDecoding(true);
     setScannedPhoto(file);
     try {
@@ -148,44 +194,46 @@ export default function Scan() {
       </div>
 
       {/*
-       * Above the camera, deliberately.
+       * Controls above the viewfinder, deliberately: on a phone the preview is
+       * tall enough that anything below it sits off the bottom of the screen,
+       * and a control nobody can see is a control nobody uses.
        *
-       * This was under the viewfinder, and on a phone the viewfinder is tall
-       * enough that everything below it sits off the bottom of the screen --
-       * so the only reliable way to read a label was the one control nobody
-       * could see. It leads now because it is the path that works: a still is
-       * decoded at full sensor resolution, where the live preview is decoded
-       * from a canvas the size of the scan box.
+       * "Capture" grabs the frame off this preview through a canvas. It is not
+       * a file input any more, so it does not open the system camera and does
+       * not leave a picture of a box in the photo library — receiving a tote no
+       * longer costs you thirty shots in your camera roll.
        */}
       <button
-        onClick={() => photoRef.current?.click()}
-        disabled={decoding}
+        onClick={() => void onCapture()}
+        disabled={decoding || !cameraLive}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 py-3 font-semibold text-white disabled:opacity-50"
       >
         <Camera size={17} aria-hidden />
-        {decoding ? "Reading photo…" : "Photo of the label"}
+        {decoding ? "Reading label…" : cameraLive ? "Capture label" : "Starting camera…"}
       </button>
       <p className="mt-1.5 text-xs text-slate-500">
-        Take one now or pick an existing photo. One shot of the label reads the whole box: GTIN,
-        lot and expiry out of the data-matrix, and the product, size, side, thickness and cement
-        off the printed words beside it. This is the reliable route for the small square
-        data-matrix; the live camera below suits larger tray and kit barcodes.
+        Hold the label steady and the camera reads it on its own — no tap needed. Capture forces a
+        read of the frame you are looking at. Either way one frame gives the whole box: GTIN, lot
+        and expiry out of the data-matrix, and the product, size, side, thickness and cement off
+        the printed words beside it. Nothing is saved to your camera roll.
       </p>
 
       {/*
-       * Deliberately NOT height-capped, and do not add one.
-       *
-       * html5-qrcode maps the scan box onto the source frame with
-       * videoHeight / videoElement.clientHeight, then drawImage()s that source
-       * rectangle. That arithmetic assumes the element displays the whole
-       * frame. Shrink the video with max-height and object-fit and the element
-       * shows a centre crop while the ratio still divides by the shrunken
-       * clientHeight, so the region actually scanned drifts away from the
-       * region drawn on screen -- it aims somewhere other than where you point
-       * it. Reachability of the controls is solved by putting them above this,
-       * which is where they now are.
+       * The preview. object-contain, not cover, and no crop: what is decoded is
+       * the whole frame at videoWidth x videoHeight, so what you see is exactly
+       * what is being read. Cropping the element here would hide part of what
+       * the decoder is actually looking at.
        */}
-      <div id={SCANNER_ID} className="mt-4 overflow-hidden rounded-xl" />
+      <div className="relative mt-4 overflow-hidden rounded-xl bg-black">
+        <video ref={videoRef} className="w-full" playsInline muted autoPlay />
+        {cameraLive && !decoding && (
+          <div className="pointer-events-none absolute inset-0 flex items-end justify-center pb-3">
+            <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-slate-200">
+              Looking for a barcode…
+            </span>
+          </div>
+        )}
+      </div>
 
       <input
         ref={photoRef}
@@ -206,6 +254,22 @@ export default function Scan() {
           {error} You can still enter the code by hand below.
         </p>
       )}
+
+      {/*
+       * The import route is kept, but demoted. Picking an existing photo adds
+       * nothing to the photo library — it reads from it — so it is still the
+       * right answer for a label somebody else photographed, or one shot
+       * earlier in the day. It is no longer the primary action because
+       * capturing off the preview is both faster and leaves no trace.
+       */}
+      <button
+        onClick={() => photoRef.current?.click()}
+        disabled={decoding}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 py-2.5 text-sm text-slate-300 disabled:opacity-50"
+      >
+        <Images size={15} aria-hidden />
+        Use a photo I already have
+      </button>
 
       <div className="mt-4">
         <label className="mb-1 block text-sm text-slate-400">Or enter a barcode manually</label>

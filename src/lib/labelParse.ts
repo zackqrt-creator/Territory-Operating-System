@@ -262,8 +262,21 @@ export function parseGs1(input: string): Gs1Fields | null {
    * Medacta packaging -- and the rep was told "not a recognized barcode" about
    * a barcode that had just been decoded perfectly.
    */
+  /*
+   * ...and normalise the OTHER way a separator arrives, which is as the four
+   * literal characters "<GS>".
+   *
+   * zxing-cpp escapes control characters when it renders the text of a symbol
+   * it has flagged as GS1, so the same physical data-matrix reaches us as
+   * "\x1d0107..." or "<GS>0107..." depending on whether that flag was set.
+   * Measured in Chromium against a generated GS1 DataMatrix: the reader
+   * returns character codes 60,71,83,62 — "<GS>" spelled out. The AI walker's
+   * leading-digit guard rejects that exactly as it once rejected a raw FNC1,
+   * so parseGs1 returned null for a barcode that had decoded perfectly, and
+   * lot and expiry silently went missing.
+   */
   const SEPARATOR = String.fromCharCode(29);
-  let raw = input.replace(/^\][A-Za-z]\d/, "");
+  let raw = input.replace(/^\][A-Za-z]\d/, "").split("<GS>").join(SEPARATOR);
   while (raw.startsWith(SEPARATOR)) raw = raw.slice(1);
   const out: Gs1Fields = { gtin: null, lot: null, expiration: null };
   const setAI = (ai: string, value: string) => {
@@ -341,6 +354,8 @@ export function prefillFromScan(code: string): ScanPrefill {
   // character inside a regex reads as a smudge and the linter objects to it.
   const plain = code
     .replace(/^\][A-Za-z]\d/, "")
+    .split("<GS>")
+    .join("")
     .split(String.fromCharCode(29))
     .join("")
     .replace(/\s/g, "");
