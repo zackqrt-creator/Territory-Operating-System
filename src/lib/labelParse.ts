@@ -27,6 +27,24 @@ export interface LabelScan {
   cement: "cemented" | "cementless" | null;
   lot: string | null;
   expiration: string | null; // YYYY-MM-DD
+  /** Product family off the header band, display-cased: "GMK Sphere Primary". */
+  productLine: string | null;
+  /** Knee or hip, from the product family — the label never says which. */
+  joint: "KNEE" | "HIP" | null;
+  /** What the box says the device is, display-cased: "Tibial Insert Fixed". */
+  deviceDescription: string | null;
+  /** Insert thickness as printed, e.g. "10mm" (THICKNESS cell). */
+  thickness: string | null;
+  /** Patella diameter as printed, e.g. "32mm" (the Ø cell). */
+  diameter: string | null;
+  /** Insert type, e.g. "Flex" (TYPE cell). */
+  insertType: string | null;
+  /** E-CROSS and the like — printed beside the family, part of the identity. */
+  material: string | null;
+  /** Product line + device, deduped: "Moto Patella Resurfacing". */
+  suggestedName: string | null;
+  /** Size plus whatever dimension the device carries: "4 · 10mm", "3 · Ø32mm". */
+  suggestedSizeLabel: string | null;
   /** Human list of which fields we actually pulled, for the "verify" note. */
   fieldsRead: string[];
 }
@@ -34,6 +52,157 @@ export interface LabelScan {
 function normalizeRef(raw: string): string {
   // OCR sometimes reads leading 0 as O and adds spaces around dots.
   return raw.toUpperCase().replace(/\s+/g, "").replace(/O/g, "0");
+}
+
+/*
+ * Vocabularies, matched against the label rather than read freely off it.
+ *
+ * Free text is the wrong tool here: a Medacta box is a boxed table printed
+ * sideways, and OCR of one returns the cells in an order nobody can predict,
+ * with the header band letter-spaced ("S P H E R E  P R I M A R Y"). Reading
+ * "whatever is on the second line" off that yields garbage often enough to be
+ * worse than nothing, because a wrong product name looks exactly as confident
+ * as a right one. Matching known strings instead means an unrecognised box
+ * fills nothing and says so, which the rep can act on.
+ *
+ * Each entry is [what to look for, how to write it]. The display form is not
+ * derivable -- "GMK" stays shouted, "Moto" does not -- so it is stated.
+ * Longest first: "Tibial Insert Fixed" must win over "Tibial Insert".
+ */
+type Vocab = readonly (readonly [string, string])[];
+
+/**
+ * Product families, each tagged with the joint it belongs to — the label never
+ * prints "knee" or "hip", but the family settles it, and the form needs it to
+ * offer the right device-type and product-line lists.
+ */
+const PRODUCT_FAMILIES: readonly (readonly [string, string, "KNEE" | "HIP"])[] = [
+  ["GMK SPHERE PRIMARY", "GMK Sphere Primary", "KNEE"],
+  ["GMK SPHERIKA", "GMK Spherika", "KNEE"],
+  ["GMK REVISION", "GMK Revision", "KNEE"],
+  ["GMK SPHERE", "GMK Sphere", "KNEE"],
+  ["GMK PRIMARY", "GMK Primary", "KNEE"],
+  ["MOTO PATELLA", "Moto Patella", "KNEE"],
+  ["MOTO PFJ", "Moto PFJ", "KNEE"],
+  ["KA ONE", "KA One", "KNEE"],
+  ["M-VIZION", "M-Vizion", "HIP"],
+  ["MASTERLOC", "MasterLoc", "HIP"],
+  ["VERSAFITCUP", "Versafitcup", "HIP"],
+  ["AMISTEM-P", "AMIStem-P", "HIP"],
+  ["QUADRA-P", "Quadra-P", "HIP"],
+  ["QUADRA-R", "Quadra-R", "HIP"],
+  ["MECTACEM-X", "MectaCem-X", "HIP"],
+  ["X-ACTA", "X-ACTA", "HIP"],
+  ["MPACT", "Mpact", "HIP"],
+];
+
+const DEVICE_DESCRIPTIONS: Vocab = [
+  ["TIBIAL INSERT FIXED", "Tibial Insert Fixed"],
+  ["TIBIAL INSERT MOBILE", "Tibial Insert Mobile"],
+  ["PATELLA RESURFACING", "Patella Resurfacing"],
+  ["FEMORAL COMPONENT", "Femoral Component"],
+  ["REVISION FEMORAL", "Revision Femoral"],
+  ["ACETABULAR CUP", "Acetabular Cup"],
+  ["TIBIAL INSERT", "Tibial Insert"],
+  ["INSTRUMENT TRAY", "Instrument Tray"],
+  ["FEMORAL HEAD", "Femoral Head"],
+  ["FEMORAL STEM", "Femoral Stem"],
+  ["BIPOLAR HEAD", "Bipolar Head"],
+  ["TIBIAL TRAY", "Tibial Tray"],
+  ["BONE CEMENT", "Bone Cement"],
+  ["PATELLA", "Patella"],
+  ["LINER", "Liner"],
+];
+
+const MATERIALS: Vocab = [
+  ["E-CROSS", "E-Cross"],
+  ["VIT-E", "Vit-E"],
+  ["HIGHCROSS", "HighCross"],
+];
+
+/** TYPE cell values. A whitelist, so the cell after it can't be swallowed. */
+const INSERT_TYPES: Vocab = [
+  ["STANDARD", "Standard"],
+  ["FLEX", "Flex"],
+  ["STD", "Standard"],
+  ["UC", "UC"],
+  ["CR", "CR"],
+  ["PS", "PS"],
+  ["CS", "CS"],
+];
+
+/**
+ * Match a vocabulary against the label with every non-alphanumeric character
+ * removed from both sides.
+ *
+ * The header band is letter-spaced on Medacta packaging, so OCR returns
+ * "G M K  S P H E R E  P R I M A R Y" and a word-boundary search finds
+ * nothing. Squashing both sides makes that match "GMKSPHEREPRIMARY", and the
+ * entries are long enough that squashing them together cannot collide.
+ */
+function squashedIncludes(upper: string, needle: string): boolean {
+  return upper.replace(/[^A-Z0-9]/g, "").includes(needle.replace(/[^A-Z0-9]/g, ""));
+}
+
+function matchVocab(upper: string, vocab: Vocab): string | null {
+  for (const [needle, display] of vocab) {
+    if (squashedIncludes(upper, needle)) return display;
+  }
+  return null;
+}
+
+/**
+ * Read a boxed cell's value: "<KEYWORD> <value>" when OCR kept them together,
+ * else the first token in the next stretch of text that fits `accept`.
+ *
+ * Adjacency alone is not enough. These are table cells with a rule between
+ * them, and on a sideways photo the recognizer regularly emits the keyword and
+ * its value with the neighbouring column's text in between -- which is exactly
+ * why the existing lot reader already works this way.
+ */
+function readCell(upper: string, keyword: string, accept: RegExp): string | null {
+  const idx = upper.search(new RegExp(`\\b${keyword}\\b`));
+  if (idx === -1) return null;
+  const window = upper.slice(idx + keyword.length, idx + keyword.length + 40);
+  const tokens = window.match(/[A-Z0-9][A-Z0-9.+/-]*/g) ?? [];
+  for (const token of tokens) {
+    // Another cell's label means we have walked out of this cell.
+    if (/^(SIZE|SIDE|TYPE|THICKNESS|HEIGHT|LOT|REF|GTIN|UDI)$/.test(token)) break;
+    const m = token.match(accept);
+    if (m) return m[1] ?? m[0];
+  }
+  return null;
+}
+
+/**
+ * Product line and device description joined without saying the shared word
+ * twice: "Moto Patella" + "Patella Resurfacing" is "Moto Patella Resurfacing",
+ * not "Moto Patella Patella Resurfacing".
+ */
+export function composeItemName(productLine: string | null, device: string | null): string | null {
+  if (!productLine) return device;
+  if (!device) return productLine;
+  const tail = productLine.split(" ").pop()!.toUpperCase();
+  const words = device.split(" ");
+  if (words[0].toUpperCase() === tail) words.shift();
+  return [productLine, ...words].join(" ").trim();
+}
+
+/**
+ * The size cell plus whatever second dimension the device carries -- thickness
+ * for an insert, diameter for a patella. The separator matches what the seeded
+ * catalog already uses for these ("4 · 10mm"), so a scanned entry sorts and
+ * reads alongside the ones that were migrated in.
+ */
+export function composeSizeLabel(scan: {
+  size: string | null;
+  thickness: string | null;
+  diameter: string | null;
+  height: string | null;
+}): string | null {
+  const second = scan.thickness ?? (scan.diameter ? `Ø${scan.diameter}` : null) ?? scan.height;
+  const parts = [scan.size, second].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 export interface Gs1Fields {
@@ -242,15 +411,52 @@ export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan 
   if (sideExplicit) side = sideExplicit[1] as "LEFT" | "RIGHT";
   if (side) fieldsRead.push("side");
 
-  // SIZE (may carry a trailing +)
-  const sizeMatch = upper.match(/\bSIZE\s*:?\s*(\d\+?)/);
-  const size = sizeMatch ? sizeMatch[1] : null;
+  // SIZE (may carry a trailing +). Adjacent first, then the cell reader for
+  // the sideways-photo case where the value lands away from its keyword.
+  const sizeMatch = upper.match(/\bSIZE\s*:?\s*(\d\+?)\b/);
+  const size = sizeMatch ? sizeMatch[1] : readCell(upper, "SIZE", /^(\d\+?)$/);
   if (size) fieldsRead.push("size");
 
   // HEIGHT (inserts), e.g. "HEIGHT 14 mm"
   const heightMatch = upper.match(/\bHEIGHT\s*:?\s*(\d{2})\s*MM/);
   const height = heightMatch ? heightMatch[1] : null;
   if (height) fieldsRead.push("height");
+
+  // THICKNESS (inserts), e.g. "THICKNESS 10 mm" — the number the rep needs to
+  // tell one insert from the five others of the same size in the tote.
+  const thicknessMatch = upper.match(/\bTHICKNESS\s*:?\s*(\d{1,2})\s*MM\b/);
+  const thicknessDigits = thicknessMatch ? thicknessMatch[1] : readCell(upper, "THICKNESS", /^(\d{1,2})$/);
+  const thickness = thicknessDigits ? `${thicknessDigits}mm` : null;
+  if (thickness) fieldsRead.push("thickness");
+
+  /*
+   * Ø diameter (patellae). The symbol itself is not readable: it is a small
+   * glyph in a table rule and OCR returns it as 0, O, @, (), or nothing at all,
+   * differently on each photo. So the symbol is optional here -- what makes
+   * this safe is that a bare two-digit millimetre value only appears in this
+   * cell, and a device that has a THICKNESS or HEIGHT cell is not a patella,
+   * so those win and this is not consulted.
+   */
+  let diameter: string | null = null;
+  if (!thickness && !height) {
+    const diaMatch = upper.match(/[Ø0O@()\s](\d{2})\s*MM\b/);
+    diameter = diaMatch ? `${diaMatch[1]}mm` : null;
+    if (diameter) fieldsRead.push("diameter");
+  }
+
+  // TYPE (inserts), e.g. "TYPE FLEX".
+  const typeCell = readCell(upper, "TYPE", /^[A-Z]{2,10}$/);
+  const insertType = typeCell ? matchVocab(typeCell, INSERT_TYPES) : null;
+  if (insertType) fieldsRead.push("type");
+
+  // Identity off the printed header band and description line.
+  const family = PRODUCT_FAMILIES.find(([needle]) => squashedIncludes(upper, needle)) ?? null;
+  const productLine = family?.[1] ?? null;
+  const joint = family?.[2] ?? null;
+  if (productLine) fieldsRead.push("product line");
+  const deviceDescription = matchVocab(upper, DEVICE_DESCRIPTIONS);
+  if (deviceDescription) fieldsRead.push("device");
+  const material = matchVocab(upper, MATERIALS);
 
   // CEMENT
   let cement: "cemented" | "cementless" | null = null;
@@ -285,5 +491,25 @@ export function parseLabelText(text: string, catalog: CatalogItem[]): LabelScan 
   }
   if (expiration) fieldsRead.push("expiration");
 
-  return { refText, gtin, match, side, size, height, cement, lot, expiration, fieldsRead };
+  return {
+    refText,
+    gtin,
+    match,
+    side,
+    size,
+    height,
+    cement,
+    lot,
+    expiration,
+    productLine,
+    joint,
+    deviceDescription,
+    thickness,
+    diameter,
+    insertType,
+    material,
+    suggestedName: composeItemName(productLine, deviceDescription),
+    suggestedSizeLabel: composeSizeLabel({ size, thickness, diameter, height }),
+    fieldsRead,
+  };
 }

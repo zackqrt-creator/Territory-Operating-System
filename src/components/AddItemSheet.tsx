@@ -86,11 +86,20 @@ const PRODUCT_LINES: Record<CatalogJoint, string[]> = {
 export default function AddItemSheet({
   facilities,
   prefillBarcode,
+  prefillPhoto,
   onClose,
   onCreated,
 }: {
   facilities: Facility[];
   prefillBarcode?: string;
+  /**
+   * The photo the barcode was decoded from, when a scan opened this sheet.
+   * It gets read a second time, for its printed text: the data-matrix carries
+   * only GTIN, lot and expiry, while the product name, size, thickness, side
+   * and cement are printed words beside it. Same photo, both readings — the
+   * rep should not have to shoot the same label twice.
+   */
+  prefillPhoto?: File | null;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -150,12 +159,15 @@ export default function AddItemSheet({
    * catalog item cannot overwrite what they have since typed.
    */
   const appliedScanRef = useRef<string | null>(null);
+  /** What the data-matrix gave us — exact, and so it outranks OCR of the same box. */
+  const barcodeScanRef = useRef<ReturnType<typeof prefillFromScan> | null>(null);
   useEffect(() => {
     if (!prefillBarcode || !catalogLoaded) return;
     if (appliedScanRef.current === prefillBarcode) return;
     appliedScanRef.current = prefillBarcode;
 
     const scan = prefillFromScan(prefillBarcode);
+    barcodeScanRef.current = scan;
     const filled: string[] = [];
 
     setBarcode((prev) => prev || scan.barcode);
@@ -180,10 +192,35 @@ export default function AddItemSheet({
 
     setScanNote(
       filled.length > 0
-        ? `Read from barcode: ${filled.join(", ")}. Verify before saving.`
+        ? `Read from barcode: ${filled.join(", ")}.${prefillPhoto ? " Reading the printed label too…" : " Verify before saving."}`
         : "That code carries a GTIN and nothing else — no lot or expiry is encoded in it, and it doesn't match the catalog yet. Fill those in below, or use “Scan label to auto-fill” to read the printed label.",
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillBarcode, catalog, catalogLoaded]);
+
+  /*
+   * ...and then read the same photo again, for the words.
+   *
+   * A data-matrix encodes three things: GTIN, lot, expiry. Everything the rep
+   * actually reads off the box to know what it is -- "Moto Patella
+   * Resurfacing", CEMENTED, SIZE 3, Ø 32mm, or SIZE 4 / RIGHT / THICKNESS
+   * 10mm -- is printed text next to it and is in no barcode anywhere. Until
+   * now that meant a scan filled three fields and the rep typed the rest,
+   * or shot the very same label a second time through "Scan label to
+   * auto-fill". Same photo, so: decode it, then OCR it.
+   *
+   * Runs after the barcode pass and never overwrites what that pass filled,
+   * because a data-matrix is exact and OCR of small print on a shiny box is a
+   * best effort.
+   */
+  const appliedPhotoRef = useRef<File | null>(null);
+  useEffect(() => {
+    if (!prefillPhoto || !catalogLoaded) return;
+    if (appliedPhotoRef.current === prefillPhoto) return;
+    appliedPhotoRef.current = prefillPhoto;
+    void onScanLabel(prefillPhoto, { keepScanNote: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillPhoto, catalogLoaded]);
 
   const frequent = useFrequentCatalog();
   // Same ordering as the tray picker: what we actually stock, first.
@@ -227,10 +264,10 @@ export default function AddItemSheet({
    * the rep confirms; if OCR fails, the photo still attaches and nothing else
    * changes.
    */
-  async function onScanLabel(file: File) {
+  async function onScanLabel(file: File, { keepScanNote = false } = {}) {
     onPhotoSelected(file);
     setScanning(true);
-    setScanNote(null);
+    if (!keepScanNote) setScanNote(null);
     try {
       // The scorer lets OCR retry other orientations when the upright pass
       // reads nothing usable off a sideways photo. goodEnough: 1 stops at the
@@ -241,7 +278,11 @@ export default function AddItemSheet({
       });
       const scan = parseLabelText(result.text, catalog);
       if (scan.fieldsRead.length === 0) {
-        setScanNote("Couldn't read the label clearly — fill it in by hand, the photo is attached.");
+        setScanNote(
+          keepScanNote
+            ? "Barcode read, but the printed label wouldn't come off this photo — fill in the product and size by hand, or retake it square to the label."
+            : "Couldn't read the label clearly — fill it in by hand, the photo is attached.",
+        );
         return;
       }
 
@@ -260,27 +301,60 @@ export default function AddItemSheet({
         setCatalogSearch(catalogLabel(scan.match));
         setShowNewCatalogForm(false);
         filled.push("product");
-      } else if (scan.refText || scan.gtin) {
-        // No exact hit, so the rep confirms or creates. Seed the new-catalog
-        // form with what the label says instead of reading those values off and
-        // then discarding them.
-        if (scan.refText) {
-          setName((prev) => prev || `REF ${scan.refText}`);
+      } else {
+        /*
+         * No catalog hit, so the rep confirms or creates — and everything the
+         * box states goes into that decision rather than being read and thrown
+         * away. The name is what the label calls the device ("Moto Patella
+         * Resurfacing"), not a bare REF, because a REF is unreadable at a
+         * glance on a shelf and the printed words are the thing the rep is
+         * looking at.
+         */
+        const label = scan.suggestedName ?? (scan.refText ? `REF ${scan.refText}` : null);
+        if (label) {
+          setName((prev) => prev || label);
           // The create-catalog action keys off this box, so seed it too —
           // otherwise the form opens with its create button disabled.
-          setCatalogSearch((prev) => prev || `REF ${scan.refText}`);
+          setCatalogSearch((prev) => prev || label);
+          filled.push(label);
         }
-        const sizeLabel = scan.size ?? (scan.height ? `${scan.height}mm` : null);
+
+        /*
+         * Knee or hip comes off the product family, which the parser tags,
+         * because the label never prints either word. It has to be settled
+         * before the two dropdowns below are seeded: they offer different
+         * vocabularies per joint, and a value that is not in the list a
+         * <select> is rendering silently shows as blank.
+         */
+        if (scan.joint) setJoint(scan.joint);
+        const jointForLists: CatalogJoint = scan.joint ?? joint;
+
+        if (scan.productLine) {
+          setNewProductLineChoice(
+            PRODUCT_LINES[jointForLists].includes(scan.productLine) ? scan.productLine : OTHER,
+          );
+          setNewProductLineOther(scan.productLine);
+        }
+        if (scan.deviceDescription) {
+          setNewDeviceTypeChoice(
+            DEVICE_TYPES[jointForLists].includes(scan.deviceDescription) ? scan.deviceDescription : OTHER,
+          );
+          setNewDeviceTypeOther(scan.deviceDescription);
+        }
         if (scan.side) {
           setNewSide(scan.side);
-          filled.push("side");
+          filled.push(scan.side === "LEFT" ? "side left" : "side right");
         }
-        if (sizeLabel) {
-          setNewSizeLabel(sizeLabel);
-          filled.push(scan.size ? "size" : "height");
+        if (scan.suggestedSizeLabel) {
+          setNewSizeLabel(scan.suggestedSizeLabel);
+          filled.push(`size ${scan.suggestedSizeLabel}`);
         }
         if (scan.cement) setNewCementType(scan.cement);
-        if (scan.side || sizeLabel || scan.cement) setShowNewCatalogForm(true);
+        // Open the create form whenever there is enough on the label to make a
+        // real catalog entry out of it.
+        if (scan.productLine || scan.deviceDescription || scan.suggestedSizeLabel || scan.side) {
+          setShowNewCatalogForm(true);
+        }
       }
 
       // Unit-level facts — true for this box whether or not it linked to catalog.
@@ -290,26 +364,50 @@ export default function AddItemSheet({
       }
       if (scan.cement) {
         setCementType(scan.cement);
-        filled.push("cement");
+        filled.push(scan.cement === "cemented" ? "cemented" : "cementless");
       }
+      /*
+       * Never overwrite a lot or expiry that is already in the form. When the
+       * same photo has been decoded as a barcode first, what is sitting there
+       * came out of the data-matrix -- exact by construction -- and this is
+       * OCR of small digits printed on a shiny box, which is not.
+       */
       if (scan.lot) {
-        setLot(scan.lot);
-        filled.push("lot");
+        setLot((prev) => prev || scan.lot!);
+        filled.push(`lot ${scan.lot}`);
       }
       if (scan.expiration) {
-        setExpiration(scan.expiration);
-        filled.push("expiration");
+        setExpiration((prev) => prev || scan.expiration!);
+        filled.push(`exp ${scan.expiration}`);
       }
 
-      const matchMsg = scan.match
-        ? `Matched ${scan.match.name}${scan.match.size_label ? ` · ${scan.match.size_label}` : ""}. `
-        : scan.refText
-          ? `Read REF ${scan.refText} (no catalog match — confirm or add it). `
-          : "";
+      /*
+       * One line stating what this box is, merged across both readings, so the
+       * rep checks the summary against the label in their hand rather than
+       * against six separate form fields. The barcode's lot and expiry win
+       * here for the same reason they win in the form.
+       */
+      const fromBarcode = barcodeScanRef.current;
+      const summary = [
+        scan.match ? scan.match.name : scan.suggestedName,
+        scan.match?.size_label ? `size ${scan.match.size_label}` : null,
+        !scan.match && scan.suggestedSizeLabel ? `size ${scan.suggestedSizeLabel}` : null,
+        !scan.match && scan.side ? (scan.side === "LEFT" ? "left" : "right") : null,
+        scan.insertType,
+        scan.cement,
+        (fromBarcode?.lot ?? scan.lot) ? `lot ${fromBarcode?.lot ?? scan.lot}` : null,
+        (fromBarcode?.expiration ?? scan.expiration)
+          ? `exp ${fromBarcode?.expiration ?? scan.expiration}`
+          : null,
+      ].filter(Boolean);
+
+      const unmatched = !scan.match && scan.refText ? ` No catalog match for REF ${scan.refText} — confirm or add it below.` : "";
       setScanNote(
-        filled.length > 0
-          ? `${matchMsg}Filled: ${filled.join(", ")}. Verify before saving.`
-          : `${matchMsg}Nothing could be filled automatically — enter the details by hand.`,
+        summary.length > 0
+          ? `Read: ${summary.join(" · ")}.${unmatched} Verify before saving.`
+          : filled.length > 0
+            ? `Filled: ${filled.join(", ")}.${unmatched} Verify before saving.`
+            : `Nothing could be filled automatically — enter the details by hand.`,
       );
     } catch {
       setScanNote("Label scan unavailable right now — photo attached, fill it in by hand.");
@@ -451,8 +549,9 @@ export default function AddItemSheet({
               </p>
             )}
             <p className="mt-1 text-xs text-slate-500">
-              Snap the printed label — reads the REF, size, side, cement, lot &amp; expiration, and
-              links it to the catalog. Always double-check before saving.
+              Snap the printed label — reads the product and REF, size, thickness or diameter,
+              side, type, cement, lot &amp; expiration, and links it to the catalog. Always
+              double-check before saving.
             </p>
           </div>
 

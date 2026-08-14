@@ -19,6 +19,13 @@ export default function Scan() {
   const [manualCode, setManualCode] = useState("");
   const [batchMode, setBatchMode] = useState(false);
   const [decoding, setDecoding] = useState(false);
+  /**
+   * The still the barcode came off, kept so the Add-item sheet can read the
+   * same photo a second time for the printed words no barcode carries --
+   * product, size, thickness, side, cement. Null when the code came from the
+   * live camera or was typed, because there is no still to hand on.
+   */
+  const [scannedPhoto, setScannedPhoto] = useState<File | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
   // Scan callbacks are registered once with the camera; a ref (not state)
@@ -42,7 +49,10 @@ export default function Scan() {
         { facingMode: "environment" },
         CAMERA_CONFIG,
         (decodedText) => {
-          if (!pausedRef.current) void onDetected(decodedText);
+          if (!pausedRef.current) {
+            setScannedPhoto(null);
+            void onDetected(decodedText);
+          }
         },
         () => {
           /* per-frame no-match noise, ignore */
@@ -66,6 +76,7 @@ export default function Scan() {
   async function onPhoto(file: File) {
     setError(null);
     setDecoding(true);
+    setScannedPhoto(file);
     try {
       const text = await decodePhoto(file);
       if (text) await onDetected(text);
@@ -113,6 +124,7 @@ export default function Scan() {
 
   async function onManualLookup() {
     if (!manualCode.trim()) return;
+    setScannedPhoto(null);
     await onDetected(manualCode.trim());
     setManualCode("");
   }
@@ -154,9 +166,10 @@ export default function Scan() {
         {decoding ? "Reading photo…" : "Photo of the label"}
       </button>
       <p className="mt-1.5 text-xs text-slate-500">
-        Take one now or pick an existing photo — either reads the GTIN, lot and expiry off the
-        box. This is the reliable route for the small square data-matrix; the live camera below
-        suits larger tray and kit barcodes.
+        Take one now or pick an existing photo. One shot of the label reads the whole box: GTIN,
+        lot and expiry out of the data-matrix, and the product, size, side, thickness and cement
+        off the printed words beside it. This is the reliable route for the small square
+        data-matrix; the live camera below suits larger tray and kit barcodes.
       </p>
 
       {/*
@@ -224,8 +237,15 @@ export default function Scan() {
         <AddItemSheet
           facilities={facilities}
           prefillBarcode={unknownBarcode}
-          onClose={() => setUnknownBarcode(null)}
-          onCreated={() => setUnknownBarcode(null)}
+          prefillPhoto={scannedPhoto}
+          onClose={() => {
+            setUnknownBarcode(null);
+            setScannedPhoto(null);
+          }}
+          onCreated={() => {
+            setUnknownBarcode(null);
+            setScannedPhoto(null);
+          }}
         />
       )}
 
