@@ -687,3 +687,120 @@ export interface AssetPhoto {
   uploaded_by: string | null;
   created_at: string;
 }
+
+/* ------------------------------------------------------------------ *
+ * Daily manager report
+ *
+ * A one-way artifact. Territory Operations stays private; a report is
+ * hand-curated by the rep and leaves the building as text or PDF, never as
+ * access. Every field here is something the rep chose to say.
+ * ------------------------------------------------------------------ */
+
+export type DailyReportStatus = "draft" | "ready" | "sent" | "acknowledged" | "archived";
+export type DailyReportSendMethod = "email" | "text" | "pdf" | "verbal" | "other";
+
+export type DailyReportSection =
+  | "completed"
+  | "equipment"
+  | "outstanding"
+  | "manager_request"
+  | "tomorrow"
+  | "guidance";
+
+export type DailyReportItemStatus = "complete" | "in_progress" | "pending" | "needs_attention";
+export type DailyReportPriority = "high" | "normal" | "low";
+
+/** Where a line was drawn from, so the rep does not retype what already exists. */
+export type DailyReportSourceType =
+  | "task"
+  | "case"
+  | "inventory_item"
+  | "tracked_asset"
+  | "note"
+  | "movement";
+
+export interface DailyReport {
+  id: string;
+  territory_id: string;
+  author_id: string;
+  /** YYYY-MM-DD. One report per rep per day. */
+  report_date: string;
+  area: string | null;
+  summary: string | null;
+  important_notes: string | null;
+  status: DailyReportStatus;
+  sent_at: string | null;
+  sent_to: string | null;
+  sent_method: DailyReportSendMethod | null;
+  acknowledged_at: string | null;
+  acknowledgement_note: string | null;
+  /** Frozen text of what was actually sent, so later edits cannot rewrite it. */
+  sent_snapshot: DailyReportSnapshot | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** What `sent_snapshot` holds: the generated output, exactly as it went out. */
+export interface DailyReportSnapshot {
+  generated_at: string;
+  full: string;
+  text_message: string;
+}
+
+export interface DailyReportItem {
+  id: string;
+  territory_id: string;
+  report_id: string;
+  section: DailyReportSection;
+  position: number;
+  title: string;
+  detail: string | null;
+  status: DailyReportItemStatus | null;
+  category: string | null;
+  next_action: string | null;
+  expected_date: string | null;
+  priority: DailyReportPriority | null;
+  location_id: string | null;
+  quantity: number | null;
+  occurred_at: string | null;
+  planned_time: string | null;
+  source_type: DailyReportSourceType | null;
+  source_id: string | null;
+  created_at: string;
+}
+
+export interface DailyReportPhoto {
+  id: string;
+  territory_id: string;
+  report_id: string;
+  url: string;
+  caption: string | null;
+  source_type: "task_photo" | "asset_photo" | "upload" | null;
+  source_id: string | null;
+  position: number;
+  created_at: string;
+}
+
+/** A report and everything on it, which is how every screen wants it. */
+export interface DailyReportFull extends DailyReport {
+  items: DailyReportItem[];
+  photos: DailyReportPhoto[];
+}
+
+/**
+ * Kinds of work a completed or planned line can be. Free text in the database
+ * so a rep is never blocked by a missing option, but offered as a list because
+ * consistent labels are what make a week of reports comparable.
+ */
+export const DAILY_REPORT_CATEGORIES = [
+  "Case support",
+  "Hospital / ASC visit",
+  "Delivery",
+  "Efficiency totes",
+  "Instruments / equipment",
+  "Inventory",
+  "Replenishment",
+  "Surgeon / staff support",
+  "Administrative",
+  "Other",
+] as const;

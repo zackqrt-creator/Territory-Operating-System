@@ -1,6 +1,10 @@
 import { supabase } from "./supabase";
 import { downscaleImage } from "./images";
 import type {
+  DailyReport,
+  DailyReportFull,
+  DailyReportItem,
+  DailyReportPhoto,
   AssetMovement,
   AssetPhoto,
   AssetPhotoKind,
@@ -2251,4 +2255,222 @@ export async function listFrequentCatalogItemIds(withinDays = 180): Promise<stri
     counts.set(row.catalog_item_id, (counts.get(row.catalog_item_id) ?? 0) + 1);
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
+/* ------------------------------------------------------------------ *
+ * Daily manager report
+ * ------------------------------------------------------------------ */
+
+/**
+ * The report for a given day, creating the draft on first open.
+ *
+ * Opening "today" twice must land on the same draft, which is what the unique
+ * (territory, author, date) index enforces; the insert is written to tolerate
+ * losing that race rather than surfacing a duplicate-key error to a rep who
+ * simply double-tapped.
+ */
+export async function getOrCreateDailyReport(params: {
+  territoryId: string;
+  authorId: string;
+  date: string;
+}): Promise<DailyReport> {
+  const existing = await supabase
+    .from("daily_reports")
+    .select("*")
+    .eq("author_id", params.authorId)
+    .eq("report_date", params.date)
+    .maybeSingle();
+  if (existing.error) throw existing.error;
+  if (existing.data) return existing.data as DailyReport;
+
+  const { data, error } = await supabase
+    .from("daily_reports")
+    .insert({
+      territory_id: params.territoryId,
+      author_id: params.authorId,
+      report_date: params.date,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    // Lost the race with another tab or a double tap: read back the winner.
+    const retry = await supabase
+      .from("daily_reports")
+      .select("*")
+      .eq("author_id", params.authorId)
+      .eq("report_date", params.date)
+      .maybeSingle();
+    if (retry.data) return retry.data as DailyReport;
+    throw error;
+  }
+  return data as DailyReport;
+}
+
+export async function listDailyReports(limit = 60): Promise<DailyReport[]> {
+  const { data, error } = await supabase
+    .from("daily_reports")
+    .select("*")
+    .order("report_date", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as DailyReport[];
+}
+
+/** A report with its items and photos — what every screen actually needs. */
+export async function getDailyReportFull(reportId: string): Promise<DailyReportFull | null> {
+  const [report, items, photos] = await Promise.all([
+    supabase.from("daily_reports").select("*").eq("id", reportId).maybeSingle(),
+    supabase
+      .from("daily_report_items")
+      .select("*")
+      .eq("report_id", reportId)
+      .order("section")
+      .order("position"),
+    supabase.from("daily_report_photos").select("*").eq("report_id", reportId).order("position"),
+  ]);
+  if (report.error) throw report.error;
+  if (items.error) throw items.error;
+  if (photos.error) throw photos.error;
+  if (!report.data) return null;
+  return {
+    ...(report.data as DailyReport),
+    items: (items.data ?? []) as DailyReportItem[],
+    photos: (photos.data ?? []) as DailyReportPhoto[],
+  };
+}
+
+export async function updateDailyReport(
+  id: string,
+  patch: Partial<
+    Pick<
+      DailyReport,
+      | "area"
+      | "summary"
+      | "important_notes"
+      | "status"
+      | "sent_at"
+      | "sent_to"
+      | "sent_method"
+      | "acknowledged_at"
+      | "acknowledgement_note"
+      | "sent_snapshot"
+    >
+  >,
+): Promise<void> {
+  const { error } = await supabase
+    .from("daily_reports")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function addDailyReportItem(
+  input: Omit<DailyReportItem, "id" | "created_at">,
+): Promise<DailyReportItem> {
+  const { data, error } = await supabase
+    .from("daily_report_items")
+    .insert(input)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as DailyReportItem;
+}
+
+export async function updateDailyReportItem(
+  id: string,
+  patch: Partial<Omit<DailyReportItem, "id" | "territory_id" | "report_id" | "created_at">>,
+): Promise<void> {
+  const { error } = await supabase.from("daily_report_items").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteDailyReportItem(id: string): Promise<void> {
+  const { error } = await supabase.from("daily_report_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function addDailyReportPhoto(
+  input: Omit<DailyReportPhoto, "id" | "created_at">,
+): Promise<DailyReportPhoto> {
+  const { data, error } = await supabase
+    .from("daily_report_photos")
+    .insert(input)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as DailyReportPhoto;
+}
+
+export async function updateDailyReportPhoto(
+  id: string,
+  patch: Partial<Pick<DailyReportPhoto, "caption" | "position">>,
+): Promise<void> {
+  const { error } = await supabase.from("daily_report_photos").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteDailyReportPhoto(id: string): Promise<void> {
+  const { error } = await supabase.from("daily_report_photos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * What happened on a given day, offered to the rep as candidates.
+ *
+ * Read-only and suggestion-only: nothing here reaches a report until the rep
+ * taps it. That is the whole privacy contract of this feature, so this function
+ * deliberately returns candidates rather than writing anything.
+ */
+export interface DailyReportSuggestions {
+  tasksDone: PersonalTask[];
+  tasksOpen: PersonalTask[];
+  cases: CaseRow[];
+  movements: Movement[];
+  photos: TaskPhoto[];
+}
+
+export async function getDailyReportSuggestions(date: string): Promise<DailyReportSuggestions> {
+  const dayStart = `${date}T00:00:00`;
+  const dayEnd = `${date}T23:59:59.999`;
+
+  const [done, open, cases, movements] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("*")
+      .eq("status", "done")
+      .gte("done_at", dayStart)
+      .lte("done_at", dayEnd)
+      .order("done_at"),
+    supabase
+      .from("tasks")
+      .select("*")
+      .neq("status", "done")
+      .order("due_date", { nullsFirst: false })
+      .limit(50),
+    supabase.from("cases").select("*").eq("surgery_date", date).order("surgery_time"),
+    supabase
+      .from("movements")
+      .select("*")
+      .gte("created_at", dayStart)
+      .lte("created_at", dayEnd)
+      .order("created_at")
+      .limit(50),
+  ]);
+
+  if (done.error) throw done.error;
+  if (open.error) throw open.error;
+  if (cases.error) throw cases.error;
+  if (movements.error) throw movements.error;
+
+  const taskIds = (done.data ?? []).map((t: { id: string }) => t.id);
+  const photos = taskIds.length ? await listTaskPhotos(taskIds) : [];
+
+  return {
+    tasksDone: (done.data ?? []) as PersonalTask[],
+    tasksOpen: (open.data ?? []) as PersonalTask[],
+    cases: (cases.data ?? []) as CaseRow[],
+    movements: (movements.data ?? []) as Movement[],
+    photos,
+  };
 }
