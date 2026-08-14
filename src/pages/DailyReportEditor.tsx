@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, FileText, ImagePlus, Plus, Sparkles, X } from "lucide-react";
+import { ChevronLeft, FileText, ImagePlus, Plus, Sparkles, Upload, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
   addDailyReportItem,
@@ -13,6 +13,7 @@ import {
   updateDailyReport,
   updateDailyReportItem,
   updateDailyReportPhoto,
+  uploadItemPhoto,
 } from "../lib/api";
 import { formatReportDate, isReportEmpty, sectionTitle, statusLabel } from "../lib/dailyReport";
 import DailyReportItemSheet, { type ItemDraft } from "../components/DailyReportItemSheet";
@@ -61,6 +62,8 @@ export default function DailyReportEditor() {
   } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -147,6 +150,40 @@ export default function DailyReportEditor() {
       });
     }
     await reload();
+  }
+
+  /**
+   * Add a photo straight from the camera or the file picker.
+   *
+   * Selecting one already attached to a task covers the "enter it once" case,
+   * but only if the work happened to be logged as a task with a photo on it.
+   * Plenty of proof -- a tote on a shelf, a delivered case cart -- is just a
+   * picture taken on the spot, and without this there was no way to attach it.
+   */
+  async function uploadPhotos(files: FileList) {
+    if (!report || !profile) return;
+    setUploading(true);
+    setError(null);
+    try {
+      let position = report.photos.length;
+      for (const file of Array.from(files)) {
+        const url = await uploadItemPhoto(file, report.territory_id);
+        await addDailyReportPhoto({
+          territory_id: report.territory_id,
+          report_id: report.id,
+          url,
+          caption: null,
+          source_type: "upload",
+          source_id: null,
+          position: position++,
+        });
+      }
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't upload that photo.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function markSent(params: {
@@ -362,17 +399,41 @@ export default function DailyReportEditor() {
           <h2 className="text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500">
             Photos / documentation
           </h2>
-          <button
-            onClick={() => setShowSuggestions(true)}
-            className="flex min-h-0 items-center gap-1 py-1 text-sky-400"
-          >
-            <ImagePlus size={14} aria-hidden />
-            <span className="text-sm">Choose</span>
-          </button>
+          <span className="flex items-center gap-4">
+            <button
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploading}
+              className="flex min-h-0 items-center gap-1 py-1 text-sky-400 disabled:opacity-50"
+            >
+              <Upload size={14} aria-hidden />
+              <span className="text-sm">{uploading ? "Uploading…" : "Upload"}</span>
+            </button>
+            <button
+              onClick={() => setShowSuggestions(true)}
+              className="flex min-h-0 items-center gap-1 py-1 text-sky-400"
+            >
+              <ImagePlus size={14} aria-hidden />
+              <span className="text-sm">From tasks</span>
+            </button>
+          </span>
         </div>
         <p className="mt-0.5 text-xs text-slate-500">
-          Only the photos you pick here are included. Everything else stays private.
+          Take or pick a photo, or reuse one already on today's tasks. Only what you add here is
+          included; everything else stays private.
         </p>
+
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const files = e.target.files;
+            e.target.value = "";
+            if (files?.length) void uploadPhotos(files);
+          }}
+        />
 
         {report.photos.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">No photos selected.</p>
