@@ -78,6 +78,12 @@ export default function NoteDetail() {
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const dirtyRef = useRef(false);
+  const titleRef = useRef(title);
+  const bodyRef = useRef(body);
+  titleRef.current = title;
+  bodyRef.current = body;
 
   const [entityType, setEntityType] = useState<TerritoryNoteEntityType>("case");
   const [entityId, setEntityId] = useState("");
@@ -125,9 +131,44 @@ export default function NoteDetail() {
   }, [id]);
 
   async function saveText() {
-    if (!id) return;
-    await updateNote(id, { title: title.trim() || "Untitled note", body });
+    if (!id || !dirtyRef.current) return;
+    setSaveStatus("saving");
+    dirtyRef.current = false;
+    await updateNote(id, { title: titleRef.current.trim() || "Untitled note", body: bodyRef.current });
+    setSaveStatus("saved");
   }
+
+  function onEditTitle(next: string) {
+    setTitle(next);
+    dirtyRef.current = true;
+    setSaveStatus("idle");
+  }
+
+  function onEditBody(next: string) {
+    setBody(next);
+    dirtyRef.current = true;
+    setSaveStatus("idle");
+  }
+
+  // Autosave shortly after typing stops — a rep swiping back or switching apps
+  // mid-edit shouldn't have to guess whether the blur handler caught it.
+  useEffect(() => {
+    if (!dirtyRef.current) return;
+    const timer = setTimeout(saveText, 1200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, body]);
+
+  // Safety net: flush any unsaved edit if the rep navigates away before the
+  // debounce timer or a blur fires.
+  useEffect(() => {
+    return () => {
+      if (dirtyRef.current && id) {
+        updateNote(id, { title: titleRef.current.trim() || "Untitled note", body: bodyRef.current });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   async function patch(fields: Partial<Pick<TerritoryNote, "note_type" | "visibility" | "pinned" | "archived">>) {
     if (!id) return;
@@ -144,7 +185,7 @@ export default function NoteDetail() {
   }
 
   function onInsertChecklistItem() {
-    setBody((prev) => appendChecklistItem(prev));
+    onEditBody(appendChecklistItem(body));
   }
 
   async function onPickPhoto(file: File | null) {
@@ -257,18 +298,20 @@ export default function NoteDetail() {
     <div className="min-h-screen px-4 pb-28 pt-6">
       <input
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => onEditTitle(e.target.value)}
         onBlur={saveText}
         className="w-full bg-transparent text-2xl font-bold text-slate-100 outline-none"
         placeholder="Untitled note"
       />
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
         Updated {formatRelativeDay(note.updated_at)} · created {formatRelativeDay(note.created_at)}
+        {saveStatus === "saving" && <span className="text-amber-400">· Saving…</span>}
+        {saveStatus === "saved" && <span className="text-emerald-400">· Saved ✓</span>}
       </p>
 
       <textarea
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={(e) => onEditBody(e.target.value)}
         onBlur={saveText}
         rows={6}
         placeholder={'Write here... type "- [ ] " to add a checkbox'}
