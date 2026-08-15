@@ -34,6 +34,7 @@ import type {
   WikiPage,
   PageLink,
   PageEntityType,
+  Notebook,
 } from "./types";
 import { extractLinkTitles, slugify } from "./wikilinks";
 
@@ -654,8 +655,8 @@ export async function linkCatalogItemGtin(catalogItemId: string, gtin: string): 
   if (error) throw error;
 }
 
-/** Uploads a reference photo to the public `item-photos` bucket and returns its public URL. */
-export async function uploadItemPhoto(file: File, territoryId: string): Promise<string> {
+/** Uploads a photo to the public `item-photos` bucket and returns its public URL — used for inventory items, notes, and task attachments alike. */
+export async function uploadPhoto(file: File, territoryId: string): Promise<string> {
   const ext = file.name.split(".").pop() ?? "jpg";
   const path = `${territoryId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage.from("item-photos").upload(path, file);
@@ -663,6 +664,8 @@ export async function uploadItemPhoto(file: File, territoryId: string): Promise<
   const { data } = supabase.storage.from("item-photos").getPublicUrl(path);
   return data.publicUrl;
 }
+
+export const uploadItemPhoto = uploadPhoto;
 
 export async function listSurgeons(): Promise<Surgeon[]> {
   const { data, error } = await supabase.from("surgeons").select("*").order("name");
@@ -964,6 +967,7 @@ export async function createTask(input: {
   status?: TaskStatus;
   assigned_to?: string | null;
   source_note_id?: string | null;
+  photo_url?: string | null;
   territory_id: string;
   owner_id: string;
 }): Promise<PersonalTask> {
@@ -975,7 +979,10 @@ export async function createTask(input: {
 export async function updateTask(
   id: string,
   patch: Partial<
-    Pick<PersonalTask, "title" | "notes" | "due_date" | "status" | "shared_with" | "assigned_to" | "done_at">
+    Pick<
+      PersonalTask,
+      "title" | "notes" | "due_date" | "status" | "shared_with" | "assigned_to" | "done_at" | "photo_url"
+    >
   >,
 ): Promise<void> {
   const { error } = await supabase.from("tasks").update(patch).eq("id", id);
@@ -1007,6 +1014,7 @@ export async function createEntityNote(input: {
   entity_type: NoteEntityType;
   entity_id: string;
   body: string;
+  photo_url?: string | null;
   territory_id: string;
   author_id: string;
 }): Promise<void> {
@@ -1014,11 +1022,10 @@ export async function createEntityNote(input: {
   if (error) throw error;
 }
 
-export async function updateEntityNote(id: string, body: string): Promise<void> {
-  const { error } = await supabase
-    .from("entity_notes")
-    .update({ body, updated_at: new Date().toISOString() })
-    .eq("id", id);
+export async function updateEntityNote(id: string, body: string, photoUrl?: string | null): Promise<void> {
+  const patch: Record<string, unknown> = { body, updated_at: new Date().toISOString() };
+  if (photoUrl !== undefined) patch.photo_url = photoUrl;
+  const { error } = await supabase.from("entity_notes").update(patch).eq("id", id);
   if (error) throw error;
 }
 
@@ -1132,6 +1139,7 @@ export async function createPage(input: {
   tags?: string[];
   entity_type?: PageEntityType | null;
   entity_id?: string | null;
+  notebook_id?: string | null;
   created_by: string;
 }): Promise<WikiPage> {
   const slug = await uniqueSlug(input.territory_id, input.title);
@@ -1145,6 +1153,7 @@ export async function createPage(input: {
       tags: input.tags ?? [],
       entity_type: input.entity_type ?? null,
       entity_id: input.entity_id ?? null,
+      notebook_id: input.notebook_id ?? null,
       created_by: input.created_by,
       last_edited_by: input.created_by,
     })
@@ -1154,6 +1163,50 @@ export async function createPage(input: {
   const page = data as WikiPage;
   await relinkPage(page.territory_id, page.id, page.body);
   return page;
+}
+
+// ---- Notebooks ---------------------------------------------------------
+
+export async function listNotebooks(): Promise<Notebook[]> {
+  const { data, error } = await supabase.from("notebooks").select("*").order("name");
+  if (error) throw error;
+  return data as Notebook[];
+}
+
+export async function createNotebook(input: {
+  territory_id: string;
+  name: string;
+  parent_id?: string | null;
+  created_by: string;
+}): Promise<Notebook> {
+  const { data, error } = await supabase
+    .from("notebooks")
+    .insert({
+      territory_id: input.territory_id,
+      name: input.name,
+      parent_id: input.parent_id ?? null,
+      created_by: input.created_by,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Notebook;
+}
+
+export async function renameNotebook(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from("notebooks").update({ name }).eq("id", id);
+  if (error) throw error;
+}
+
+/** Deletes a notebook; pages inside it become Unfiled (notebook_id set null by the FK), not deleted. */
+export async function deleteNotebook(id: string): Promise<void> {
+  const { error } = await supabase.from("notebooks").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function setPageNotebook(pageId: string, notebookId: string | null): Promise<void> {
+  const { error } = await supabase.from("pages").update({ notebook_id: notebookId }).eq("id", pageId);
+  if (error) throw error;
 }
 
 /** Finds a record's canonical page, creating an empty one on first visit. */

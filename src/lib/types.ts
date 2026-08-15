@@ -360,6 +360,7 @@ export interface PersonalTask {
   assigned_to: string | null;
   /** Entity note this task was spawned from ("Follow up" on a note). */
   source_note_id: string | null;
+  photo_url: string | null;
   done_at: string | null;
   created_at: string;
 }
@@ -373,6 +374,7 @@ export interface EntityNote {
   entity_type: NoteEntityType;
   entity_id: string;
   body: string;
+  photo_url: string | null;
   /** Floats to the top of its thread; author-controlled. */
   pinned: boolean;
   created_at: string;
@@ -391,11 +393,21 @@ export interface WikiPage {
   tags: string[];
   entity_type: PageEntityType | null;
   entity_id: string | null;
+  notebook_id: string | null;
   pinned: boolean;
   created_by: string | null;
   last_edited_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Notebook {
+  id: string;
+  territory_id: string;
+  name: string;
+  parent_id: string | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface PageLink {

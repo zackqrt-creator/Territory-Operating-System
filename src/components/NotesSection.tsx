@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
   createEntityNote,
@@ -8,9 +8,12 @@ import {
   listProfiles,
   setNotePinned,
   updateEntityNote,
+  uploadPhoto,
 } from "../lib/api";
 import type { EntityNote, NoteEntityType, Profile } from "../lib/types";
 import { formatRelativeDay, formatTimeOfDay, tomorrow } from "../utils/dates";
+import { appendChecklistItem, toggleChecklistLine } from "../lib/wikilinks";
+import ChecklistBody from "./ChecklistBody";
 
 /**
  * Universal note thread — drop onto any record (case, item, tote, surgeon).
@@ -40,6 +43,14 @@ export default function NotesSection({
   const [followUpDate, setFollowUpDate] = useState(tomorrow());
   const [followUpDone, setFollowUpDone] = useState<Set<string>>(new Set());
   const [dictating, setDictating] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function onPickPhoto(file: File | null) {
+    setPhotoFile(file);
+    setPhotoPreview(file ? URL.createObjectURL(file) : null);
+  }
 
   // Browser speech-to-text, where the platform offers it (iOS/Android/Chrome).
   // No API, no server — and the button simply doesn't render elsewhere.
@@ -91,15 +102,18 @@ export default function NotesSection({
     if (!draft.trim() || !profile) return;
     setBusy(true);
     try {
+      const photoUrl = photoFile ? await uploadPhoto(photoFile, profile.territory_id) : null;
       await createEntityNote({
         entity_type: entityType,
         entity_id: entityId,
         body: draft.trim(),
+        photo_url: photoUrl,
         territory_id: profile.territory_id,
         author_id: profile.id,
       });
       setDraft("");
       setAdding(false);
+      onPickPhoto(null);
       await refresh();
     } finally {
       setBusy(false);
@@ -112,6 +126,17 @@ export default function NotesSection({
     try {
       await updateEntityNote(id, editDraft.trim());
       setEditingId(null);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Toggles a checkbox in a saved note directly — no need to open edit mode. */
+  async function onToggleChecklist(note: EntityNote, lineIndex: number) {
+    setBusy(true);
+    try {
+      await updateEntityNote(note.id, toggleChecklistLine(note.body, lineIndex));
       await refresh();
     } finally {
       setBusy(false);
@@ -208,11 +233,51 @@ export default function NotesSection({
             placeholder={placeholder}
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
           />
+
+          {photoPreview && (
+            <div className="relative mt-1.5 inline-block">
+              <img src={photoPreview} alt="" className="h-20 w-20 rounded-lg object-cover" />
+              <button
+                onClick={() => {
+                  onPickPhoto(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 min-h-0 items-center justify-center rounded-full bg-slate-900 text-xs text-white"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+          />
+
           <div className="mt-1.5 flex gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="min-h-0 rounded-lg bg-slate-700 px-2.5 py-2 text-xs font-medium text-slate-200"
+              title="Attach a photo"
+            >
+              📷
+            </button>
+            <button
+              onClick={() => setDraft((prev) => appendChecklistItem(prev))}
+              className="min-h-0 rounded-lg bg-slate-700 px-2.5 py-2 text-xs font-medium text-slate-200"
+              title="Add a checkbox"
+            >
+              + ☑
+            </button>
             <button
               onClick={() => {
                 setAdding(false);
                 setDraft("");
+                onPickPhoto(null);
               }}
               className="min-h-0 flex-1 rounded-lg bg-slate-800 py-2 text-xs text-slate-300"
             >
@@ -274,7 +339,16 @@ export default function NotesSection({
                   📌 Pinned
                 </p>
               )}
-              <p className="whitespace-pre-wrap text-sm text-slate-200">{n.body}</p>
+              {n.photo_url && (
+                <a href={n.photo_url} target="_blank" rel="noreferrer" className="mb-1.5 block">
+                  <img src={n.photo_url} alt="" className="max-h-48 rounded-lg object-cover" />
+                </a>
+              )}
+              <ChecklistBody
+                body={n.body}
+                onToggle={(lineIndex) => onToggleChecklist(n, lineIndex)}
+                className="text-sm text-slate-200"
+              />
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span>
                   {nameOf(n.author_id)} · {formatRelativeDay(n.created_at)}{" "}

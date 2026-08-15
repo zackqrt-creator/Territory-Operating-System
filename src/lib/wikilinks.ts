@@ -67,6 +67,67 @@ export interface RenderToken {
   display?: string;
 }
 
+const CHECKLIST_RE = /^(\s*)-\s*\[([ xX])\]\s*(.*)$/;
+
+export interface BodyBlock {
+  type: "text" | "checklist";
+  /** Rendered content for a text block; item text for a checklist block. */
+  content: string;
+  checked?: boolean;
+  /** Index into the body's split-by-"\n" lines — needed to toggle this exact line back. */
+  lineIndex?: number;
+}
+
+/**
+ * Splits a note/page body into text blocks and individual checklist lines
+ * ("- [ ] text" / "- [x] text"), so a checklist item can render as a real,
+ * independently-toggleable checkbox while everything else still renders as
+ * normal wrapped prose. Consecutive non-checklist lines are grouped into one
+ * text block so whitespace-pre-wrap keeps their original line breaks.
+ */
+export function parseBodyBlocks(body: string): BodyBlock[] {
+  const lines = body.split("\n");
+  const blocks: BodyBlock[] = [];
+  let textBuffer: string[] = [];
+
+  const flushText = () => {
+    if (textBuffer.length > 0) {
+      blocks.push({ type: "text", content: textBuffer.join("\n") });
+      textBuffer = [];
+    }
+  };
+
+  lines.forEach((line, i) => {
+    const match = line.match(CHECKLIST_RE);
+    if (match) {
+      flushText();
+      blocks.push({ type: "checklist", content: match[3], checked: match[2].toLowerCase() === "x", lineIndex: i });
+    } else {
+      textBuffer.push(line);
+    }
+  });
+  flushText();
+  return blocks;
+}
+
+/** Flips a checklist line's [ ]/[x] state at the given line index; returns the updated body. */
+export function toggleChecklistLine(body: string, lineIndex: number): string {
+  const lines = body.split("\n");
+  const line = lines[lineIndex];
+  if (line === undefined) return body;
+  const match = line.match(CHECKLIST_RE);
+  if (!match) return body;
+  const nextMark = match[2].toLowerCase() === "x" ? " " : "x";
+  lines[lineIndex] = `${match[1]}- [${nextMark}] ${match[3]}`;
+  return lines.join("\n");
+}
+
+/** Appends a new empty checklist item to a body, on its own line. */
+export function appendChecklistItem(body: string): string {
+  const trimmed = body.replace(/\s+$/, "");
+  return trimmed ? `${trimmed}\n- [ ] ` : "- [ ] ";
+}
+
 export function tokenizeBody(body: string): RenderToken[] {
   const tokens: RenderToken[] = [];
   let lastIndex = 0;

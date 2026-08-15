@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { createTask, deleteTask, listMyTasks, listProfiles, updateTask } from "../lib/api";
+import { createTask, deleteTask, listMyTasks, listProfiles, updateTask, uploadPhoto } from "../lib/api";
 import type { PersonalTask, Profile, TaskStatus } from "../lib/types";
 import { daysUntil, formatDateShort, tomorrow } from "../utils/dates";
+import { appendChecklistItem, toggleChecklistLine } from "../lib/wikilinks";
+import ChecklistBody from "../components/ChecklistBody";
 
 const COLUMNS: { value: TaskStatus; label: string }[] = [
   { value: "todo", label: "To do" },
@@ -30,6 +32,14 @@ export default function Tasks() {
   const [assignTo, setAssignTo] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function onPickPhoto(file: File | null) {
+    setPhotoFile(file);
+    setPhotoPreview(file ? URL.createObjectURL(file) : null);
+  }
 
   function refresh() {
     return Promise.all([listMyTasks(), listProfiles()]).then(([t, p]) => {
@@ -49,12 +59,14 @@ export default function Tasks() {
     if (!title.trim() || !profile) return;
     setSaving(true);
     try {
+      const photoUrl = photoFile ? await uploadPhoto(photoFile, profile.territory_id) : null;
       await createTask({
         title: title.trim(),
         notes: notes.trim() || null,
         due_date: due || null,
         shared_with: sharedWith,
         assigned_to: assignTo,
+        photo_url: photoUrl,
         territory_id: profile.territory_id,
         owner_id: profile.id,
       });
@@ -64,6 +76,7 @@ export default function Tasks() {
       setSharedWith([]);
       setAssignTo(null);
       setShowForm(false);
+      onPickPhoto(null);
       await refresh();
     } finally {
       setSaving(false);
@@ -102,9 +115,47 @@ export default function Tasks() {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
-            placeholder="Notes (optional)..."
+            placeholder="Notes (optional)... tap + ☑ to add a checkbox"
             className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
           />
+
+          {photoPreview && (
+            <div className="relative mt-2 inline-block">
+              <img src={photoPreview} alt="" className="h-20 w-20 rounded-lg object-cover" />
+              <button
+                onClick={() => {
+                  onPickPhoto(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 min-h-0 items-center justify-center rounded-full bg-slate-900 text-xs text-white"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="min-h-0 rounded-lg bg-slate-800 px-2.5 py-2 text-xs font-medium text-slate-300"
+            >
+              📷 Photo
+            </button>
+            <button
+              onClick={() => setNotes((prev) => appendChecklistItem(prev))}
+              className="min-h-0 rounded-lg bg-slate-800 px-2.5 py-2 text-xs font-medium text-slate-300"
+            >
+              + ☑ Checkbox
+            </button>
+          </div>
+
           <div className="mt-2 flex items-center gap-2">
             <label className="text-xs text-slate-400">Due</label>
             <input
@@ -251,6 +302,7 @@ function TaskCard({
         notes: task.notes,
         due_date: dupDate || null,
         shared_with: task.shared_with,
+        photo_url: task.photo_url,
         territory_id: territoryId,
         owner_id: meId,
       });
@@ -266,6 +318,27 @@ function TaskCard({
     try {
       await updateTask(task.id, { title: eTitle.trim() || task.title, notes: eNotes.trim() || null });
       setEditing(false);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onToggleChecklist(lineIndex: number) {
+    if (!task.notes) return;
+    setBusy(true);
+    try {
+      await updateTask(task.id, { notes: toggleChecklistLine(task.notes, lineIndex) });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRemovePhoto() {
+    setBusy(true);
+    try {
+      await updateTask(task.id, { photo_url: null });
       onChanged();
     } finally {
       setBusy(false);
@@ -306,6 +379,24 @@ function TaskCard({
             placeholder="Notes..."
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
           />
+          <button
+            onClick={() => setENotes((prev) => appendChecklistItem(prev))}
+            className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300"
+          >
+            + ☑ Checkbox
+          </button>
+          {task.photo_url && (
+            <div className="relative inline-block">
+              <img src={task.photo_url} alt="" className="h-20 w-20 rounded-lg object-cover" />
+              <button
+                onClick={onRemovePhoto}
+                disabled={busy}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 min-h-0 items-center justify-center rounded-full bg-slate-900 text-xs text-white"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <div className="flex gap-2">
             <button onClick={() => setEditing(false)} className="flex-1 rounded-lg bg-slate-800 py-2 text-sm text-white">
               Cancel
@@ -320,7 +411,14 @@ function TaskCard({
           <p className={`text-sm font-medium ${task.status === "done" ? "text-slate-400 line-through" : "text-white"}`}>
             {task.title}
           </p>
-          {task.notes && <p className="mt-0.5 text-sm text-slate-400">{task.notes}</p>}
+          {task.photo_url && (
+            <a href={task.photo_url} target="_blank" rel="noreferrer" className="mt-1 block">
+              <img src={task.photo_url} alt="" className="max-h-40 rounded-lg object-cover" />
+            </a>
+          )}
+          {task.notes && (
+            <ChecklistBody body={task.notes} onToggle={onToggleChecklist} className="mt-0.5 text-sm text-slate-400" />
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
             {task.due_date && (
               <span className={overdue ? "font-medium text-red-300" : ""}>
