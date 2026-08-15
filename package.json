@@ -11,7 +11,9 @@
     "test:report": "vite-node scripts/test-daily-report.mjs",
     "test:scan": "vite-node scripts/test-scan-prefill.mjs",
     "test:label": "vite-node scripts/test-label-parse.mjs",
-    "test:livescan": "node scripts/test-live-scan.mjs"
+    "test:livescan": "node scripts/test-live-scan.mjs",
+    "test:integrations": "vite-node scripts/test-integrations.mjs",
+    "test": "npm run test:report && npm run test:scan && npm run test:label && npm run test:integrations"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

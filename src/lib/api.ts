@@ -1,6 +1,13 @@
 import { supabase } from "./supabase";
 import { downscaleImage } from "./images";
 import type {
+  Integration,
+  IntegrationLink,
+  IntegrationRun,
+  IntegrationRunKind,
+  IntegrationRunStatus,
+  IntegrationRunTrigger,
+  IntegrationWithRun,
   DailyReport,
   DailyReportFull,
   DailyReportItem,
@@ -2473,4 +2480,255 @@ export async function getDailyReportSuggestions(date: string): Promise<DailyRepo
     movements: (movements.data ?? []) as Movement[],
     photos,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Integration framework
+ *
+ * Reminder, because it is the one thing that must not drift: `config` holds
+ * non-secret settings, `credential_ref` holds the NAME of a Supabase secret,
+ * and no function here ever sees a token. Connectors run server-side.
+ * ------------------------------------------------------------------ */
+
+export async function listIntegrations(): Promise<IntegrationWithRun[]> {
+  const { data, error } = await supabase.from("integrations").select("*").order("display_name");
+  if (error) throw error;
+  const rows = (data ?? []) as Integration[];
+  if (rows.length === 0) return [];
+
+  // One query for every integration's latest run rather than N: this screen
+  // renders on open and a request per row is what makes it feel slow.
+  const { data: runs, error: runErr } = await supabase
+    .from("integration_runs")
+    .select("*")
+    .in(
+      "integration_id",
+      rows.map((r) => r.id),
+    )
+    .order("started_at", { ascending: false });
+  if (runErr) throw runErr;
+
+  const latest = new Map<string, IntegrationRun>();
+  for (const run of (runs ?? []) as IntegrationRun[]) {
+    if (!latest.has(run.integration_id)) latest.set(run.integration_id, run);
+  }
+  return rows.map((r) => ({ ...r, latest_run: latest.get(r.id) ?? null }));
+}
+
+/**
+ * Create the row for a provider the first time it is configured.
+ *
+ * Starts disabled and 'not_configured' on purpose: appearing in the list is
+ * not the same as working, and a fresh row must never read as connected.
+ */
+export async function createIntegration(input: {
+  territoryId: string;
+  provider: string;
+  displayName: string;
+  config?: Record<string, unknown>;
+  credentialRef?: string | null;
+}): Promise<Integration> {
+  const { data, error } = await supabase
+    .from("integrations")
+    .insert({
+      territory_id: input.territoryId,
+      provider: input.provider,
+      display_name: input.displayName,
+      config: input.config ?? {},
+      credential_ref: input.credentialRef ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Integration;
+}
+
+export async function updateIntegration(
+  id: string,
+  patch: Partial<
+    Pick<Integration, "display_name" | "enabled" | "status" | "config" | "credential_ref" | "sync_cursor">
+  >,
+): Promise<void> {
+  const { error } = await supabase
+    .from("integrations")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteIntegration(id: string): Promise<void> {
+  const { error } = await supabase.from("integrations").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function listIntegrationRuns(
+  integrationId: string,
+  limit = 20,
+): Promise<IntegrationRun[]> {
+  const { data, error } = await supabase
+    .from("integration_runs")
+    .select("*")
+    .eq("integration_id", integrationId)
+    .order("started_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as IntegrationRun[];
+}
+
+/**
+ * Open a run row before the work starts.
+ *
+ * Written up front so a connector that crashes leaves a visible 'running' row
+ * rather than nothing at all -- silence is the failure mode that makes people
+ * stop trusting a sync status.
+ */
+export async function startIntegrationRun(input: {
+  territoryId: string;
+  integrationId: string;
+  kind: IntegrationRunKind;
+  trigger?: IntegrationRunTrigger;
+  createdBy?: string | null;
+}): Promise<IntegrationRun> {
+  const { data, error } = await supabase
+    .from("integration_runs")
+    .insert({
+      territory_id: input.territoryId,
+      integration_id: input.integrationId,
+      kind: input.kind,
+      trigger: input.trigger ?? "manual",
+      created_by: input.createdBy ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as IntegrationRun;
+}
+
+/**
+ * Close a run and roll its outcome up onto the integration.
+ *
+ * Both writes happen here so the summary on the integration row cannot drift
+ * from the run history that justifies it.
+ */
+export async function finishIntegrationRun(input: {
+  runId: string;
+  integrationId: string;
+  status: Exclude<IntegrationRunStatus, "running">;
+  counts?: Partial<Pick<IntegrationRun, "items_seen" | "items_created" | "items_updated" | "items_skipped">>;
+  errorMessage?: string | null;
+  errorDetail?: Record<string, unknown> | null;
+  summary?: Record<string, unknown> | null;
+}): Promise<void> {
+  const finishedAt = new Date().toISOString();
+
+  const { error: runErr } = await supabase
+    .from("integration_runs")
+    .update({
+      status: input.status,
+      finished_at: finishedAt,
+      ...input.counts,
+      error_message: input.errorMessage ?? null,
+      error_detail: input.errorDetail ?? null,
+      summary: input.summary ?? null,
+    })
+    .eq("id", input.runId);
+  if (runErr) throw runErr;
+
+  const succeeded = input.status === "success";
+  const { data: current } = await supabase
+    .from("integrations")
+    .select("consecutive_failures")
+    .eq("id", input.integrationId)
+    .maybeSingle();
+  const failures = (current?.consecutive_failures as number | undefined) ?? 0;
+
+  const { error: intErr } = await supabase
+    .from("integrations")
+    .update({
+      last_attempt_at: finishedAt,
+      last_success_at: succeeded ? finishedAt : undefined,
+      last_error: succeeded ? null : (input.errorMessage ?? "Failed"),
+      consecutive_failures: succeeded ? 0 : failures + 1,
+      status: succeeded ? "connected" : "error",
+      updated_at: finishedAt,
+    })
+    .eq("id", input.integrationId);
+  if (intErr) throw intErr;
+}
+
+/**
+ * Ask the server to run a connector.
+ *
+ * The browser never holds a credential, so it cannot do the work itself: it
+ * invokes the edge function with the user's own JWT and reads back what
+ * happened. A provider with no connector deployed returns a real error from
+ * the server, which is recorded as a real failed run -- deliberately, rather
+ * than being smoothed over into a success the screen cannot back up.
+ */
+export async function invokeIntegrationRun(params: {
+  integrationId: string;
+  kind: IntegrationRunKind;
+}): Promise<{ ok: boolean; message: string; detail?: Record<string, unknown> }> {
+  const { data, error } = await supabase.functions.invoke("integration-run", {
+    body: { integration_id: params.integrationId, kind: params.kind },
+  });
+  if (error) {
+    return { ok: false, message: error.message || "The integration service could not be reached." };
+  }
+  const payload = (data ?? {}) as { ok?: boolean; message?: string; detail?: Record<string, unknown> };
+  return {
+    ok: payload.ok === true,
+    message: payload.message ?? (payload.ok ? "Done." : "The connector returned no result."),
+    detail: payload.detail,
+  };
+}
+
+/**
+ * Look up what an outside record maps to here.
+ *
+ * The point of the mapping table: a connector calls this before creating
+ * anything, so re-running a sync updates rather than duplicating.
+ */
+export async function findIntegrationLink(params: {
+  integrationId: string;
+  externalKind: string;
+  externalId: string;
+}): Promise<IntegrationLink | null> {
+  const { data, error } = await supabase
+    .from("integration_links")
+    .select("*")
+    .eq("integration_id", params.integrationId)
+    .eq("external_kind", params.externalKind)
+    .eq("external_id", params.externalId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as IntegrationLink | null) ?? null;
+}
+
+/** Records (or refreshes) the mapping between an external record and a local row. */
+export async function upsertIntegrationLink(input: {
+  territoryId: string;
+  integrationId: string;
+  externalKind: string;
+  externalId: string;
+  entityType: string;
+  entityId: string;
+  externalUpdatedAt?: string | null;
+  payloadHash?: string | null;
+}): Promise<void> {
+  const { error } = await supabase.from("integration_links").upsert(
+    {
+      territory_id: input.territoryId,
+      integration_id: input.integrationId,
+      external_kind: input.externalKind,
+      external_id: input.externalId,
+      entity_type: input.entityType,
+      entity_id: input.entityId,
+      external_updated_at: input.externalUpdatedAt ?? null,
+      payload_hash: input.payloadHash ?? null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "integration_id,external_kind,external_id" },
+  );
+  if (error) throw error;
 }

@@ -804,3 +804,81 @@ export const DAILY_REPORT_CATEGORIES = [
   "Administrative",
   "Other",
 ] as const;
+
+/* ------------------------------------------------------------------ *
+ * Integration framework
+ *
+ * Plumbing for future connections to myOPS, calendars, shipment tracking,
+ * document sources and so on. No connector is implemented yet; these are the
+ * shapes one plugs into.
+ *
+ * `config` is NON-SECRET settings only and `credential_ref` is the NAME of a
+ * Supabase secret, never its value -- anything this app can read, a browser can
+ * read. See migration 054 and supabase/functions/link-note for the precedent.
+ * ------------------------------------------------------------------ */
+
+export type IntegrationStatus = "not_configured" | "connected" | "error" | "disabled";
+export type IntegrationRunKind = "test" | "sync" | "backfill";
+export type IntegrationRunTrigger = "manual" | "scheduled" | "webhook";
+export type IntegrationRunStatus = "running" | "success" | "error" | "partial";
+
+export interface Integration {
+  id: string;
+  territory_id: string;
+  /** Stable machine name: 'myops', 'google_calendar', 'shipments'… */
+  provider: string;
+  display_name: string;
+  enabled: boolean;
+  status: IntegrationStatus;
+  /** Non-secret settings only. */
+  config: Record<string, unknown>;
+  /** Name of a Supabase secret, e.g. "MYOPS_API_TOKEN". Never the secret. */
+  credential_ref: string | null;
+  last_attempt_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  consecutive_failures: number;
+  /** Connector-defined resume point for incremental sync. */
+  sync_cursor: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntegrationRun {
+  id: string;
+  territory_id: string;
+  integration_id: string;
+  kind: IntegrationRunKind;
+  trigger: IntegrationRunTrigger;
+  status: IntegrationRunStatus;
+  started_at: string;
+  finished_at: string | null;
+  items_seen: number;
+  items_created: number;
+  items_updated: number;
+  items_skipped: number;
+  error_message: string | null;
+  error_detail: Record<string, unknown> | null;
+  summary: Record<string, unknown> | null;
+  created_by: string | null;
+}
+
+/** Maps an outside system's record id to a row in this database. */
+export interface IntegrationLink {
+  id: string;
+  territory_id: string;
+  integration_id: string;
+  external_kind: string;
+  external_id: string;
+  external_updated_at: string | null;
+  payload_hash: string | null;
+  entity_type: string;
+  entity_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** An integration plus its most recent run, which is what every screen wants. */
+export interface IntegrationWithRun extends Integration {
+  latest_run: IntegrationRun | null;
+}

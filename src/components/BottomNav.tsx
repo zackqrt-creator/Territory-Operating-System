@@ -21,6 +21,7 @@ import {
   ScanLine,
   ListChecks,
   FileText,
+  Plug,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -47,6 +48,7 @@ const MORE: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/qa", label: "Q&A", icon: HelpCircle },
   { to: "/pages", label: "Knowledge base", icon: Library },
   { to: "/scan", label: "Scan", icon: ScanLine },
+  { to: "/integrations", label: "Integrations", icon: Plug },
 ];
 
 export default function BottomNav() {

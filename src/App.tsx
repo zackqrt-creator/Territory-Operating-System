@@ -44,6 +44,7 @@ const RunSheet = lazy(() => import("./pages/RunSheet"));
 const Sets = lazy(() => import("./pages/Sets"));
 const DailyReports = lazy(() => import("./pages/DailyReports"));
 const DailyReportEditor = lazy(() => import("./pages/DailyReportEditor"));
+const Integrations = lazy(() => import("./pages/Integrations"));
 const Notes = lazy(() => import("./pages/Notes"));
 const NoteDetail = lazy(() => import("./pages/NoteDetail"));
 const SecondBrainQueue = lazy(() => import("./pages/SecondBrainQueue"));
@@ -117,6 +118,7 @@ function App() {
           <Route path="/sets" element={<Sets />} />
           <Route path="/daily" element={<DailyReports />} />
           <Route path="/daily/:id" element={<DailyReportEditor />} />
+          <Route path="/integrations" element={<Integrations />} />
           <Route path="/wiki" element={<Navigate to="/pages" replace />} />
           <Route path="/wiki/:id" element={<WikiRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
