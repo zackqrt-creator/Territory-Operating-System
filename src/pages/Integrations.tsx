@@ -248,7 +248,14 @@ export default function Integrations() {
                   <StatusChip integration={integration} def={def} />
                 </div>
 
-                {integration && runnable && (
+                {/*
+                 * Gated on last_success_at rather than `runnable`: a manual
+                 * provider like myOPS has no live connector and can never use
+                 * the Test/Sync buttons below, but the CSV import screen now
+                 * logs a real integration_runs row every time it links a
+                 * case, so it has genuine sync history to show.
+                 */}
+                {integration?.last_success_at && (
                   <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
                     <Clock size={12} aria-hidden />
                     Last successful sync: {relativeTime(integration.last_success_at)}

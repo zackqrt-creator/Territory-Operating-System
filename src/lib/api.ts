@@ -1095,6 +1095,8 @@ export type CasePatch = Partial<
     | "variant"
     | "notes"
     | "status"
+    | "time_tba"
+    | "side"
   >
 >;
 
@@ -2731,4 +2733,251 @@ export async function upsertIntegrationLink(input: {
     { onConflict: "integration_id,external_kind,external_id" },
   );
   if (error) throw error;
+}
+
+/**
+ * Finds this territory's myOPS integration row, creating it on first use.
+ *
+ * Mirrors what the Integrations screen does for every provider (see
+ * Integrations.tsx's ensureRow) so a rep who has never opened that screen and
+ * one who has land on the same row rather than two.
+ */
+async function ensureMyopsIntegration(territoryId: string): Promise<Integration> {
+  const { data, error } = await supabase
+    .from("integrations")
+    .select("*")
+    .eq("territory_id", territoryId)
+    .eq("provider", "myops")
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return data as Integration;
+  return createIntegration({
+    territoryId,
+    provider: "myops",
+    displayName: "myOPS",
+    credentialRef: "MYOPS_API_TOKEN",
+  });
+}
+
+/**
+ * Cheap, deterministic fingerprint of the fields a myOPS row could change.
+ *
+ * Not a security hash -- just enough to tell "this case is exactly what it
+ * was last import" from "something changed", so re-importing the same export
+ * costs zero writes instead of rewriting every row every time. DJB2 over a
+ * canonical string is collision-prone in theory; in practice a false match
+ * here only means a changed row gets skipped until it changes again in a way
+ * that happens to alter the hash too, which for case logistics data is not a
+ * real risk worth pulling in a crypto dependency for.
+ */
+function hashPayload(fields: Record<string, string | number | boolean | null>): string {
+  const canonical = Object.keys(fields)
+    .sort()
+    .map((k) => `${k}=${fields[k]}`)
+    .join("|");
+  let hash = 5381;
+  for (let i = 0; i < canonical.length; i++) {
+    hash = (hash * 33) ^ canonical.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export interface MyopsSyncRow {
+  case_id: string;
+  surgery_type: "KNEE" | "HIP" | "INSTRUMENT";
+  side: "LEFT" | "RIGHT" | null;
+  surgery_date: string;
+  surgery_time: string | null;
+  time_tba: boolean;
+  status: "scheduled" | "completed";
+  notes: string | null;
+  purchase_order_no: string | null;
+  invoice_no: string | null;
+  billing_status: BillingStatus;
+}
+
+export interface MyopsSyncResult {
+  runId: string;
+  created: number;
+  updated: number;
+  skipped: number;
+}
+
+function myopsHashFields(row: MyopsSyncRow): Record<string, string | number | boolean | null> {
+  return {
+    surgery_type: row.surgery_type,
+    side: row.side,
+    surgery_date: row.surgery_date,
+    surgery_time: row.surgery_time,
+    time_tba: row.time_tba,
+    status: row.status,
+    notes: row.notes,
+    purchase_order_no: row.purchase_order_no,
+    invoice_no: row.invoice_no,
+    billing_status: row.billing_status,
+  };
+}
+
+/**
+ * Import a myOPS CSV export as a real, logged sync rather than a one-shot
+ * insert.
+ *
+ * Every row with a case_id is linked through integration_links: a case seen
+ * before is updated in place (or skipped if nothing changed), a case never
+ * seen before -- including one that already exists here from a plain paste
+ * import that predates this linking -- is adopted and linked. Only a row with
+ * no case_id at all, which can never be matched to anything, is always a
+ * fresh insert. The whole import is wrapped in one integration_runs row so
+ * "last synced" and "what changed last time" have a real answer.
+ */
+export async function syncMyopsCases(input: {
+  rows: MyopsSyncRow[];
+  facilityId: string;
+  territoryId: string;
+  profileId: string;
+}): Promise<MyopsSyncResult> {
+  const { rows, facilityId, territoryId, profileId } = input;
+  const integration = await ensureMyopsIntegration(territoryId);
+  const run = await startIntegrationRun({
+    territoryId,
+    integrationId: integration.id,
+    kind: "sync",
+    createdBy: profileId,
+  });
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  try {
+    const caseIds = rows.map((r) => r.case_id);
+
+    const links = new Map<string, IntegrationLink>();
+    if (caseIds.length > 0) {
+      const { data: linkRows, error: linkErr } = await supabase
+        .from("integration_links")
+        .select("*")
+        .eq("integration_id", integration.id)
+        .eq("external_kind", "case")
+        .in("external_id", caseIds);
+      if (linkErr) throw linkErr;
+      for (const l of (linkRows ?? []) as IntegrationLink[]) links.set(l.external_id, l);
+    }
+
+    // A case with this case_id that predates this framework -- imported by
+    // the plain paste path before links existed. Adopt it instead of trying
+    // to insert a duplicate the unique case_id would collide on anyway.
+    const unlinkedIds = caseIds.filter((id) => !links.has(id));
+    const existingByCaseId = new Map<string, CaseRow>();
+    if (unlinkedIds.length > 0) {
+      const { data: existingRows, error: exErr } = await supabase
+        .from("cases")
+        .select("*")
+        .in("case_id", unlinkedIds);
+      if (exErr) throw exErr;
+      for (const c of (existingRows ?? []) as CaseRow[]) {
+        if (c.case_id) existingByCaseId.set(c.case_id, c);
+      }
+    }
+
+    const toInsert: BulkCaseInput[] = [];
+
+    for (const row of rows) {
+      const hash = hashPayload(myopsHashFields(row));
+      const link = links.get(row.case_id);
+      const existing = link ? null : (existingByCaseId.get(row.case_id) ?? null);
+      const entityId = link?.entity_id ?? existing?.id ?? null;
+
+      if (entityId) {
+        if (link && link.payload_hash === hash) {
+          skipped++;
+          continue;
+        }
+        await updateCase(entityId, {
+          surgery_date: row.surgery_date,
+          surgery_time: row.surgery_time,
+          time_tba: row.time_tba,
+          side: row.side,
+          status: row.status,
+          notes: row.notes,
+        });
+        await updateCaseBilling(entityId, {
+          purchase_order_no: row.purchase_order_no,
+          invoice_no: row.invoice_no,
+          billing_status: row.billing_status,
+        });
+        await upsertIntegrationLink({
+          territoryId,
+          integrationId: integration.id,
+          externalKind: "case",
+          externalId: row.case_id,
+          entityType: "case",
+          entityId,
+          payloadHash: hash,
+        });
+        updated++;
+        continue;
+      }
+
+      toInsert.push({
+        case_id: row.case_id,
+        surgery_type: row.surgery_type,
+        side: row.side,
+        surgery_date: row.surgery_date,
+        surgery_time: row.surgery_time,
+        time_tba: row.time_tba,
+        status: row.status,
+        notes: row.notes,
+        purchase_order_no: row.purchase_order_no,
+        invoice_no: row.invoice_no,
+        billing_status: row.billing_status,
+        facility_id: facilityId,
+        territory_id: territoryId,
+        created_by: profileId,
+      });
+    }
+
+    if (toInsert.length > 0) {
+      const { data: insertedRows, error: insErr } = await supabase
+        .from("cases")
+        .insert(toInsert)
+        .select("*");
+      if (insErr) throw insErr;
+      created += insertedRows?.length ?? 0;
+
+      for (const inserted of (insertedRows ?? []) as CaseRow[]) {
+        if (!inserted.case_id) continue;
+        const original = rows.find((r) => r.case_id === inserted.case_id);
+        if (!original) continue;
+        await upsertIntegrationLink({
+          territoryId,
+          integrationId: integration.id,
+          externalKind: "case",
+          externalId: inserted.case_id,
+          entityType: "case",
+          entityId: inserted.id,
+          payloadHash: hashPayload(myopsHashFields(original)),
+        });
+      }
+    }
+
+    await finishIntegrationRun({
+      runId: run.id,
+      integrationId: integration.id,
+      status: "success",
+      counts: { items_seen: rows.length, items_created: created, items_updated: updated, items_skipped: skipped },
+      summary: { created, updated, skipped },
+    });
+
+    return { runId: run.id, created, updated, skipped };
+  } catch (e) {
+    await finishIntegrationRun({
+      runId: run.id,
+      integrationId: integration.id,
+      status: "error",
+      errorMessage: e instanceof Error ? e.message : "Sync failed.",
+      counts: { items_seen: rows.length, items_created: created, items_updated: updated, items_skipped: skipped },
+    });
+    throw e;
+  }
 }

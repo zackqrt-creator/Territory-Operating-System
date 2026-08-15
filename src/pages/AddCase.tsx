@@ -13,6 +13,7 @@ import {
   listSurgeons,
   listTimeOff,
   listUpcomingCases,
+  syncMyopsCases,
   updateLastFacility,
 } from "../lib/api";
 import type {
@@ -574,6 +575,19 @@ function PasteImport({
   const [facilityId, setFacilityId] = useState(lastFacilityId ?? "");
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  /**
+   * The CSV export is a real myOPS extract with stable case_ids, so it goes
+   * through syncMyopsCases: a case seen in a previous import updates in place
+   * and gets logged, rather than the plain paste path's insert-or-skip. Paste
+   * rows are looser (copied straight from the schedule view, case_id often
+   * missing) and keep the simpler bulkCreateCases behavior.
+   */
+  const [source, setSource] = useState<"csv" | "paste" | null>(null);
+  const [syncResult, setSyncResult] = useState<{
+    created: number;
+    updated: number;
+    skipped: number;
+  } | null>(null);
   const surgicalFacilities = facilities.filter((f) => f.type === "hospital" || f.type === "surgery_center");
 
   useEffect(() => {
@@ -592,6 +606,8 @@ function PasteImport({
     setDuplicates(duplicates);
     setCsvNote(null);
     setResult(null);
+    setSyncResult(null);
+    setSource("paste");
   }
 
   async function onCsvFile(file: File) {
@@ -616,6 +632,8 @@ function PasteImport({
         ". Patient names in the file are never imported.",
     );
     setResult(null);
+    setSyncResult(null);
+    setSource("csv");
   }
 
   async function onImport() {
@@ -626,29 +644,94 @@ function PasteImport({
     if (rows.length === 0) return;
     setImporting(true);
     try {
-      const res = await bulkCreateCases(
-        rows.map((r) => ({
-          case_id: r.case_id,
-          surgery_type: r.surgery_type,
-          side: r.side,
-          surgery_date: r.surgery_date,
-          surgery_time: r.surgery_time,
-          time_tba: r.time_tba ?? false,
-          status: r.status,
-          notes: r.notes ?? null,
-          purchase_order_no: r.purchase_order_no ?? null,
-          invoice_no: r.invoice_no ?? null,
-          billing_status: r.billing_status ?? "none",
-          facility_id: facilityId,
-          territory_id: territoryId,
-          created_by: profileId,
-        })),
-      );
-      await updateLastFacility(profileId, facilityId);
-      setResult(res);
+      if (source === "csv") {
+        // A real myOPS export carries stable case_ids, so those rows are run
+        // through the linked sync -- a case seen in a previous import updates
+        // in place instead of being silently skipped as "already existed".
+        // A row with no case_id can never be matched to a prior import and
+        // falls back to a plain insert, same as before.
+        const withId = rows.filter((r) => r.case_id) as (ImportRow & { case_id: string })[];
+        const withoutId = rows.filter((r) => !r.case_id);
+
+        let created = 0;
+        let updated = 0;
+        let skipped = 0;
+
+        if (withId.length > 0) {
+          const sync = await syncMyopsCases({
+            rows: withId.map((r) => ({
+              case_id: r.case_id,
+              surgery_type: r.surgery_type,
+              side: r.side,
+              surgery_date: r.surgery_date,
+              surgery_time: r.surgery_time,
+              time_tba: r.time_tba ?? false,
+              status: r.status ?? "scheduled",
+              notes: r.notes ?? null,
+              purchase_order_no: r.purchase_order_no ?? null,
+              invoice_no: r.invoice_no ?? null,
+              billing_status: r.billing_status ?? "none",
+            })),
+            facilityId,
+            territoryId,
+            profileId,
+          });
+          created += sync.created;
+          updated += sync.updated;
+          skipped += sync.skipped;
+        }
+
+        if (withoutId.length > 0) {
+          const res = await bulkCreateCases(
+            withoutId.map((r) => ({
+              case_id: r.case_id,
+              surgery_type: r.surgery_type,
+              side: r.side,
+              surgery_date: r.surgery_date,
+              surgery_time: r.surgery_time,
+              time_tba: r.time_tba ?? false,
+              status: r.status,
+              notes: r.notes ?? null,
+              purchase_order_no: r.purchase_order_no ?? null,
+              invoice_no: r.invoice_no ?? null,
+              billing_status: r.billing_status ?? "none",
+              facility_id: facilityId,
+              territory_id: territoryId,
+              created_by: profileId,
+            })),
+          );
+          created += res.inserted;
+          skipped += res.skipped;
+        }
+
+        await updateLastFacility(profileId, facilityId);
+        setSyncResult({ created, updated, skipped });
+      } else {
+        const res = await bulkCreateCases(
+          rows.map((r) => ({
+            case_id: r.case_id,
+            surgery_type: r.surgery_type,
+            side: r.side,
+            surgery_date: r.surgery_date,
+            surgery_time: r.surgery_time,
+            time_tba: r.time_tba ?? false,
+            status: r.status,
+            notes: r.notes ?? null,
+            purchase_order_no: r.purchase_order_no ?? null,
+            invoice_no: r.invoice_no ?? null,
+            billing_status: r.billing_status ?? "none",
+            facility_id: facilityId,
+            territory_id: territoryId,
+            created_by: profileId,
+          })),
+        );
+        await updateLastFacility(profileId, facilityId);
+        setResult(res);
+      }
       setParsed([]);
       setText("");
       setCsvNote(null);
+      setSource(null);
     } finally {
       setImporting(false);
     }
@@ -706,6 +789,13 @@ function PasteImport({
         <div className="rounded-lg border border-emerald-800 bg-emerald-950/40 p-3 text-emerald-300">
           Imported {result.inserted} case{result.inserted === 1 ? "" : "s"}
           {result.skipped > 0 ? ` (${result.skipped} already existed)` : ""}.
+        </div>
+      )}
+
+      {syncResult && (
+        <div className="rounded-lg border border-emerald-800 bg-emerald-950/40 p-3 text-emerald-300">
+          Synced with myOPS: {syncResult.created} new, {syncResult.updated} updated
+          {syncResult.skipped > 0 ? `, ${syncResult.skipped} unchanged` : ""}.
         </div>
       )}
 
@@ -769,8 +859,10 @@ function PasteImport({
 
           <p className="text-xs text-slate-500">
             {parsed.length} row{parsed.length === 1 ? "" : "s"} parsed
-            {duplicates > 0 ? `, ${duplicates} duplicate row(s) already dropped` : ""}. Existing
-            case IDs will be skipped automatically on import too.
+            {duplicates > 0 ? `, ${duplicates} duplicate row(s) already dropped` : ""}.{" "}
+            {source === "csv"
+              ? "A case # you've imported before will be updated with anything that changed, not duplicated."
+              : "Existing case IDs will be skipped automatically on import too."}
           </p>
 
           <button
