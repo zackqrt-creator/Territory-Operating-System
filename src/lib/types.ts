@@ -670,6 +670,17 @@ export interface NotePhoto {
   created_at: string;
 }
 
+/** A photo attached to a Knowledge page. */
+export interface PagePhoto {
+  id: string;
+  territory_id: string;
+  page_id: string;
+  url: string;
+  caption: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
 /**
  * What a photo of a tray is showing.
  *

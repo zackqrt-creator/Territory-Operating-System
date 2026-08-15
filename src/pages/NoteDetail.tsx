@@ -46,6 +46,20 @@ import { formatDateShort, formatRelativeDay } from "../utils/dates";
 import { NOTE_KINDS } from "../lib/noteKinds";
 import { appendChecklistItem, toggleChecklistLine } from "../lib/wikilinks";
 import ChecklistBody from "../components/ChecklistBody";
+import FormatToolbar from "../components/FormatToolbar";
+
+/** Image files out of a drop or paste event — used by both drag-and-drop and clipboard-paste. */
+function imageFilesFrom(items: DataTransferItemList | null): File[] {
+  if (!items) return [];
+  const files: File[] = [];
+  for (const item of items) {
+    if (item.kind === "file" && item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) files.push(file);
+    }
+  }
+  return files;
+}
 
 /*
  * This screen used to keep its own hardcoded list of note types, which had
@@ -99,7 +113,9 @@ export default function NoteDetail() {
 
   const [photos, setPhotos] = useState<NotePhoto[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [myTags, setMyTags] = useState<TerritoryNoteTag[]>([]);
   const [allTags, setAllTags] = useState<TerritoryNoteTag[]>([]);
@@ -188,11 +204,13 @@ export default function NoteDetail() {
     onEditBody(appendChecklistItem(body));
   }
 
-  async function onPickPhoto(file: File | null) {
-    if (!file || !id || !profile) return;
+  async function onPickPhotos(files: File[]) {
+    if (files.length === 0 || !id || !profile) return;
     setUploadingPhoto(true);
     try {
-      await addNotePhoto({ file, territory_id: profile.territory_id, note_id: id, uploaded_by: profile.id });
+      for (const file of files) {
+        await addNotePhoto({ file, territory_id: profile.territory_id, note_id: id, uploaded_by: profile.id });
+      }
       await refresh();
     } finally {
       setUploadingPhoto(false);
@@ -309,14 +327,36 @@ export default function NoteDetail() {
         {saveStatus === "saved" && <span className="text-emerald-400">· Saved ✓</span>}
       </p>
 
-      <textarea
-        value={body}
-        onChange={(e) => onEditBody(e.target.value)}
-        onBlur={saveText}
-        rows={6}
-        placeholder={'Write here... type "- [ ] " to add a checkbox'}
-        className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
-      />
+      <div className="mt-3">
+        <FormatToolbar textareaRef={bodyTextareaRef} value={body} onChange={onEditBody} />
+      </div>
+      <div
+        className={`mt-1.5 rounded-lg ${dragOver ? "ring-2 ring-sky-500" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          onPickPhotos(imageFilesFrom(e.dataTransfer.items));
+        }}
+      >
+        <textarea
+          ref={bodyTextareaRef}
+          value={body}
+          onChange={(e) => onEditBody(e.target.value)}
+          onBlur={saveText}
+          onPaste={(e) => {
+            const files = imageFilesFrom(e.clipboardData.items);
+            if (files.length > 0) onPickPhotos(files);
+          }}
+          rows={6}
+          placeholder={'Write here... **bold**, *italic*, ++underline++, ~~strike~~, # heading, "- [ ] " checkbox. Drag or paste a photo in anywhere.'}
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
+        />
+      </div>
       <button
         onClick={onInsertChecklistItem}
         className="mt-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300"
@@ -342,10 +382,16 @@ export default function NoteDetail() {
             type="file"
             accept="image/*"
             capture="environment"
+            multiple
             className="hidden"
-            onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              if (e.target.files) onPickPhotos(Array.from(e.target.files));
+            }}
           />
         </div>
+        {photos.length === 0 && (
+          <p className="mt-1 text-xs text-slate-600">Drag, paste, or tap + Photo to attach one.</p>
+        )}
         {photos.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {photos.map((p) => (

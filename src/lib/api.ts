@@ -55,6 +55,7 @@ import type {
   SurgeonPreference,
   TaskPhoto,
   NotePhoto,
+  PagePhoto,
   TaskStage,
   TaskStatus,
   TerritoryNote,
@@ -1818,6 +1819,46 @@ export async function addNotePhoto(input: {
 
 export async function deleteNotePhoto(id: string): Promise<void> {
   const { error } = await supabase.from("note_photos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---- Page photos ---------------------------------------------------------
+
+export async function listPagePhotos(pageId: string): Promise<PagePhoto[]> {
+  const { data, error } = await supabase
+    .from("page_photos")
+    .select("*")
+    .eq("page_id", pageId)
+    .order("created_at");
+  if (error) throw error;
+  return data as PagePhoto[];
+}
+
+export async function addPagePhoto(input: {
+  file: File;
+  territory_id: string;
+  page_id: string;
+  caption?: string | null;
+  uploaded_by?: string | null;
+}): Promise<PagePhoto> {
+  const url = await uploadItemPhoto(input.file, input.territory_id);
+  const { data, error } = await supabase
+    .from("page_photos")
+    .insert({
+      territory_id: input.territory_id,
+      page_id: input.page_id,
+      url,
+      caption: input.caption ?? null,
+      uploaded_by: input.uploaded_by ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PagePhoto;
+}
+
+export async function deletePagePhoto(id: string): Promise<void> {
+  const { error } = await supabase.from("page_photos").delete().eq("id", id);
   if (error) throw error;
 }
 
