@@ -2283,10 +2283,12 @@ export async function receiveInventoryShipment(params: {
 export async function listAssetPhotos(params: {
   inventoryItemId?: string;
   trackedAssetId?: string;
+  toteTemplateId?: string;
 }): Promise<AssetPhoto[]> {
   let q = supabase.from("asset_photos").select("*");
   if (params.inventoryItemId) q = q.eq("inventory_item_id", params.inventoryItemId);
   else if (params.trackedAssetId) q = q.eq("tracked_asset_id", params.trackedAssetId);
+  else if (params.toteTemplateId) q = q.eq("tote_template_id", params.toteTemplateId);
   else return [];
   // Label sorts before layer alphabetically, which is also the order you want.
   const { data, error } = await q.order("kind").order("layer_index", { nullsFirst: true });
@@ -2300,6 +2302,7 @@ export async function addAssetPhoto(params: {
   territoryId: string;
   inventoryItemId?: string;
   trackedAssetId?: string;
+  toteTemplateId?: string;
   kind: AssetPhotoKind;
   layerIndex?: number | null;
   caption?: string | null;
@@ -2313,6 +2316,7 @@ export async function addAssetPhoto(params: {
       territory_id: params.territoryId,
       inventory_item_id: params.inventoryItemId ?? null,
       tracked_asset_id: params.trackedAssetId ?? null,
+      tote_template_id: params.toteTemplateId ?? null,
       kind: params.kind,
       layer_index: params.kind === "layer" ? (params.layerIndex ?? 1) : null,
       caption: params.caption ?? null,

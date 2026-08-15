@@ -699,6 +699,8 @@ export interface AssetPhoto {
   territory_id: string;
   inventory_item_id: string | null;
   tracked_asset_id: string | null;
+  /** A Set/Tote template's own reference photo — "what a correct one looks like", not tied to one physical unit. */
+  tote_template_id: string | null;
   kind: AssetPhotoKind;
   /** 1-based, top layer first. Null for a label photo. */
   layer_index: number | null;

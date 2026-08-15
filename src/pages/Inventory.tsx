@@ -403,6 +403,8 @@ export default function Inventory() {
           set={editingSet.set}
           catalog={catalog}
           territoryId={profile?.territory_id ?? null}
+          uploadedBy={profile?.id ?? null}
+          onCatalogChanged={(item) => setCatalog((prev) => [...prev, item])}
           onClose={() => setEditingSet(null)}
           onChanged={refreshSets}
         />

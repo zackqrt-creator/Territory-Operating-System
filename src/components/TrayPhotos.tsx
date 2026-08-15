@@ -26,6 +26,7 @@ import type { AssetPhoto, AssetPhotoKind } from "../lib/types";
 export default function TrayPhotos({
   inventoryItemId,
   trackedAssetId,
+  toteTemplateId,
   territoryId,
   uploadedBy,
   title = "As it arrived",
@@ -33,6 +34,8 @@ export default function TrayPhotos({
 }: {
   inventoryItemId?: string;
   trackedAssetId?: string;
+  /** A Set/Tote template's own reference photos, not tied to one physical unit. */
+  toteTemplateId?: string;
   territoryId: string;
   uploadedBy?: string | null;
   title?: string;
@@ -49,7 +52,7 @@ export default function TrayPhotos({
   const layerCount = photos.filter((p) => p.kind === "layer").length;
 
   function reload() {
-    listAssetPhotos({ inventoryItemId, trackedAssetId })
+    listAssetPhotos({ inventoryItemId, trackedAssetId, toteTemplateId })
       .then((rows) => {
         setPhotos(rows);
         setAvailable(true);
@@ -57,7 +60,7 @@ export default function TrayPhotos({
       .catch(() => setAvailable(false));
   }
 
-  useEffect(reload, [inventoryItemId, trackedAssetId]);
+  useEffect(reload, [inventoryItemId, trackedAssetId, toteTemplateId]);
 
   if (!available) return null;
 
@@ -73,6 +76,7 @@ export default function TrayPhotos({
         await addAssetPhoto({
           inventoryItemId,
           trackedAssetId,
+          toteTemplateId,
           file,
           territoryId,
           kind,
