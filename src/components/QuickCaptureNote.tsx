@@ -2,15 +2,19 @@ import { useState } from "react";
 import { Check, ChevronDown, Link2, Lock, Sparkles, Users } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
+  assignNoteTag,
   createNote,
+  createNoteTag,
   linkNoteToEntity,
   listFacilities,
+  listNoteTags,
   listUpcomingCases,
   suggestNoteLinks,
   type SuggestedNoteLink,
 } from "../lib/api";
-import type { CaseRow, Facility, TerritoryNoteVisibility } from "../lib/types";
+import type { CaseRow, Facility, TerritoryNoteTag, TerritoryNoteVisibility } from "../lib/types";
 import { formatDateShort } from "../utils/dates";
+import { appendChecklistItem } from "../lib/wikilinks";
 
 /**
  * One box. Type, save, done.
@@ -39,12 +43,16 @@ export default function QuickCaptureNote({
 }) {
   const { profile } = useAuth();
   const [text, setText] = useState("");
+  const [titleOverride, setTitleOverride] = useState("");
   const [visibility, setVisibility] = useState<TerritoryNoteVisibility>("private");
   const [showMore, setShowMore] = useState(false);
   const [cases, setCases] = useState<CaseRow[] | null>(null);
   const [facilities, setFacilities] = useState<Facility[] | null>(null);
   const [linkCaseId, setLinkCaseId] = useState("");
   const [linkFacilityId, setLinkFacilityId] = useState("");
+  const [tags, setTags] = useState<TerritoryNoteTag[] | null>(null);
+  const [tagId, setTagId] = useState("");
+  const [newTagName, setNewTagName] = useState("");
   const [saving, setSaving] = useState(false);
   // Populated only after the note is safely written; the sheet then switches
   // from "write it down" to "is it about any of these?".
@@ -58,6 +66,23 @@ export default function QuickCaptureNote({
     setShowMore(true);
     if (!cases) listUpcomingCases().then(setCases).catch(() => setCases([]));
     if (!facilities) listFacilities().then(setFacilities).catch(() => setFacilities([]));
+    if (!tags && profile) listNoteTags(profile.territory_id).then(setTags).catch(() => setTags([]));
+  }
+
+  async function onCreateTag() {
+    if (!profile || !newTagName.trim()) return;
+    const created = await createNoteTag({
+      name: newTagName.trim(),
+      territory_id: profile.territory_id,
+      created_by: profile.id,
+    });
+    setTags((prev) => [...(prev ?? []), created].sort((a, b) => a.name.localeCompare(b.name)));
+    setNewTagName("");
+    setTagId(created.id);
+  }
+
+  function insertChecklistItem() {
+    setText((prev) => appendChecklistItem(prev));
   }
 
   async function save() {
@@ -65,10 +90,12 @@ export default function QuickCaptureNote({
     if (!profile || !trimmed) return;
     setSaving(true);
     try {
-      // First line is the title, the rest is the body. A single-line note gets
-      // an empty body rather than a duplicate of its own title.
+      // Title defaults to the first line (Apple Notes/Obsidian-style) unless
+      // explicitly overridden. A single-line note gets an empty body rather
+      // than a duplicate of its own title.
       const newline = trimmed.indexOf("\n");
-      const title = (newline === -1 ? trimmed : trimmed.slice(0, newline)).trim().slice(0, 120);
+      const autoTitle = (newline === -1 ? trimmed : trimmed.slice(0, newline)).trim().slice(0, 120);
+      const title = titleOverride.trim() || autoTitle;
       const body = newline === -1 ? "" : trimmed.slice(newline + 1).trim();
 
       const note = await createNote({
@@ -94,6 +121,7 @@ export default function QuickCaptureNote({
           created_by: profile.id,
         });
       }
+      if (tagId) await assignNoteTag(note.id, tagId);
 
       // The note is saved and safe from here on. Suggestions are a bonus
       // offered afterwards, never something the rep waits on -- the whole
@@ -213,9 +241,12 @@ export default function QuickCaptureNote({
           rows={7}
           className="w-full resize-none rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-base text-slate-100 placeholder:text-slate-500"
         />
-        <p className="mt-1.5 text-xs text-slate-500">
-          First line becomes the title. File it later, or don't.
-        </p>
+        <div className="mt-1.5 flex items-center justify-between">
+          <p className="text-xs text-slate-500">First line becomes the title. File it later, or don't.</p>
+          <button onClick={insertChecklistItem} className="shrink-0 text-xs font-medium text-sky-400">
+            + ☑ Checkbox
+          </button>
+        </div>
 
         <div className="mt-4 flex gap-2">
           <button
@@ -239,10 +270,51 @@ export default function QuickCaptureNote({
             className="mt-3 flex w-full items-center justify-center gap-1 text-xs font-medium text-slate-500"
           >
             <ChevronDown className="h-3.5 w-3.5" />
-            {visibility === "private" ? "Private" : "Team-visible"} · add a link
+            {visibility === "private" ? "Private" : "Team-visible"} · title · notebook · link
           </button>
         ) : (
           <div className="mt-4 space-y-2 border-t border-slate-800 pt-4">
+            <label className="block text-xs text-slate-500">
+              Title (optional — defaults to the first line)
+              <input
+                value={titleOverride}
+                onChange={(e) => setTitleOverride(e.target.value)}
+                placeholder="Leave blank to use the first line"
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+              />
+            </label>
+
+            <div>
+              <p className="pt-1 text-xs text-slate-500">Notebook</p>
+              <select
+                value={tagId}
+                onChange={(e) => setTagId(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+              >
+                <option value="">Unfiled</option>
+                {(tags ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  placeholder="New notebook name…"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+                />
+                <button
+                  onClick={onCreateTag}
+                  disabled={!newTagName.trim()}
+                  className="shrink-0 rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-sky-400 disabled:opacity-50"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+
             <button
               onClick={() => setVisibility(visibility === "private" ? "team" : "private")}
               className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2.5"
