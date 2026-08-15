@@ -54,6 +54,7 @@ import type {
   Surgeon,
   SurgeonPreference,
   TaskPhoto,
+  NotePhoto,
   TaskStage,
   TaskStatus,
   TerritoryNote,
@@ -1767,6 +1768,56 @@ export async function unassignNoteTag(noteId: string, tagId: string): Promise<vo
     .delete()
     .eq("note_id", noteId)
     .eq("tag_id", tagId);
+  if (error) throw error;
+}
+
+/** A note's own tags — getNote doesn't carry them (only the aggregated feed view does). */
+export async function listTagsForNote(noteId: string): Promise<TerritoryNoteTag[]> {
+  const { data, error } = await supabase
+    .from("territory_note_tag_assignments")
+    .select("territory_note_tags(*)")
+    .eq("note_id", noteId);
+  if (error) throw error;
+  return (data ?? []).map((r) => (r as unknown as { territory_note_tags: TerritoryNoteTag }).territory_note_tags);
+}
+
+// ---- Note photos --------------------------------------------------------
+
+export async function listNotePhotos(noteId: string): Promise<NotePhoto[]> {
+  const { data, error } = await supabase
+    .from("note_photos")
+    .select("*")
+    .eq("note_id", noteId)
+    .order("created_at");
+  if (error) throw error;
+  return data as NotePhoto[];
+}
+
+export async function addNotePhoto(input: {
+  file: File;
+  territory_id: string;
+  note_id: string;
+  caption?: string | null;
+  uploaded_by?: string | null;
+}): Promise<NotePhoto> {
+  const url = await uploadItemPhoto(input.file, input.territory_id);
+  const { data, error } = await supabase
+    .from("note_photos")
+    .insert({
+      territory_id: input.territory_id,
+      note_id: input.note_id,
+      url,
+      caption: input.caption ?? null,
+      uploaded_by: input.uploaded_by ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as NotePhoto;
+}
+
+export async function deleteNotePhoto(id: string): Promise<void> {
+  const { error } = await supabase.from("note_photos").delete().eq("id", id);
   if (error) throw error;
 }
 

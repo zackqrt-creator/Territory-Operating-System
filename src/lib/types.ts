@@ -659,6 +659,17 @@ export interface TaskPhoto {
   created_at: string;
 }
 
+/** A photo attached to a territory note — a tray, a label, a shelf, whatever the note is about. */
+export interface NotePhoto {
+  id: string;
+  territory_id: string;
+  note_id: string;
+  url: string;
+  caption: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
 /**
  * What a photo of a tray is showing.
  *

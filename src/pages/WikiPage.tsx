@@ -11,30 +11,9 @@ import {
   updatePage,
 } from "../lib/api";
 import type { WikiPage as WikiPageType, PageLink } from "../lib/types";
-import { extractStructuredFields, tokenizeBody } from "../lib/wikilinks";
+import { appendChecklistItem, extractStructuredFields, toggleChecklistLine } from "../lib/wikilinks";
 import { formatRelativeDay } from "../utils/dates";
-
-/** Renders body text with [[links]] as clickable spans; unresolved links are dashed/amber. */
-function RenderedBody({ body, onFollow }: { body: string; onFollow: (title: string) => void }) {
-  const tokens = tokenizeBody(body);
-  return (
-    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
-      {tokens.map((t, i) =>
-        t.type === "text" ? (
-          <span key={i}>{t.text}</span>
-        ) : (
-          <button
-            key={i}
-            onClick={() => onFollow(t.text)}
-            className="rounded bg-sky-950/60 px-1 text-sky-300 underline decoration-sky-700 underline-offset-2"
-          >
-            {t.display}
-          </button>
-        ),
-      )}
-    </p>
-  );
-}
+import ChecklistBody from "../components/ChecklistBody";
 
 export default function WikiPageView() {
   const { id } = useParams<{ id: string }>();
@@ -92,6 +71,15 @@ export default function WikiPageView() {
     }
   }
 
+  /** Toggles a checkbox straight from view mode — no need to enter edit mode for the common case. */
+  async function onToggleChecklist(lineIndex: number) {
+    if (!page || !profile) return;
+    const nextBody = toggleChecklistLine(page.body, lineIndex);
+    const updated = await updatePage(page.id, { body: nextBody }, profile.id);
+    setPage(updated);
+    setBodyDraft(updated.body);
+  }
+
   async function onTogglePin() {
     if (!page) return;
     await setPagePinned(page.id, !page.pinned);
@@ -141,7 +129,7 @@ export default function WikiPageView() {
             {fields.map((f, i) => (
               <div key={i} className="flex gap-2 text-sm">
                 <span className="shrink-0 font-medium text-slate-400">{f.key}</span>
-                <RenderedBody body={f.value} onFollow={onFollow} />
+                <ChecklistBody body={f.value} onFollow={onFollow} className="text-sm text-slate-200" />
               </div>
             ))}
           </div>
@@ -155,12 +143,12 @@ export default function WikiPageView() {
             onChange={(e) => setBodyDraft(e.target.value)}
             rows={16}
             placeholder={
-              "Write freely. Use [[Title]] to link another page (surgeon, facility, set, or a new note).\n\nStructured fields the pack-list engine can read:\nSet:: [[KAONE Setup]]\nFacilities:: [[Saint Joseph's]]\nExcludes:: [[San Joaquin General]]"
+              'Write freely. Use [[Title]] to link another page, and "- [ ] " for a checkbox.\n\nStructured fields the pack-list engine can read:\nSet:: [[KAONE Setup]]\nFacilities:: [[Saint Joseph\'s]]\nExcludes:: [[San Joaquin General]]'
             }
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600"
           />
         ) : page.body ? (
-          <RenderedBody body={page.body} onFollow={onFollow} />
+          <ChecklistBody body={page.body} onFollow={onFollow} onToggle={onToggleChecklist} />
         ) : (
           <p className="text-sm text-slate-600">Empty page — tap Edit to write something.</p>
         )}
@@ -169,6 +157,12 @@ export default function WikiPageView() {
       <div className="mt-4 flex gap-2">
         {editing ? (
           <>
+            <button
+              onClick={() => setBodyDraft((prev) => appendChecklistItem(prev))}
+              className="shrink-0 rounded-lg bg-slate-800 px-3 py-2.5 text-sm text-slate-300"
+            >
+              + ☑
+            </button>
             <button
               onClick={() => {
                 setEditing(false);

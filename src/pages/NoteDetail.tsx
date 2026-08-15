@@ -1,20 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Lock, Users, Pin } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
+  addNotePhoto,
+  assignNoteTag,
+  createNoteTag,
   deleteNote,
+  deleteNotePhoto,
   getNote,
   linkNoteToEntity,
   listCatalogItems,
   listCaseTemplatesWithItems,
   listFacilities,
+  listNotePhotos,
+  listNoteTags,
   listSurgeons,
+  listTagsForNote,
   listToteTemplatesWithItems,
   listNoteLinks,
   listTasksForNote,
   listUpcomingCases,
   spawnTaskFromNote,
+  unassignNoteTag,
   unlinkNote,
   updateNote,
   updateTask,
@@ -24,16 +32,20 @@ import type {
   CaseTemplateWithItems,
   CatalogItem,
   Facility,
+  NotePhoto,
   PersonalTask,
   Surgeon,
   TerritoryNote,
   TerritoryNoteEntityType,
   TerritoryNoteLink,
+  TerritoryNoteTag,
   TerritoryNoteVisibility,
   ToteTemplateWithItems,
 } from "../lib/types";
 import { formatDateShort, formatRelativeDay } from "../utils/dates";
 import { NOTE_KINDS } from "../lib/noteKinds";
+import { appendChecklistItem, toggleChecklistLine } from "../lib/wikilinks";
+import ChecklistBody from "../components/ChecklistBody";
 
 /*
  * This screen used to keep its own hardcoded list of note types, which had
@@ -79,17 +91,32 @@ export default function NoteDetail() {
 
   const [taskTitle, setTaskTitle] = useState("");
 
+  const [photos, setPhotos] = useState<NotePhoto[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [myTags, setMyTags] = useState<TerritoryNoteTag[]>([]);
+  const [allTags, setAllTags] = useState<TerritoryNoteTag[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+
   function refresh() {
     if (!id) return Promise.resolve();
-    return Promise.all([getNote(id), listNoteLinks(id), listTasksForNote(id)]).then(
-      ([n, l, t]) => {
-        setNote(n);
-        setTitle(n?.title ?? "");
-        setBody(n?.body ?? "");
-        setLinks(l);
-        setTasks(t);
-      },
-    );
+    return Promise.all([
+      getNote(id),
+      listNoteLinks(id),
+      listTasksForNote(id),
+      listNotePhotos(id),
+      listTagsForNote(id),
+    ]).then(([n, l, t, ph, tg]) => {
+      setNote(n);
+      setTitle(n?.title ?? "");
+      setBody(n?.body ?? "");
+      setLinks(l);
+      setTasks(t);
+      setPhotos(ph);
+      setMyTags(tg);
+    });
   }
 
   useEffect(() => {
@@ -106,6 +133,65 @@ export default function NoteDetail() {
     if (!id) return;
     await updateNote(id, fields);
     refresh();
+  }
+
+  /** Toggles a checkbox line straight from the rendered preview — saves immediately, no need to hand-edit the raw text. */
+  async function onToggleChecklist(lineIndex: number) {
+    if (!id) return;
+    const nextBody = toggleChecklistLine(body, lineIndex);
+    setBody(nextBody);
+    await updateNote(id, { body: nextBody });
+  }
+
+  function onInsertChecklistItem() {
+    setBody((prev) => appendChecklistItem(prev));
+  }
+
+  async function onPickPhoto(file: File | null) {
+    if (!file || !id || !profile) return;
+    setUploadingPhoto(true);
+    try {
+      await addNotePhoto({ file, territory_id: profile.territory_id, note_id: id, uploaded_by: profile.id });
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function onDeletePhoto(photoId: string) {
+    await deleteNotePhoto(photoId);
+    await refresh();
+  }
+
+  function openTagPicker() {
+    setShowTagPicker(true);
+    if (profile && allTags.length === 0) listNoteTags(profile.territory_id).then(setAllTags);
+  }
+
+  async function onAssignTag(tagId: string) {
+    if (!id) return;
+    await assignNoteTag(id, tagId);
+    setShowTagPicker(false);
+    await refresh();
+  }
+
+  async function onRemoveTag(tagId: string) {
+    if (!id) return;
+    await unassignNoteTag(id, tagId);
+    await refresh();
+  }
+
+  async function onCreateTag() {
+    if (!id || !profile || !newTagName.trim()) return;
+    const created = await createNoteTag({
+      name: newTagName.trim(),
+      territory_id: profile.territory_id,
+      created_by: profile.id,
+    });
+    setAllTags((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    setNewTagName("");
+    await onAssignTag(created.id);
   }
 
   function openLinkPicker() {
@@ -185,9 +271,122 @@ export default function NoteDetail() {
         onChange={(e) => setBody(e.target.value)}
         onBlur={saveText}
         rows={6}
-        placeholder="Write here..."
+        placeholder={'Write here... type "- [ ] " to add a checkbox'}
         className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
       />
+      <button
+        onClick={onInsertChecklistItem}
+        className="mt-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300"
+      >
+        + ☑ Checkbox
+      </button>
+
+      {/* Live checklist preview — tap a box to toggle without hand-editing the raw text above. */}
+      {body.includes("- [") && (
+        <div className="mt-2 rounded-lg border border-slate-700 bg-slate-800/40 px-3 py-2">
+          <ChecklistBody body={body} onToggle={onToggleChecklist} className="text-sm text-slate-200" />
+        </div>
+      )}
+
+      <div className="mt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-100">Photos</h2>
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploadingPhoto} className="text-sm font-medium text-sky-400 disabled:opacity-50">
+            {uploadingPhoto ? "Uploading…" : "+ Photo"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        {photos.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {photos.map((p) => (
+              <div key={p.id} className="relative">
+                <a href={p.url} target="_blank" rel="noreferrer">
+                  <img src={p.url} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                </a>
+                <button
+                  onClick={() => onDeletePhoto(p.id)}
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 min-h-0 items-center justify-center rounded-full bg-slate-900 text-xs text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-100">Notebook / tags</h2>
+          {!showTagPicker && (
+            <button onClick={openTagPicker} className="text-sm font-medium text-sky-400">
+              + Notebook
+            </button>
+          )}
+        </div>
+        {myTags.length === 0 && !showTagPicker && (
+          <p className="mt-1 text-sm text-slate-500">Not filed in a notebook yet.</p>
+        )}
+        {myTags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {myTags.map((t) => (
+              <span
+                key={t.id}
+                className="flex items-center gap-1.5 rounded-full bg-sky-950/50 px-3 py-1 text-sm text-sky-300"
+              >
+                {t.name}
+                <button onClick={() => onRemoveTag(t.id)} className="text-sky-500">
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {showTagPicker && (
+          <div className="mt-2 rounded-lg border border-slate-700 bg-slate-800/40 p-3">
+            {allTags.filter((t) => !myTags.some((m) => m.id === t.id)).length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {allTags
+                  .filter((t) => !myTags.some((m) => m.id === t.id))
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => onAssignTag(t.id)}
+                      className="rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300"
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="New notebook name…"
+                className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+              />
+              <button
+                onClick={onCreateTag}
+                disabled={!newTagName.trim()}
+                className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Create
+              </button>
+            </div>
+            <button onClick={() => setShowTagPicker(false)} className="mt-2 text-xs text-slate-500 underline">
+              Close
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {NOTE_KINDS.map((k) => (
