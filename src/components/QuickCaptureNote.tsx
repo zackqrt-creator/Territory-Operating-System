@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, ChevronDown, Link2, Lock, Sparkles, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Link2, Lock, Sparkles, Users } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
   assignNoteTag,
@@ -45,7 +45,6 @@ export default function QuickCaptureNote({
   const [text, setText] = useState("");
   const [titleOverride, setTitleOverride] = useState("");
   const [visibility, setVisibility] = useState<TerritoryNoteVisibility>("private");
-  const [showMore, setShowMore] = useState(false);
   const [cases, setCases] = useState<CaseRow[] | null>(null);
   const [facilities, setFacilities] = useState<Facility[] | null>(null);
   const [linkCaseId, setLinkCaseId] = useState("");
@@ -62,12 +61,14 @@ export default function QuickCaptureNote({
   const [accepted, setAccepted] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  function openMore() {
-    setShowMore(true);
-    if (!cases) listUpcomingCases().then(setCases).catch(() => setCases([]));
-    if (!facilities) listFacilities().then(setFacilities).catch(() => setFacilities([]));
-    if (!tags && profile) listNoteTags(profile.territory_id).then(setTags).catch(() => setTags([]));
-  }
+  // Title/notebook/link fields are visible by default now — load their
+  // options as soon as the sheet opens instead of waiting for a tap.
+  useEffect(() => {
+    listUpcomingCases().then(setCases).catch(() => setCases([]));
+    listFacilities().then(setFacilities).catch(() => setFacilities([]));
+    if (profile) listNoteTags(profile.territory_id).then(setTags).catch(() => setTags([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onCreateTag() {
     if (!profile || !newTagName.trim()) return;
@@ -264,16 +265,7 @@ export default function QuickCaptureNote({
           </button>
         </div>
 
-        {!showMore ? (
-          <button
-            onClick={openMore}
-            className="mt-3 flex w-full items-center justify-center gap-1 text-xs font-medium text-slate-500"
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-            {visibility === "private" ? "Private" : "Team-visible"} · title · notebook · link
-          </button>
-        ) : (
-          <div className="mt-4 space-y-2 border-t border-slate-800 pt-4">
+        <div className="mt-4 space-y-2 border-t border-slate-800 pt-4">
             <label className="block text-xs text-slate-500">
               Title (optional — defaults to the first line)
               <input
@@ -364,8 +356,7 @@ export default function QuickCaptureNote({
                 </option>
               ))}
             </select>
-          </div>
-        )}
+        </div>
         </>
         )}
       </div>
