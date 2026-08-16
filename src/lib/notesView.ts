@@ -65,6 +65,8 @@ export interface Row {
   label: string;
   count: number;
   Icon: LucideIcon;
+  /** Only set for tag rows — the underlying territory_note_tags.id, needed to rename/delete it. */
+  tagId?: string;
 }
 
 /** Only non-empty buckets, so the sidebar never advertises a filter that finds nothing. */
@@ -91,17 +93,21 @@ export function buildRows(notes: TerritoryNoteFeedItem[]): { top: Row[]; types: 
     }))
     .filter((r) => r.count > 0);
 
-  const tagCounts = new Map<string, number>();
+  const tagCounts = new Map<string, { id: string; count: number }>();
   for (const n of notes) {
-    for (const t of n.tags) tagCounts.set(t.name, (tagCounts.get(t.name) ?? 0) + 1);
+    for (const t of n.tags) {
+      const existing = tagCounts.get(t.name);
+      tagCounts.set(t.name, { id: t.id, count: (existing?.count ?? 0) + 1 });
+    }
   }
   const tags: Row[] = [...tagCounts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([name, c]) => ({
+    .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+    .map(([name, { id, count: c }]) => ({
       view: { kind: "tag", value: name } as NotesView,
       label: name,
       count: c,
       Icon: Hash,
+      tagId: id,
     }));
 
   return { top, types, tags };

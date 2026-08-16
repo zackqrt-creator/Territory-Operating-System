@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, Plus, Pin, Lock, Link2, BrainCircuit, PanelLeft } from "lucide-react";
-import { listNoteFeed, listPages, listSecondBrainQueue } from "../lib/api";
+import { deleteNoteTag, listNoteFeed, listPages, listSecondBrainQueue, renameNoteTag } from "../lib/api";
 import type { TerritoryNoteFeedItem } from "../lib/types";
 import { noteKindIcon } from "../lib/noteKinds";
 import { buildVaultFiles, buildZip } from "../lib/markdownExport";
@@ -79,6 +79,18 @@ export default function Notes() {
     setDrawerOpen(false);
   }
 
+  async function renameNotebook(tagId: string, oldName: string, newName: string) {
+    await renameNoteTag(tagId, newName);
+    await refresh();
+    setView((v) => (v.kind === "tag" && v.value === oldName ? { kind: "tag", value: newName } : v));
+  }
+
+  async function deleteNotebook(tagId: string, name: string) {
+    await deleteNoteTag(tagId);
+    await refresh();
+    setView((v) => (v.kind === "tag" && v.value === name ? { kind: "all" } : v));
+  }
+
   const sidebar = (onClose?: () => void) => (
     <NotesSidebar
       notes={notes}
@@ -87,6 +99,8 @@ export default function Notes() {
       onClose={onClose}
       onExport={exportVault}
       exporting={exporting}
+      onRenameNotebook={renameNotebook}
+      onDeleteNotebook={deleteNotebook}
     />
   );
 

@@ -1758,6 +1758,17 @@ export async function createNoteTag(input: {
   return data as TerritoryNoteTag;
 }
 
+export async function renameNoteTag(tagId: string, name: string): Promise<void> {
+  const { error } = await supabase.from("territory_note_tags").update({ name }).eq("id", tagId);
+  if (error) throw error;
+}
+
+/** Assignments cascade off the tag row, so this alone unfiles it from every note. */
+export async function deleteNoteTag(tagId: string): Promise<void> {
+  const { error } = await supabase.from("territory_note_tags").delete().eq("id", tagId);
+  if (error) throw error;
+}
+
 export async function assignNoteTag(noteId: string, tagId: string): Promise<void> {
   const { error } = await supabase.from("territory_note_tag_assignments").insert({ note_id: noteId, tag_id: tagId });
   if (error) throw error;
