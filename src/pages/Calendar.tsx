@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  listCalendarBlocks,
   listCasesInRange,
   listCaseTemplatesWithItems,
   listFacilities,
@@ -9,6 +10,7 @@ import {
   listTimeOff,
 } from "../lib/api";
 import type {
+  CalendarBlock,
   CaseRow,
   CaseTemplateWithItems,
   Facility,
@@ -57,6 +59,7 @@ export default function Calendar() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
+  const [blocks, setBlocks] = useState<CalendarBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [openCase, setOpenCase] = useState<CaseRow | null>(null);
   const [showTimeOff, setShowTimeOff] = useState(false);
@@ -95,14 +98,18 @@ export default function Calendar() {
       listInventory(),
       listProfiles(),
       listTimeOff(),
+      // Blocks are a newer table (migration 045) — the overview should not
+      // break on a territory that hasn't run it, so this one fails quiet.
+      listCalendarBlocks(rangeStart, rangeEnd).catch(() => []),
     ])
-      .then(([c, f, t, i, p, to]) => {
+      .then(([c, f, t, i, p, to, bl]) => {
         setCases(c);
         setFacilities(f);
         setTemplates(t);
         setInventory(i);
         setProfiles(p);
         setTimeOff(to);
+        setBlocks(bl);
       })
       .finally(() => setLoading(false));
   }
@@ -163,6 +170,19 @@ export default function Calendar() {
     return map;
   }, [visibleCases]);
 
+  const visibleBlocks = useMemo(() => {
+    if (repFilter === "mine" && profile) {
+      return blocks.filter((b) => b.rep_id === profile.id);
+    }
+    return blocks;
+  }, [blocks, repFilter, profile]);
+
+  const blocksByDay = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of visibleBlocks) set.add(b.block_date);
+    return set;
+  }, [visibleBlocks]);
+
   function dayStatus(date: string): "ready" | "gap" | "none" {
     const dayCases = casesByDay.get(date) ?? [];
     if (dayCases.length === 0) return "none";
@@ -180,6 +200,7 @@ export default function Calendar() {
   const selectedTimeOff = timeOff.filter(
     (t) => t.start_date <= selectedDate && t.end_date >= selectedDate,
   );
+  const selectedBlocks = visibleBlocks.filter((b) => b.block_date === selectedDate);
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-6">
@@ -281,15 +302,18 @@ export default function Calendar() {
               >
                 <span className="text-[10px]">{DAY_LABEL[i]}</span>
                 <span className="text-sm font-medium">{Number(date.slice(-2))}</span>
-                <span
-                  className={`mt-0.5 h-1.5 w-1.5 rounded-full ${
-                    status === "gap"
-                      ? "bg-red-500"
-                      : status === "ready"
-                        ? "bg-emerald-500"
-                        : "bg-transparent"
-                  }`}
-                />
+                <span className="mt-0.5 flex h-1.5 items-center gap-0.5">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      status === "gap"
+                        ? "bg-red-500"
+                        : status === "ready"
+                          ? "bg-emerald-500"
+                          : "bg-transparent"
+                    }`}
+                  />
+                  {blocksByDay.has(date) && <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />}
+                </span>
                 <span
                   className={`h-3 text-[9px] leading-3 ${
                     count >= 3 ? "font-semibold text-amber-400" : "text-slate-400"
@@ -329,15 +353,18 @@ export default function Calendar() {
                   } ${isToday(date) && !selected ? "ring-1 ring-sky-500" : ""}`}
                 >
                   <span className="text-xs font-medium">{Number(date.slice(-2))}</span>
-                  <span
-                    className={`mt-0.5 h-1.5 w-1.5 rounded-full ${
-                      status === "gap"
-                        ? "bg-red-500"
-                        : status === "ready"
-                          ? "bg-emerald-500"
-                          : "bg-transparent"
-                    }`}
-                  />
+                  <span className="mt-0.5 flex h-1.5 items-center gap-0.5">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        status === "gap"
+                          ? "bg-red-500"
+                          : status === "ready"
+                            ? "bg-emerald-500"
+                            : "bg-transparent"
+                      }`}
+                    />
+                    {blocksByDay.has(date) && <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />}
+                  </span>
                   <span
                     className={`h-3 text-[9px] leading-3 ${
                       count >= 3 ? "font-semibold text-amber-400" : "text-slate-400"
@@ -372,6 +399,13 @@ export default function Calendar() {
       ) : selectedCases.length === 0 ? (
         <div className="mt-8 text-center">
           <p className="text-slate-400">No cases on this day.</p>
+          {selectedBlocks.length > 0 && (
+            <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-violet-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+              {selectedBlocks.length} event{selectedBlocks.length === 1 ? "" : "s"} on the calendar —{" "}
+              {selectedBlocks.map((b) => b.label).join(", ")}
+            </p>
+          )}
           <button
             onClick={() => setOpenDay(selectedDate)}
             className="mt-2 text-sm font-medium text-sky-400"

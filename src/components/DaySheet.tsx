@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarPlus, Clock, Plus, Trash2, X } from "lucide-react";
+import { CalendarPlus, Clock, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   createCalendarBlock,
   deleteCalendarBlock,
   listCalendarBlocks,
   listCaseAssignees,
+  updateCalendarBlock,
 } from "../lib/api";
 import NotesSection from "./NotesSection";
 import type {
@@ -77,6 +78,9 @@ export default function DaySheet({
   const [drafting, setDrafting] = useState<number | null>(null);
   const [draftLabel, setDraftLabel] = useState("");
   const [draftKind, setDraftKind] = useState<CalendarBlockKind>("hospital_visit");
+  const [editingBlock, setEditingBlock] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editKind, setEditKind] = useState<CalendarBlockKind>("hospital_visit");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assignees, setAssignees] = useState<CaseAssignee[]>([]);
@@ -126,6 +130,28 @@ export default function DaySheet({
       // Keep the draft on screen -- retyping it is the last thing anyone
       // wants after a save that looked like it worked.
       setError("Couldn't save that block. Check your signal and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startEdit(b: CalendarBlock) {
+    setEditingBlock(b.id);
+    setEditLabel(b.label);
+    setEditKind(b.kind);
+    setOpenBlock(b.id);
+  }
+
+  async function saveEdit(id: string) {
+    if (!editLabel.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await updateCalendarBlock(id, { label: editLabel.trim(), kind: editKind });
+      setEditingBlock(null);
+      loadBlocks();
+    } catch {
+      setError("Couldn't save that change. Check your signal and try again.");
     } finally {
       setBusy(false);
     }
@@ -276,47 +302,100 @@ export default function DaySheet({
                       {slot.map((c) => (
                         <CaseChip key={c.id} c={c} />
                       ))}
-                      {hourBlocks.map((b) => (
-                        <div
-                          key={b.id}
-                          className="rounded-lg border border-slate-700/70 bg-slate-900 px-2.5 py-2"
-                        >
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setOpenBlock(openBlock === b.id ? null : b.id)}
-                              className="min-w-0 flex-1 text-left"
-                            >
-                              <span className="block truncate text-sm text-slate-200">{b.label}</span>
-                              <span className="text-[11px] text-slate-500">
-                                {BLOCK_KINDS.find((k) => k.value === b.kind)?.label ?? "Other"}
-                                {" · "}
-                                {formatTime(b.start_time)}
-                              </span>
-                            </button>
-                            {b.rep_id === currentProfileId && (
+                      {hourBlocks.map((b) =>
+                        editingBlock === b.id ? (
+                          <div
+                            key={b.id}
+                            className="rounded-lg border border-sky-800 bg-slate-900 p-2"
+                          >
+                            <input
+                              autoFocus
+                              value={editLabel}
+                              onChange={(e) => setEditLabel(e.target.value)}
+                              className="w-full rounded-md border border-slate-700 bg-slate-800 px-2.5 py-2 text-sm text-slate-100"
+                            />
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {BLOCK_KINDS.map((k) => (
+                                <button
+                                  key={k.value}
+                                  onClick={() => setEditKind(k.value)}
+                                  className={`rounded-full px-2 py-0.5 text-[11px] ${
+                                    editKind === k.value
+                                      ? "bg-sky-600 text-white"
+                                      : "bg-slate-800 text-slate-400"
+                                  }`}
+                                >
+                                  {k.label}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="mt-2 flex gap-2">
                               <button
-                                onClick={() => removeBlock(b.id)}
-                                aria-label="Remove block"
-                                className="shrink-0 rounded p-1 text-slate-500 active:bg-slate-800"
+                                onClick={() => saveEdit(b.id)}
+                                disabled={busy || !editLabel.trim()}
+                                className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                               >
-                                <Trash2 size={14} />
+                                {busy ? "Saving..." : "Save"}
                               </button>
+                              <button
+                                onClick={() => setEditingBlock(null)}
+                                className="rounded-md bg-slate-800 px-3 py-1.5 text-xs text-slate-300"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            key={b.id}
+                            className="rounded-lg border border-slate-700/70 bg-slate-900 px-2.5 py-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setOpenBlock(openBlock === b.id ? null : b.id)}
+                                className="min-w-0 flex-1 text-left"
+                              >
+                                <span className="block truncate text-sm text-slate-200">{b.label}</span>
+                                <span className="text-[11px] text-slate-500">
+                                  {BLOCK_KINDS.find((k) => k.value === b.kind)?.label ?? "Other"}
+                                  {" · "}
+                                  {formatTime(b.start_time)}
+                                </span>
+                              </button>
+                              {b.rep_id === currentProfileId && (
+                                <>
+                                  <button
+                                    onClick={() => startEdit(b)}
+                                    aria-label="Edit block"
+                                    className="shrink-0 rounded p-1 text-slate-500 active:bg-slate-800"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => removeBlock(b.id)}
+                                    aria-label="Remove block"
+                                    className="shrink-0 rounded p-1 text-slate-500 active:bg-slate-800"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                            {/*
+                              A blocked-out hour is where the day's loose ends
+                              live -- what the visit was for, what came out of it,
+                              what it created. Tapping it opens that.
+                            */}
+                            {openBlock === b.id && (
+                              <NotesSection
+                                entityType="calendar_block"
+                                entityId={b.id}
+                                title="Notes on this block"
+                              />
                             )}
                           </div>
-                          {/*
-                            A blocked-out hour is where the day's loose ends
-                            live -- what the visit was for, what came out of it,
-                            what it created. Tapping it opens that.
-                          */}
-                          {openBlock === b.id && (
-                            <NotesSection
-                              entityType="calendar_block"
-                              entityId={b.id}
-                              title="Notes on this block"
-                            />
-                          )}
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   )}
 
@@ -364,28 +443,28 @@ export default function DaySheet({
                       </div>
                     </div>
                   ) : (
-                    slot.length === 0 &&
-                    hourBlocks.length === 0 && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => addAt(h)}
-                          className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs text-slate-600 active:bg-slate-900"
-                        >
-                          <Plus size={13} />
-                          Case
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDrafting(h);
-                            setDraftLabel("");
-                          }}
-                          className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs text-slate-600 active:bg-slate-900"
-                        >
-                          <CalendarPlus size={13} />
-                          Block
-                        </button>
-                      </div>
-                    )
+                    // Always available, even when the hour already holds a case
+                    // or a block -- a rep's day is layered (a case AND a call AND
+                    // a note about it), not one thing per hour.
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => addAt(h)}
+                        className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs text-slate-600 active:bg-slate-900"
+                      >
+                        <Plus size={13} />
+                        Case
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDrafting(h);
+                          setDraftLabel("");
+                        }}
+                        className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs text-slate-600 active:bg-slate-900"
+                      >
+                        <CalendarPlus size={13} />
+                        Block
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

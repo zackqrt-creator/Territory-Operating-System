@@ -2106,6 +2106,20 @@ export async function createCalendarBlock(
   return data as CalendarBlock;
 }
 
+export async function updateCalendarBlock(
+  id: string,
+  patch: Partial<Pick<CalendarBlock, "label" | "kind" | "start_time" | "end_time" | "facility_id">>,
+): Promise<CalendarBlock> {
+  const { data, error } = await supabase
+    .from("calendar_blocks")
+    .update(patch)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as CalendarBlock;
+}
+
 export async function deleteCalendarBlock(id: string): Promise<void> {
   const { error } = await supabase.from("calendar_blocks").delete().eq("id", id);
   if (error) throw error;
