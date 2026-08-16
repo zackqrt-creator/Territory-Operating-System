@@ -128,22 +128,161 @@ export default function Home() {
   const reserveAlerts = activity.filter((entry) => entry.reserveAlert && !entry.movement.acknowledged_at);
 
   // Expiry safety: never implant an expired device. Loaner-tote wrappers excluded.
-  const expiryFlags = items.filter(
-    (i) => i.expiration_date && !i.loaner_code && daysUntil(i.expiration_date) <= 30,
+  // Split so an already-expired device (a safety issue right now) outranks a
+  // merely-expiring one (a heads-up for later) instead of the two blurring
+  // into one count, as they used to.
+  const expiredNow = items.filter(
+    (i) => i.expiration_date && !i.loaner_code && daysUntil(i.expiration_date) < 0,
   );
-  const expiredCount = expiryFlags.filter((i) => daysUntil(i.expiration_date!) < 0).length;
+  const expiringSoon = items.filter(
+    (i) => i.expiration_date && !i.loaner_code && daysUntil(i.expiration_date) >= 0 && daysUntil(i.expiration_date) <= 30,
+  );
 
   const urgentTasks = myTasks.filter(
     (t) => t.status !== "done" && t.due_date && daysUntil(t.due_date) <= 0,
   ).length;
 
-  const hasAlerts =
-    reserveAlerts.length > 0 ||
-    expiryFlags.length > 0 ||
-    scores.today.red > 0 ||
-    scores.tomorrow.red > 0 ||
-    urgentLoaners.length > 0 ||
-    urgentTasks > 0;
+  /**
+   * Everything that could compete for "what do I do first" reduced to one
+   * ranked list, by timing alone: how soon does waiting on this actually cost
+   * something. A live misallocation right now outranks a device that expires
+   * in three weeks even though both are technically "alerts" — the old
+   * layout gave them the same visual weight and left the ordering to
+   * whichever block happened to be coded first on the page.
+   *
+   * Lower weight = do it first. Ties keep their original relative order.
+   */
+  const PRIORITY = {
+    reserveAlert: 0,
+    expiredStock: 1,
+    caseRiskToday: 2,
+    overdueOrDueTask: 3,
+    loanerShipSoon: 4,
+    caseRiskTomorrow: 5,
+    expiringSoon: 6,
+  } as const;
+
+  const priorityEntries: { key: string; weight: number; node: React.ReactNode }[] = [];
+
+  for (const entry of reserveAlerts) {
+    priorityEntries.push({
+      key: `reserve-${entry.id}`,
+      weight: PRIORITY.reserveAlert,
+      node: (
+        <div className="rounded-xl border border-red-700 bg-red-950/50 p-3">
+          <p className="flex items-start gap-2 text-sm text-red-100">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+            {entry.text}
+          </p>
+          <button
+            onClick={() => onAcknowledge(entry.movement.id)}
+            className="mt-2 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white active:bg-red-600"
+          >
+            Mark replenished
+          </button>
+        </div>
+      ),
+    });
+  }
+
+  if (expiredNow.length > 0) {
+    priorityEntries.push({
+      key: "expired-now",
+      weight: PRIORITY.expiredStock,
+      node: (
+        <AlertRow
+          to="/inventory"
+          icon={AlertTriangle}
+          tone="danger"
+          text={`${expiredNow.length} expired item${expiredNow.length === 1 ? "" : "s"} in stock`}
+        />
+      ),
+    });
+  }
+
+  if (scores.today.red > 0) {
+    priorityEntries.push({
+      key: "case-today",
+      weight: PRIORITY.caseRiskToday,
+      node: (
+        <AlertRow
+          to={`/runsheet?date=${today}`}
+          icon={AlertTriangle}
+          tone="danger"
+          text={`${scores.today.red} case${scores.today.red === 1 ? "" : "s"} at risk today`}
+        />
+      ),
+    });
+  }
+
+  if (urgentTasks > 0) {
+    priorityEntries.push({
+      key: "urgent-tasks",
+      weight: PRIORITY.overdueOrDueTask,
+      node: (
+        <AlertRow
+          to="/tasks"
+          icon={CheckSquare}
+          tone="warn"
+          text={`${urgentTasks} task${urgentTasks === 1 ? "" : "s"} due today or overdue`}
+        />
+      ),
+    });
+  }
+
+  if (urgentLoaners.length > 0) {
+    priorityEntries.push({
+      key: "urgent-loaners",
+      weight: PRIORITY.loanerShipSoon,
+      node: (
+        <Link to="/loaners" className="block rounded-xl border border-red-800 bg-red-950/40 p-3">
+          <span className="flex items-center gap-2 text-sm font-medium text-red-200">
+            <RotateCcw className="h-4 w-4 shrink-0" /> Loaners to ship soon
+          </span>
+          <ul className="mt-1.5 space-y-0.5 pl-6">
+            {urgentLoaners.slice(0, 3).map((s) => (
+              <li key={s.item.id} className="text-sm text-red-200/90">
+                {s.item.name} — ship by {formatDateShort(s.effectiveDeadline)}
+              </li>
+            ))}
+          </ul>
+        </Link>
+      ),
+    });
+  }
+
+  if (scores.tomorrow.red > 0) {
+    priorityEntries.push({
+      key: "case-tomorrow",
+      weight: PRIORITY.caseRiskTomorrow,
+      node: (
+        <AlertRow
+          to={`/runsheet?date=${tomorrowISO}`}
+          icon={AlertTriangle}
+          tone="danger"
+          text={`${scores.tomorrow.red} case${scores.tomorrow.red === 1 ? "" : "s"} at risk tomorrow`}
+        />
+      ),
+    });
+  }
+
+  if (expiringSoon.length > 0) {
+    priorityEntries.push({
+      key: "expiring-soon",
+      weight: PRIORITY.expiringSoon,
+      node: (
+        <AlertRow
+          to="/inventory"
+          icon={AlertTriangle}
+          tone="warn"
+          text={`${expiringSoon.length} item${expiringSoon.length === 1 ? "" : "s"} expiring soon`}
+        />
+      ),
+    });
+  }
+
+  priorityEntries.sort((a, b) => a.weight - b.weight);
+  const hasAlerts = priorityEntries.length > 0;
 
   async function onAcknowledge(movementId: string) {
     if (!profile) return;
@@ -204,81 +343,13 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4 text-red-400" />
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-red-300">
-                  Needs attention
+                  Do these first
                 </h2>
               </div>
               <div className="mt-2 space-y-2">
-                {reserveAlerts.map((entry) => (
-                  <div key={entry.id} className="rounded-xl border border-red-700 bg-red-950/50 p-3">
-                    <p className="flex items-start gap-2 text-sm text-red-100">
-                      <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
-                      {entry.text}
-                    </p>
-                    <button
-                      onClick={() => onAcknowledge(entry.movement.id)}
-                      /* red-700 is the ramp's only solid red; red-800 is a pale
-                         tint that left this white label unreadable. */
-                      className="mt-2 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white active:bg-red-600"
-                    >
-                      Mark replenished
-                    </button>
-                  </div>
+                {priorityEntries.map((entry) => (
+                  <div key={entry.key}>{entry.node}</div>
                 ))}
-
-                {scores.today.red > 0 && (
-                  <AlertRow
-                    to={`/runsheet?date=${today}`}
-                    icon={AlertTriangle}
-                    tone="danger"
-                    text={`${scores.today.red} case${scores.today.red === 1 ? "" : "s"} at risk today`}
-                  />
-                )}
-
-                {scores.tomorrow.red > 0 && (
-                  <AlertRow
-                    to={`/runsheet?date=${tomorrowISO}`}
-                    icon={AlertTriangle}
-                    tone="danger"
-                    text={`${scores.tomorrow.red} case${scores.tomorrow.red === 1 ? "" : "s"} at risk tomorrow`}
-                  />
-                )}
-
-                {urgentLoaners.length > 0 && (
-                  <Link to="/loaners" className="block rounded-xl border border-red-800 bg-red-950/40 p-3">
-                    <span className="flex items-center gap-2 text-sm font-medium text-red-200">
-                      <RotateCcw className="h-4 w-4 shrink-0" /> Loaners to ship soon
-                    </span>
-                    <ul className="mt-1.5 space-y-0.5 pl-6">
-                      {urgentLoaners.slice(0, 3).map((s) => (
-                        <li key={s.item.id} className="text-sm text-red-200/90">
-                          {s.item.name} — ship by {formatDateShort(s.effectiveDeadline)}
-                        </li>
-                      ))}
-                    </ul>
-                  </Link>
-                )}
-
-                {expiryFlags.length > 0 && (
-                  <AlertRow
-                    to="/inventory"
-                    icon={AlertTriangle}
-                    tone={expiredCount > 0 ? "danger" : "warn"}
-                    text={
-                      expiredCount > 0
-                        ? `${expiredCount} expired item${expiredCount === 1 ? "" : "s"} in stock`
-                        : `${expiryFlags.length} item${expiryFlags.length === 1 ? "" : "s"} expiring soon`
-                    }
-                  />
-                )}
-
-                {urgentTasks > 0 && (
-                  <AlertRow
-                    to="/tasks"
-                    icon={CheckSquare}
-                    tone="warn"
-                    text={`${urgentTasks} task${urgentTasks === 1 ? "" : "s"} due today or overdue`}
-                  />
-                )}
               </div>
             </section>
           ) : (
