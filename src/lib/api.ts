@@ -739,8 +739,10 @@ export async function consumeStickerUsage(params: {
   caseId: string | null;
   movedBy: string;
   territoryId: string;
+  /** What to call the source in the movement note — defaults to "sticker sheet". */
+  source?: string;
 }): Promise<void> {
-  const { allocations, caseId, movedBy, territoryId } = params;
+  const { allocations, caseId, movedBy, territoryId, source = "sticker sheet" } = params;
   for (const a of allocations) {
     if (a.quantity <= 0) continue;
     const { error: updateError } = await supabase
@@ -756,7 +758,7 @@ export async function consumeStickerUsage(params: {
       to_location: a.item.location_id,
       moved_by: movedBy,
       related_case_id: caseId,
-      note: `Used ${a.quantity} in case (sticker sheet)`,
+      note: `Used ${a.quantity} in case (${source})`,
     });
     if (moveError) throw moveError;
   }

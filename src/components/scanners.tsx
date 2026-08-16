@@ -19,6 +19,7 @@ import type { ComponentProps } from "react";
 const PackingSlipScanInner = lazy(() => import("./PackingSlipScan"));
 const StickerSheetCaptureInner = lazy(() => import("./StickerSheetCapture"));
 const BatchScanSheetInner = lazy(() => import("./BatchScanSheet"));
+const DigitalTicketImportInner = lazy(() => import("./DigitalTicketImport"));
 
 /**
  * Full-screen, because that is how each of these presents. Anything smaller
@@ -53,6 +54,14 @@ export function BatchScanSheet(props: ComponentProps<typeof BatchScanSheetInner>
   return (
     <Suspense fallback={<ScannerLoading />}>
       <BatchScanSheetInner {...props} />
+    </Suspense>
+  );
+}
+
+export function DigitalTicketImport(props: ComponentProps<typeof DigitalTicketImportInner>) {
+  return (
+    <Suspense fallback={<ScannerLoading />}>
+      <DigitalTicketImportInner {...props} />
     </Suspense>
   );
 }
