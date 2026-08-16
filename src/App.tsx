@@ -50,6 +50,7 @@ const NoteDetail = lazy(() => import("./pages/NoteDetail"));
 const SecondBrainQueue = lazy(() => import("./pages/SecondBrainQueue"));
 const Knowledge = lazy(() => import("./pages/Wiki"));
 const NotePage = lazy(() => import("./pages/WikiPage"));
+const Trends = lazy(() => import("./pages/Trends"));
 
 /** Legacy /wiki/:id bookmarks now live under /pages/:id. */
 function WikiRedirect() {
@@ -119,6 +120,7 @@ function App() {
           <Route path="/daily" element={<DailyReports />} />
           <Route path="/daily/:id" element={<DailyReportEditor />} />
           <Route path="/integrations" element={<Integrations />} />
+          <Route path="/trends" element={<Trends />} />
           <Route path="/wiki" element={<Navigate to="/pages" replace />} />
           <Route path="/wiki/:id" element={<WikiRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
