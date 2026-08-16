@@ -154,6 +154,15 @@ export default function NoteDetail() {
     setSaveStatus("saved");
   }
 
+  /** The explicit Save button — always writes, even if the debounce already caught it, so tapping it is never a silent no-op. */
+  async function saveNow() {
+    if (!id) return;
+    setSaveStatus("saving");
+    dirtyRef.current = false;
+    await updateNote(id, { title: titleRef.current.trim() || "Untitled note", body: bodyRef.current });
+    setSaveStatus("saved");
+  }
+
   function onEditTitle(next: string) {
     setTitle(next);
     dirtyRef.current = true;
@@ -313,7 +322,7 @@ export default function NoteDetail() {
   if (!note) return <div className="min-h-screen px-4 pt-6 text-slate-400">Note not found.</div>;
 
   return (
-    <div className="min-h-screen px-4 pb-28 pt-6">
+    <div className="min-h-screen px-4 pb-40 pt-6">
       <input
         value={title}
         onChange={(e) => onEditTitle(e.target.value)}
@@ -671,6 +680,22 @@ export default function NoteDetail() {
       <button onClick={removeNote} className="mt-8 text-sm text-red-400 underline underline-offset-2">
         Delete note
       </button>
+
+      {/* Fixed above the bottom nav, not just near the body text — this page
+          scrolls long (photos, notebook, links, tasks), and a Save button
+          only reachable by scrolling back up isn't "always there". */}
+      <div
+        className="fixed left-0 right-0 z-30 border-t border-slate-800 bg-slate-950/95 px-4 py-2.5 backdrop-blur-xl"
+        style={{ bottom: "calc(64px + var(--safe-bottom))" }}
+      >
+        <button
+          onClick={saveNow}
+          disabled={saveStatus === "saving"}
+          className="w-full rounded-lg bg-sky-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }
