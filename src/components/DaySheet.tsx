@@ -77,7 +77,11 @@ export default function DaySheet({
   const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [drafting, setDrafting] = useState<number | null>(null);
   const [draftLabel, setDraftLabel] = useState("");
-  const [draftKind, setDraftKind] = useState<CalendarBlockKind>("hospital_visit");
+  // "Other" by default and hidden behind a toggle -- picking a category up
+  // front turned a one-line note into a six-button form. Most events don't
+  // need one; the rare one that does can still get tagged, before or after.
+  const [draftKind, setDraftKind] = useState<CalendarBlockKind>("other");
+  const [showDraftKind, setShowDraftKind] = useState(false);
   const [editingBlock, setEditingBlock] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [editKind, setEditKind] = useState<CalendarBlockKind>("hospital_visit");
@@ -125,6 +129,8 @@ export default function DaySheet({
       });
       setDraftLabel("");
       setDrafting(null);
+      setShowDraftKind(false);
+      setDraftKind("other");
       loadBlocks();
     } catch {
       // Keep the draft on screen -- retyping it is the last thing anyone
@@ -405,24 +411,40 @@ export default function DaySheet({
                         autoFocus
                         value={draftLabel}
                         onChange={(e) => setDraftLabel(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveBlock(h);
+                          if (e.key === "Escape") {
+                            setDrafting(null);
+                            setDraftLabel("");
+                          }
+                        }}
                         placeholder={`What is ${hourLabel(h)} for?`}
                         className="w-full rounded-md border border-slate-700 bg-slate-800 px-2.5 py-2 text-sm text-slate-100 placeholder:text-slate-500"
                       />
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {BLOCK_KINDS.map((k) => (
-                          <button
-                            key={k.value}
-                            onClick={() => setDraftKind(k.value)}
-                            className={`rounded-full px-2 py-0.5 text-[11px] ${
-                              draftKind === k.value
-                                ? "bg-sky-600 text-white"
-                                : "bg-slate-800 text-slate-400"
-                            }`}
-                          >
-                            {k.label}
-                          </button>
-                        ))}
-                      </div>
+                      {showDraftKind ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {BLOCK_KINDS.map((k) => (
+                            <button
+                              key={k.value}
+                              onClick={() => setDraftKind(k.value)}
+                              className={`rounded-full px-2 py-0.5 text-[11px] ${
+                                draftKind === k.value
+                                  ? "bg-sky-600 text-white"
+                                  : "bg-slate-800 text-slate-400"
+                              }`}
+                            >
+                              {k.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowDraftKind(true)}
+                          className="mt-1.5 text-[11px] text-slate-500 underline"
+                        >
+                          Tag a category (optional)
+                        </button>
+                      )}
                       <div className="mt-2 flex gap-2">
                         <button
                           onClick={() => saveBlock(h)}
@@ -435,6 +457,8 @@ export default function DaySheet({
                           onClick={() => {
                             setDrafting(null);
                             setDraftLabel("");
+                            setShowDraftKind(false);
+                            setDraftKind("other");
                           }}
                           className="rounded-md bg-slate-800 px-3 py-1.5 text-xs text-slate-300"
                         >
@@ -462,7 +486,7 @@ export default function DaySheet({
                         className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-left text-xs text-slate-600 active:bg-slate-900"
                       >
                         <CalendarPlus size={13} />
-                        Block
+                        Event
                       </button>
                     </div>
                   )}
