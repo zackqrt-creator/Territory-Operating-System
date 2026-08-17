@@ -307,7 +307,12 @@ export default function NoteDetail() {
   }
 
   async function toggleTaskDone(t: PersonalTask) {
-    await updateTask(t.id, { status: t.status === "done" ? "todo" : "done", done_at: t.status === "done" ? null : new Date().toISOString() });
+    const done = t.status === "done";
+    await updateTask(
+      t.id,
+      { status: done ? "todo" : "done", done_at: done ? null : new Date().toISOString() },
+      profile ? { id: profile.id, territoryId: profile.territory_id } : undefined,
+    );
     refresh();
   }
 

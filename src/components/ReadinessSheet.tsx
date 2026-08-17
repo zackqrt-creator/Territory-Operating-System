@@ -21,6 +21,8 @@ import {
 } from "../lib/api";
 import { scoreCase, type CheckStatus } from "../lib/crm";
 import CaseCoverage from "./CaseCoverage";
+import EntityTags from "./EntityTags";
+import EntityTimeline from "./EntityTimeline";
 import MoveItemSheet from "./MoveItemSheet";
 import NotesSection from "./NotesSection";
 import QuickLogSheet from "./QuickLogSheet";
@@ -144,6 +146,8 @@ export default function ReadinessSheet({
         {caseRow.surgeon && <p className="text-sm text-slate-500">{caseRow.surgeon}</p>}
         {caseRow.case_id && <p className="text-xs text-slate-600">Case #{caseRow.case_id}</p>}
 
+        <EntityTags entityType="case" entityId={caseRow.id} />
+
         <div
           className={`mt-3 rounded-xl border p-3 ${
             score.color === "red"
@@ -185,6 +189,8 @@ export default function ReadinessSheet({
         <CaseCoverage caseId={caseRow.id} territoryId={caseRow.territory_id ?? null} />
 
         <NotesSection entityType="case" entityId={caseRow.id} />
+
+        <EntityTimeline entityType="case" entityId={caseRow.id} />
 
         {caseRow.facility_id && (
           <NotesSection

@@ -582,6 +582,66 @@ export interface TerritoryNoteFeedItem extends TerritoryNote {
   tags: Array<{ id: string; name: string; color: string | null }>;
 }
 
+// ---- Entity graph: universal tags, links, events ---------------------------
+//
+// The same (entity_type, entity_id) identity entity_notes/tasks already use,
+// widened to cover record kinds that don't have a dedicated table yet.
+// person/place/asset/document/photo are placeholders for future phases (and
+// future industries) — nothing writes them today, but tags/links/events on
+// them will work the moment something does.
+
+export type GraphEntityType =
+  | "case"
+  | "inventory_item"
+  | "surgeon"
+  | "facility"
+  | "catalog_item"
+  | "tote_template"
+  | "case_template"
+  | "movement"
+  | "calendar_block"
+  | "task"
+  | "note"
+  | "territory"
+  | "person"
+  | "place"
+  | "asset"
+  | "document"
+  | "photo";
+
+export interface EntityTagAssignment {
+  id: string;
+  territory_id: string;
+  tag_id: string;
+  entity_type: GraphEntityType;
+  entity_id: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface EntityLink {
+  id: string;
+  territory_id: string;
+  from_type: GraphEntityType;
+  from_id: string;
+  to_type: GraphEntityType;
+  to_id: string;
+  relation: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface EntityEvent {
+  id: string;
+  territory_id: string;
+  entity_type: GraphEntityType;
+  entity_id: string;
+  verb: string;
+  actor_id: string | null;
+  payload: Record<string, unknown>;
+  occurred_at: string;
+}
+
 export interface WikiPage {
   id: string;
   territory_id: string;

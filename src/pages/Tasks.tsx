@@ -334,10 +334,11 @@ function TaskCard({
   async function move(next: TaskStatus) {
     setBusy(true);
     try {
-      await updateTask(task.id, {
-        status: next,
-        done_at: next === "done" ? new Date().toISOString() : null,
-      });
+      await updateTask(
+        task.id,
+        { status: next, done_at: next === "done" ? new Date().toISOString() : null },
+        { id: meId, territoryId },
+      );
       onChanged();
     } finally {
       setBusy(false);

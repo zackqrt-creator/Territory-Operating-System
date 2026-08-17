@@ -75,10 +75,11 @@ export default function EntityTasks({
     setBusy(true);
     try {
       const done = task.status === "done";
-      await updateTask(task.id, {
-        status: done ? "todo" : "done",
-        done_at: done ? null : new Date().toISOString(),
-      });
+      await updateTask(
+        task.id,
+        { status: done ? "todo" : "done", done_at: done ? null : new Date().toISOString() },
+        profile ? { id: profile.id, territoryId: profile.territory_id } : undefined,
+      );
       await refresh();
     } finally {
       setBusy(false);
