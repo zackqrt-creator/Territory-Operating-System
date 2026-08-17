@@ -9,10 +9,14 @@ import {
   updateSurgeonNotes,
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
+import EntityLinkPicker from "../components/EntityLinkPicker";
+import EntityTags from "../components/EntityTags";
+import EntityTimeline from "../components/EntityTimeline";
 import NotesSection from "../components/NotesSection";
 import RenameField from "../components/RenameField";
 import WikiLinkButton from "../components/WikiLinkButton";
 import type { CaseRow, Surgeon, SurgeonPreference, ToteTemplateWithItems } from "../lib/types";
+import { caseLabel } from "../lib/staging";
 import { formatDateShort } from "../utils/dates";
 
 export default function Surgeons() {
@@ -48,7 +52,7 @@ export default function Surgeons() {
     if (!newName.trim() || !profile) return;
     setAdding(true);
     try {
-      await createSurgeon(newName.trim(), profile.territory_id);
+      await createSurgeon(newName.trim(), profile.territory_id, profile.id);
       setNewName("");
       await refresh();
     } finally {
@@ -160,6 +164,16 @@ function SurgeonCard({
         <WikiLinkButton entityType="surgeon" entityId={surgeon.id} title={surgeon.name} label="Page" className="shrink-0" />
       </div>
 
+      <EntityTags entityType="surgeon" entityId={surgeon.id} />
+
+      <EntityLinkPicker
+        entityType="surgeon"
+        entityId={surgeon.id}
+        candidates={{
+          case: cases.map((c) => ({ id: c.id, label: caseLabel(c) })),
+        }}
+      />
+
       {done.length > 0 && (
         <div className="mt-2 rounded-lg bg-slate-800/50 p-2.5">
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300">
@@ -229,6 +243,8 @@ function SurgeonCard({
         )}
         {!dirty && saved && <p className="mt-2 text-sm text-emerald-400">Saved ✓</p>}
       </div>
+
+      <EntityTimeline entityType="surgeon" entityId={surgeon.id} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { downscaleImage } from "./images";
+import { caseLabel } from "./staging";
 import type {
   Integration,
   IntegrationLink,
@@ -955,14 +956,27 @@ export async function listSurgeons(): Promise<Surgeon[]> {
   return data as Surgeon[];
 }
 
-export async function createSurgeon(name: string, territoryId: string): Promise<Surgeon> {
+export async function createSurgeon(
+  name: string,
+  territoryId: string,
+  actorId?: string,
+): Promise<Surgeon> {
   const { data, error } = await supabase
     .from("surgeons")
     .insert({ name, territory_id: territoryId })
     .select()
     .single();
   if (error) throw error;
-  return data as Surgeon;
+  const row = data as Surgeon;
+  logEvent({
+    entity_type: "surgeon",
+    entity_id: row.id,
+    verb: "created",
+    actor_id: actorId ?? null,
+    payload: { name: row.name },
+    territory_id: territoryId,
+  }).catch(() => {});
+  return row;
 }
 
 export async function updateSurgeonNotes(surgeonId: string, notes: string): Promise<void> {
@@ -1993,6 +2007,65 @@ export async function logEvent(input: {
   if (error) throw error;
 }
 
+/**
+ * Resolves a (entity_type, entity_id) pair to something a human can read —
+ * the one piece of logic the generic entity page needs that nothing else
+ * does, since every other screen already knows what kind of record it's
+ * showing. Returns null for a type/id this app can't look up (deleted row,
+ * or a placeholder type like "person" with no table behind it yet).
+ */
+export async function getEntityLabel(
+  entityType: GraphEntityType,
+  entityId: string,
+): Promise<{ title: string; subtitle?: string } | null> {
+  switch (entityType) {
+    case "case": {
+      const { data } = await supabase.from("cases").select("*").eq("id", entityId).maybeSingle();
+      if (!data) return null;
+      const c = data as CaseRow;
+      return { title: caseLabel(c), subtitle: c.surgery_date };
+    }
+    case "inventory_item": {
+      const { data } = await supabase.from("inventory_items").select("name, category").eq("id", entityId).maybeSingle();
+      return data ? { title: data.name, subtitle: data.category } : null;
+    }
+    case "surgeon": {
+      const { data } = await supabase.from("surgeons").select("name").eq("id", entityId).maybeSingle();
+      return data ? { title: data.name } : null;
+    }
+    case "facility": {
+      const { data } = await supabase.from("facilities").select("name, type").eq("id", entityId).maybeSingle();
+      return data ? { title: data.name, subtitle: data.type } : null;
+    }
+    case "catalog_item": {
+      const { data } = await supabase.from("catalog_items").select("name").eq("id", entityId).maybeSingle();
+      return data ? { title: data.name } : null;
+    }
+    case "tote_template": {
+      const { data } = await supabase.from("tote_templates").select("name").eq("id", entityId).maybeSingle();
+      return data ? { title: data.name } : null;
+    }
+    case "case_template": {
+      const { data } = await supabase.from("case_templates").select("name").eq("id", entityId).maybeSingle();
+      return data ? { title: data.name } : null;
+    }
+    case "task": {
+      const { data } = await supabase.from("tasks").select("title").eq("id", entityId).maybeSingle();
+      return data ? { title: data.title } : null;
+    }
+    case "note": {
+      const { data } = await supabase.from("territory_notes").select("title").eq("id", entityId).maybeSingle();
+      return data ? { title: data.title } : null;
+    }
+    case "calendar_block": {
+      const { data } = await supabase.from("calendar_blocks").select("label, start_time").eq("id", entityId).maybeSingle();
+      return data ? { title: data.label, subtitle: data.start_time } : null;
+    }
+    default:
+      return null;
+  }
+}
+
 export async function listEntityEvents(
   entityType: GraphEntityType,
   entityId: string,
@@ -2003,6 +2076,19 @@ export async function listEntityEvents(
     .select("*")
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
+    .order("occurred_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as EntityEvent[];
+}
+
+/** Every logged action across the territory, not scoped to one record —
+ * what pattern-detection reads from. RLS already limits this to the caller's
+ * own territory, same as everything else. */
+export async function listRecentEvents(limit = 2000): Promise<EntityEvent[]> {
+  const { data, error } = await supabase
+    .from("entity_events")
+    .select("*")
     .order("occurred_at", { ascending: false })
     .limit(limit);
   if (error) throw error;

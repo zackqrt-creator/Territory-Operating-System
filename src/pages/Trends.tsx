@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Package, Stethoscope, Building2, CheckSquare } from "lucide-react";
+import { Activity, BarChart3, Package, Stethoscope, Building2, CheckSquare } from "lucide-react";
 import {
   listCasesInRange,
   listFacilities,
   listInventory,
   listMyTasks,
+  listRecentEvents,
   listRecentMovements,
   listSurgeons,
 } from "../lib/api";
-import type { CaseRow, Facility, InventoryItem, Movement, PersonalTask, Surgeon } from "../lib/types";
+import type { CaseRow, EntityEvent, Facility, InventoryItem, Movement, PersonalTask, Surgeon } from "../lib/types";
 import {
   caseVolumeByFacility,
   caseVolumeBySurgeon,
@@ -18,6 +19,7 @@ import {
   topUsedItems,
   type DateRange,
 } from "../lib/trends";
+import { describeBusiestPattern, eventsByVerb } from "../lib/patterns";
 import { addDays, toISODate } from "../utils/dates";
 
 const RANGES = [
@@ -41,6 +43,7 @@ export default function Trends() {
   const [tasks, setTasks] = useState<PersonalTask[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [surgeons, setSurgeons] = useState<Surgeon[]>([]);
+  const [events, setEvents] = useState<EntityEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const range: DateRange = useMemo(() => {
@@ -59,14 +62,18 @@ export default function Trends() {
       listMyTasks(),
       listFacilities(),
       listSurgeons(),
+      // Silent on failure so a territory without migration 058 sees Trends
+      // exactly as it did before — the rest of the page doesn't depend on it.
+      listRecentEvents(2000).catch(() => []),
     ])
-      .then(([c, m, i, t, f, s]) => {
+      .then(([c, m, i, t, f, s, ev]) => {
         setCases(c);
         setMovements(m);
         setInventory(i);
         setTasks(t);
         setFacilities(f);
         setSurgeons(s);
+        setEvents(ev);
       })
       .finally(() => setLoading(false));
   }, [range.start, range.end]);
@@ -77,6 +84,12 @@ export default function Trends() {
   const usedItems = useMemo(() => topUsedItems(movements, inventory, range, 10), [movements, inventory, range]);
   const tasksStat = useMemo(() => taskStats(tasks, range), [tasks, range]);
   const replenishStat = useMemo(() => replenishTaskStats(tasks, range), [tasks, range]);
+  const eventsInRange = useMemo(
+    () => events.filter((e) => e.occurred_at.slice(0, 10) >= range.start && e.occurred_at.slice(0, 10) <= range.end),
+    [events, range],
+  );
+  const verbCounts = useMemo(() => eventsByVerb(eventsInRange), [eventsInRange]);
+  const patternInsight = useMemo(() => describeBusiestPattern(eventsInRange), [eventsInRange]);
 
   const unitsUsed = usedItems.reduce((sum, r) => sum + r.unitsUsed, 0);
   const maxWeek = Math.max(1, ...byWeek.map((w) => w.count));
@@ -179,6 +192,21 @@ export default function Trends() {
               }))}
             />
           </section>
+
+          {/* ── Patterns ──────────────────────────────────────── */}
+          {eventsInRange.length > 0 && (
+            <section>
+              <SectionHeader icon={Activity} label="Patterns" />
+              {patternInsight && <p className="mt-1 text-sm text-slate-300">{patternInsight}</p>}
+              <BarList
+                rows={verbCounts.map((v) => ({
+                  key: v.verb,
+                  label: v.verb.replace(/_/g, " "),
+                  count: v.count,
+                }))}
+              />
+            </section>
+          )}
         </div>
       )}
     </div>

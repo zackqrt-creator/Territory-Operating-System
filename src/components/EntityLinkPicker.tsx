@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Link2, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { linkEntities, listEntityLinks, unlinkEntities } from "../lib/api";
@@ -121,12 +122,15 @@ export default function EntityLinkPicker({
                 key={l.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800/40 px-3 py-2"
               >
-                <span className="flex min-w-0 items-center gap-1.5 text-sm text-slate-300">
+                <Link
+                  to={`/entity/${other.type}/${other.id}`}
+                  className="flex min-w-0 items-center gap-1.5 text-sm text-slate-300"
+                >
                   <Link2 className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                  <span className="truncate">
+                  <span className="truncate underline decoration-slate-700">
                     {l.relation.replace(/_/g, " ")} · {labelFor(other.type, other.id)}
                   </span>
-                </span>
+                </Link>
                 <button onClick={() => remove(l.id)} disabled={busy} aria-label="Remove link">
                   <X className="h-3.5 w-3.5 shrink-0 text-slate-500" />
                 </button>
