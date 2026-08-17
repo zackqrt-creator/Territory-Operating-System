@@ -221,10 +221,22 @@ export interface NewItemInput {
   cement_type?: "cemented" | "cementless" | null;
 }
 
-export async function createInventoryItem(input: NewItemInput): Promise<InventoryItem> {
+export async function createInventoryItem(
+  input: NewItemInput,
+  actorId?: string,
+): Promise<InventoryItem> {
   const { data, error } = await supabase.from("inventory_items").insert(input).select().single();
   if (error) throw error;
-  return data as InventoryItem;
+  const row = data as InventoryItem;
+  logEvent({
+    entity_type: "inventory_item",
+    entity_id: row.id,
+    verb: "created",
+    actor_id: actorId ?? null,
+    payload: { name: row.name, category: row.category },
+    territory_id: input.territory_id,
+  }).catch(() => {});
+  return row;
 }
 
 /** Fix a mistyped item (lot, expiration, quantity, name, cement, location). */
@@ -545,6 +557,15 @@ export async function moveItem(params: {
 
   const { error: updateError } = await supabase.from("inventory_items").update(update).eq("id", item.id);
   if (updateError) throw updateError;
+
+  logEvent({
+    entity_type: "inventory_item",
+    entity_id: item.id,
+    verb: "moved",
+    actor_id: movedBy,
+    payload: { from: item.location_id, to: toLocation, relatedCaseId: relatedCaseId ?? null },
+    territory_id: territoryId,
+  }).catch(() => {});
 }
 
 export async function listRecentMovements(limit = 100): Promise<Movement[]> {

@@ -460,7 +460,7 @@ export default function AddItemSheet({
         expiration_date: expiration || null,
         acquisition_type: "consignment",
         cement_type: category === "implant" ? cementType : null,
-      });
+      }, profile.id);
       onCreated();
     } finally {
       setSaving(false);

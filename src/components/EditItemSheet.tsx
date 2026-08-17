@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { deleteInventoryItem, updateCatalogItemName, updateInventoryItem } from "../lib/api";
 import type { DeliveryStatus, Facility, InventoryItem } from "../lib/types";
+import EntityTags from "./EntityTags";
+import EntityTimeline from "./EntityTimeline";
 import NotesSection from "./NotesSection";
 import RenameField from "./RenameField";
 import WikiLinkButton from "./WikiLinkButton";
@@ -73,6 +75,8 @@ export default function EditItemSheet({
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-700" />
         <h2 className="text-lg font-semibold text-slate-100">Edit item</h2>
+
+        <EntityTags entityType="inventory_item" entityId={item.id} />
 
         <div className="mt-4 space-y-4">
           <div>
@@ -215,6 +219,8 @@ export default function EditItemSheet({
           )}
 
           <NotesSection entityType="inventory_item" entityId={item.id} />
+
+          <EntityTimeline entityType="inventory_item" entityId={item.id} />
 
           <button
             onClick={onSave}

@@ -217,7 +217,7 @@ export default function BatchScanSheet({
           acquisition_type: "consignment",
           cement_type: row.category === "implant" ? row.cementType : null,
           quantity: row.quantity,
-        });
+        }, profile.id);
       }
       onSaved();
     } finally {
