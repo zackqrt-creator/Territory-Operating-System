@@ -21,6 +21,7 @@ import {
 } from "../lib/api";
 import { scoreCase, type CheckStatus } from "../lib/crm";
 import CaseCoverage from "./CaseCoverage";
+import EntityLinkPicker from "./EntityLinkPicker";
 import EntityTags from "./EntityTags";
 import EntityTimeline from "./EntityTimeline";
 import MoveItemSheet from "./MoveItemSheet";
@@ -147,6 +148,15 @@ export default function ReadinessSheet({
         {caseRow.case_id && <p className="text-xs text-slate-600">Case #{caseRow.case_id}</p>}
 
         <EntityTags entityType="case" entityId={caseRow.id} />
+
+        <EntityLinkPicker
+          entityType="case"
+          entityId={caseRow.id}
+          candidates={{
+            facility: facilities.map((f) => ({ id: f.id, label: f.name })),
+            case_template: templates.map((t) => ({ id: t.id, label: t.name })),
+          }}
+        />
 
         <div
           className={`mt-3 rounded-xl border p-3 ${

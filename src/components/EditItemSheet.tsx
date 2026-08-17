@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { deleteInventoryItem, updateCatalogItemName, updateInventoryItem } from "../lib/api";
 import type { DeliveryStatus, Facility, InventoryItem } from "../lib/types";
+import EntityLinkPicker from "./EntityLinkPicker";
 import EntityTags from "./EntityTags";
 import EntityTimeline from "./EntityTimeline";
 import NotesSection from "./NotesSection";
@@ -77,6 +78,14 @@ export default function EditItemSheet({
         <h2 className="text-lg font-semibold text-slate-100">Edit item</h2>
 
         <EntityTags entityType="inventory_item" entityId={item.id} />
+
+        <EntityLinkPicker
+          entityType="inventory_item"
+          entityId={item.id}
+          candidates={{
+            facility: facilities.map((f) => ({ id: f.id, label: f.name })),
+          }}
+        />
 
         <div className="mt-4 space-y-4">
           <div>

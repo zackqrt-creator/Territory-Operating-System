@@ -1391,6 +1391,14 @@ export async function createFacilityCredential(input: {
 }): Promise<void> {
   const { error } = await supabase.from("facility_credentials").insert(input);
   if (error) throw error;
+  logEvent({
+    entity_type: "facility",
+    entity_id: input.facility_id,
+    verb: "credential_added",
+    actor_id: input.profile_id,
+    payload: { vendor: input.vendor, expires_on: input.expires_on },
+    territory_id: input.territory_id,
+  }).catch(() => {});
 }
 
 export async function updateCaseBilling(

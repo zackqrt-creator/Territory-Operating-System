@@ -10,6 +10,8 @@ import {
 } from "../lib/api";
 import type { CaseRow, Facility, FacilityCredential, Profile } from "../lib/types";
 import { credentialConflicts } from "../lib/crm";
+import EntityTags from "../components/EntityTags";
+import EntityTimeline from "../components/EntityTimeline";
 import NotesSection from "../components/NotesSection";
 import WikiLinkButton from "../components/WikiLinkButton";
 import { daysUntil, formatDateShort, toISODate } from "../utils/dates";
@@ -179,13 +181,16 @@ export default function Compliance() {
             </p>
             <div className="mt-2 space-y-2">
               {facilities.map((f) => (
-                <NotesSection
-                  key={f.id}
-                  entityType="facility"
-                  entityId={f.id}
-                  title={f.name}
-                  placeholder="Dock hours, parking, door codes, who to find in SPD…"
-                />
+                <div key={f.id}>
+                  <EntityTags entityType="facility" entityId={f.id} />
+                  <NotesSection
+                    entityType="facility"
+                    entityId={f.id}
+                    title={f.name}
+                    placeholder="Dock hours, parking, door codes, who to find in SPD…"
+                  />
+                  <EntityTimeline entityType="facility" entityId={f.id} />
+                </div>
               ))}
             </div>
           </div>

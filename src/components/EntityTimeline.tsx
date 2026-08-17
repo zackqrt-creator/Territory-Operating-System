@@ -9,6 +9,8 @@ const VERB_LABEL: Record<string, string> = {
   status_changed: "Status changed",
   completed: "Completed",
   items_consumed: "Items used",
+  moved: "Moved",
+  credential_added: "Credential added",
 };
 
 function describe(e: EntityEvent): string {
@@ -18,6 +20,9 @@ function describe(e: EntityEvent): string {
   }
   if (e.verb === "items_consumed" && typeof e.payload.lineCount === "number") {
     return `${label} — ${e.payload.lineCount} line${e.payload.lineCount === 1 ? "" : "s"} (${e.payload.source ?? "scan"})`;
+  }
+  if (e.verb === "credential_added" && typeof e.payload.vendor === "string") {
+    return `${label} — ${e.payload.vendor}`;
   }
   return label;
 }
