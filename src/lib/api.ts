@@ -26,6 +26,9 @@ import type {
   CaseChecklistMark,
   DayChecklistMark,
   DayRequirement,
+  EntityEvent,
+  EntityLink,
+  GraphEntityType,
   CaseItemPlan,
   CaseRow,
   CaseTemplateWithItems,
@@ -54,6 +57,8 @@ import type {
   Surgeon,
   SurgeonPreference,
   TaskPhoto,
+  NotePhoto,
+  PagePhoto,
   TaskStage,
   TaskStatus,
   TerritoryNote,
@@ -132,7 +137,16 @@ export interface NewCaseInput {
 export async function createCase(input: NewCaseInput): Promise<CaseRow> {
   const { data, error } = await supabase.from("cases").insert(input).select().single();
   if (error) throw error;
-  return data as CaseRow;
+  const row = data as CaseRow;
+  logEvent({
+    entity_type: "case",
+    entity_id: row.id,
+    verb: "created",
+    actor_id: input.created_by,
+    payload: { surgery_type: row.surgery_type, surgery_date: row.surgery_date, facility_id: row.facility_id },
+    territory_id: input.territory_id,
+  }).catch(() => {});
+  return row;
 }
 
 export interface BulkCaseInput extends NewCaseInput {}
@@ -634,6 +648,15 @@ export async function logCaseUsage(params: {
     .update({ status: "completed" })
     .eq("id", caseRow.id);
   if (caseError) throw caseError;
+
+  logEvent({
+    entity_type: "case",
+    entity_id: caseRow.id,
+    verb: "completed",
+    actor_id: movedBy,
+    payload: { itemsUsed: usedItems.length },
+    territory_id: territoryId,
+  }).catch(() => {});
 }
 
 /**
@@ -737,8 +760,10 @@ export async function consumeStickerUsage(params: {
   caseId: string | null;
   movedBy: string;
   territoryId: string;
+  /** What to call the source in the movement note — defaults to "sticker sheet". */
+  source?: string;
 }): Promise<void> {
-  const { allocations, caseId, movedBy, territoryId } = params;
+  const { allocations, caseId, movedBy, territoryId, source = "sticker sheet" } = params;
   for (const a of allocations) {
     if (a.quantity <= 0) continue;
     const { error: updateError } = await supabase
@@ -754,9 +779,20 @@ export async function consumeStickerUsage(params: {
       to_location: a.item.location_id,
       moved_by: movedBy,
       related_case_id: caseId,
-      note: `Used ${a.quantity} in case (sticker sheet)`,
+      note: `Used ${a.quantity} in case (${source})`,
     });
     if (moveError) throw moveError;
+  }
+
+  if (caseId) {
+    logEvent({
+      entity_type: "case",
+      entity_id: caseId,
+      verb: "items_consumed",
+      actor_id: movedBy,
+      payload: { source, lineCount: allocations.length },
+      territory_id: territoryId,
+    }).catch(() => {});
   }
 }
 
@@ -1100,9 +1136,23 @@ export type CasePatch = Partial<
   >
 >;
 
-export async function updateCase(id: string, patch: CasePatch): Promise<void> {
+export async function updateCase(
+  id: string,
+  patch: CasePatch,
+  actor?: { id: string; territoryId: string },
+): Promise<void> {
   const { error } = await supabase.from("cases").update(patch).eq("id", id);
   if (error) throw error;
+  if (patch.status && actor) {
+    logEvent({
+      entity_type: "case",
+      entity_id: id,
+      verb: "status_changed",
+      actor_id: actor.id,
+      payload: { status: patch.status },
+      territory_id: actor.territoryId,
+    }).catch(() => {});
+  }
 }
 
 export async function deleteCase(id: string): Promise<void> {
@@ -1481,7 +1531,16 @@ export async function createTask(input: {
 }): Promise<PersonalTask> {
   const { data, error } = await supabase.from("tasks").insert(input).select().single();
   if (error) throw error;
-  return data as PersonalTask;
+  const row = data as PersonalTask;
+  logEvent({
+    entity_type: "task",
+    entity_id: row.id,
+    verb: "created",
+    actor_id: input.owner_id,
+    payload: { title: row.title },
+    territory_id: input.territory_id,
+  }).catch(() => {});
+  return row;
 }
 
 export async function updateTask(
@@ -1489,9 +1548,19 @@ export async function updateTask(
   patch: Partial<
     Pick<PersonalTask, "title" | "notes" | "due_date" | "status" | "shared_with" | "assigned_to" | "done_at">
   >,
+  actor?: { id: string; territoryId: string },
 ): Promise<void> {
   const { error } = await supabase.from("tasks").update(patch).eq("id", id);
   if (error) throw error;
+  if (patch.status === "done" && actor) {
+    logEvent({
+      entity_type: "task",
+      entity_id: id,
+      verb: "completed",
+      actor_id: actor.id,
+      territory_id: actor.territoryId,
+    }).catch(() => {});
+  }
 }
 
 /** Tasks spawned from a specific territory note (entity_type="note"). */
@@ -1756,6 +1825,17 @@ export async function createNoteTag(input: {
   return data as TerritoryNoteTag;
 }
 
+export async function renameNoteTag(tagId: string, name: string): Promise<void> {
+  const { error } = await supabase.from("territory_note_tags").update({ name }).eq("id", tagId);
+  if (error) throw error;
+}
+
+/** Assignments cascade off the tag row, so this alone unfiles it from every note. */
+export async function deleteNoteTag(tagId: string): Promise<void> {
+  const { error } = await supabase.from("territory_note_tags").delete().eq("id", tagId);
+  if (error) throw error;
+}
+
 export async function assignNoteTag(noteId: string, tagId: string): Promise<void> {
   const { error } = await supabase.from("territory_note_tag_assignments").insert({ note_id: noteId, tag_id: tagId });
   if (error) throw error;
@@ -1767,6 +1847,216 @@ export async function unassignNoteTag(noteId: string, tagId: string): Promise<vo
     .delete()
     .eq("note_id", noteId)
     .eq("tag_id", tagId);
+  if (error) throw error;
+}
+
+/** A note's own tags — getNote doesn't carry them (only the aggregated feed view does). */
+export async function listTagsForNote(noteId: string): Promise<TerritoryNoteTag[]> {
+  const { data, error } = await supabase
+    .from("territory_note_tag_assignments")
+    .select("territory_note_tags(*)")
+    .eq("note_id", noteId);
+  if (error) throw error;
+  return (data ?? []).map((r) => (r as unknown as { territory_note_tags: TerritoryNoteTag }).territory_note_tags);
+}
+
+// ---- Entity graph: universal tags, links, events ---------------------------
+//
+// Works on any (entity_type, entity_id), not just notes. Tags reuse the same
+// territory_note_tags pool notes already draw from, so a tag created on a
+// note and a tag applied to a case are the same tag, filterable together.
+
+export async function listEntityTags(
+  entityType: GraphEntityType,
+  entityId: string,
+): Promise<TerritoryNoteTag[]> {
+  const { data, error } = await supabase
+    .from("entity_tag_assignments")
+    .select("territory_note_tags(*)")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId);
+  if (error) throw error;
+  return (data ?? []).map((r) => (r as unknown as { territory_note_tags: TerritoryNoteTag }).territory_note_tags);
+}
+
+export async function tagEntity(input: {
+  entity_type: GraphEntityType;
+  entity_id: string;
+  tag_id: string;
+  territory_id: string;
+  created_by: string;
+}): Promise<void> {
+  const { error } = await supabase.from("entity_tag_assignments").insert(input);
+  if (error) throw error;
+}
+
+export async function untagEntity(
+  entityType: GraphEntityType,
+  entityId: string,
+  tagId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("entity_tag_assignments")
+    .delete()
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .eq("tag_id", tagId);
+  if (error) throw error;
+}
+
+export async function linkEntities(input: {
+  from_type: GraphEntityType;
+  from_id: string;
+  to_type: GraphEntityType;
+  to_id: string;
+  relation?: string;
+  territory_id: string;
+  created_by: string;
+}): Promise<EntityLink> {
+  const { data, error } = await supabase.from("entity_links").insert(input).select().single();
+  if (error) throw error;
+  return data as EntityLink;
+}
+
+/** Every link touching this record, in either direction. */
+export async function listEntityLinks(
+  entityType: GraphEntityType,
+  entityId: string,
+): Promise<EntityLink[]> {
+  const { data, error } = await supabase
+    .from("entity_links")
+    .select("*")
+    .or(
+      `and(from_type.eq.${entityType},from_id.eq.${entityId}),and(to_type.eq.${entityType},to_id.eq.${entityId})`,
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as EntityLink[];
+}
+
+export async function unlinkEntities(linkId: string): Promise<void> {
+  const { error } = await supabase.from("entity_links").delete().eq("id", linkId);
+  if (error) throw error;
+}
+
+/**
+ * Records one line in the append-only event log. Never throws into the
+ * caller's own success path — logging a case as created should not be able
+ * to fail the case creation itself, so every call site fires this and moves
+ * on rather than awaiting it into a try/catch that could roll anything back.
+ */
+export async function logEvent(input: {
+  entity_type: GraphEntityType;
+  entity_id: string;
+  verb: string;
+  actor_id?: string | null;
+  payload?: Record<string, unknown>;
+  territory_id: string;
+}): Promise<void> {
+  const { error } = await supabase.from("entity_events").insert({
+    entity_type: input.entity_type,
+    entity_id: input.entity_id,
+    verb: input.verb,
+    actor_id: input.actor_id ?? null,
+    payload: input.payload ?? {},
+    territory_id: input.territory_id,
+  });
+  if (error) throw error;
+}
+
+export async function listEntityEvents(
+  entityType: GraphEntityType,
+  entityId: string,
+  limit = 25,
+): Promise<EntityEvent[]> {
+  const { data, error } = await supabase
+    .from("entity_events")
+    .select("*")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("occurred_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as EntityEvent[];
+}
+
+// ---- Note photos --------------------------------------------------------
+
+export async function listNotePhotos(noteId: string): Promise<NotePhoto[]> {
+  const { data, error } = await supabase
+    .from("note_photos")
+    .select("*")
+    .eq("note_id", noteId)
+    .order("created_at");
+  if (error) throw error;
+  return data as NotePhoto[];
+}
+
+export async function addNotePhoto(input: {
+  file: File;
+  territory_id: string;
+  note_id: string;
+  caption?: string | null;
+  uploaded_by?: string | null;
+}): Promise<NotePhoto> {
+  const url = await uploadItemPhoto(input.file, input.territory_id);
+  const { data, error } = await supabase
+    .from("note_photos")
+    .insert({
+      territory_id: input.territory_id,
+      note_id: input.note_id,
+      url,
+      caption: input.caption ?? null,
+      uploaded_by: input.uploaded_by ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as NotePhoto;
+}
+
+export async function deleteNotePhoto(id: string): Promise<void> {
+  const { error } = await supabase.from("note_photos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---- Page photos ---------------------------------------------------------
+
+export async function listPagePhotos(pageId: string): Promise<PagePhoto[]> {
+  const { data, error } = await supabase
+    .from("page_photos")
+    .select("*")
+    .eq("page_id", pageId)
+    .order("created_at");
+  if (error) throw error;
+  return data as PagePhoto[];
+}
+
+export async function addPagePhoto(input: {
+  file: File;
+  territory_id: string;
+  page_id: string;
+  caption?: string | null;
+  uploaded_by?: string | null;
+}): Promise<PagePhoto> {
+  const url = await uploadItemPhoto(input.file, input.territory_id);
+  const { data, error } = await supabase
+    .from("page_photos")
+    .insert({
+      territory_id: input.territory_id,
+      page_id: input.page_id,
+      url,
+      caption: input.caption ?? null,
+      uploaded_by: input.uploaded_by ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PagePhoto;
+}
+
+export async function deletePagePhoto(id: string): Promise<void> {
+  const { error } = await supabase.from("page_photos").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -2001,6 +2291,20 @@ export async function createCalendarBlock(
   return data as CalendarBlock;
 }
 
+export async function updateCalendarBlock(
+  id: string,
+  patch: Partial<Pick<CalendarBlock, "label" | "kind" | "start_time" | "end_time" | "facility_id">>,
+): Promise<CalendarBlock> {
+  const { data, error } = await supabase
+    .from("calendar_blocks")
+    .update(patch)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as CalendarBlock;
+}
+
 export async function deleteCalendarBlock(id: string): Promise<void> {
   const { error } = await supabase.from("calendar_blocks").delete().eq("id", id);
   if (error) throw error;
@@ -2191,10 +2495,12 @@ export async function receiveInventoryShipment(params: {
 export async function listAssetPhotos(params: {
   inventoryItemId?: string;
   trackedAssetId?: string;
+  toteTemplateId?: string;
 }): Promise<AssetPhoto[]> {
   let q = supabase.from("asset_photos").select("*");
   if (params.inventoryItemId) q = q.eq("inventory_item_id", params.inventoryItemId);
   else if (params.trackedAssetId) q = q.eq("tracked_asset_id", params.trackedAssetId);
+  else if (params.toteTemplateId) q = q.eq("tote_template_id", params.toteTemplateId);
   else return [];
   // Label sorts before layer alphabetically, which is also the order you want.
   const { data, error } = await q.order("kind").order("layer_index", { nullsFirst: true });
@@ -2208,6 +2514,7 @@ export async function addAssetPhoto(params: {
   territoryId: string;
   inventoryItemId?: string;
   trackedAssetId?: string;
+  toteTemplateId?: string;
   kind: AssetPhotoKind;
   layerIndex?: number | null;
   caption?: string | null;
@@ -2221,6 +2528,7 @@ export async function addAssetPhoto(params: {
       territory_id: params.territoryId,
       inventory_item_id: params.inventoryItemId ?? null,
       tracked_asset_id: params.trackedAssetId ?? null,
+      tote_template_id: params.toteTemplateId ?? null,
       kind: params.kind,
       layer_index: params.kind === "layer" ? (params.layerIndex ?? 1) : null,
       caption: params.caption ?? null,

@@ -22,6 +22,8 @@ import {
   ListChecks,
   FileText,
   Plug,
+  BarChart3,
+  Bot,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +37,8 @@ const PRIMARY: { to: string; label: string; icon: LucideIcon; end?: boolean }[] 
 ];
 
 const MORE: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: "/assistant", label: "Assistant", icon: Bot },
+  { to: "/trends", label: "Trends", icon: BarChart3 },
   { to: "/daily", label: "Daily report", icon: FileText },
   { to: "/runsheet", label: "Run sheet", icon: ListChecks },
   { to: "/staging", label: "Staging", icon: Truck },

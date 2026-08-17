@@ -582,6 +582,66 @@ export interface TerritoryNoteFeedItem extends TerritoryNote {
   tags: Array<{ id: string; name: string; color: string | null }>;
 }
 
+// ---- Entity graph: universal tags, links, events ---------------------------
+//
+// The same (entity_type, entity_id) identity entity_notes/tasks already use,
+// widened to cover record kinds that don't have a dedicated table yet.
+// person/place/asset/document/photo are placeholders for future phases (and
+// future industries) — nothing writes them today, but tags/links/events on
+// them will work the moment something does.
+
+export type GraphEntityType =
+  | "case"
+  | "inventory_item"
+  | "surgeon"
+  | "facility"
+  | "catalog_item"
+  | "tote_template"
+  | "case_template"
+  | "movement"
+  | "calendar_block"
+  | "task"
+  | "note"
+  | "territory"
+  | "person"
+  | "place"
+  | "asset"
+  | "document"
+  | "photo";
+
+export interface EntityTagAssignment {
+  id: string;
+  territory_id: string;
+  tag_id: string;
+  entity_type: GraphEntityType;
+  entity_id: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface EntityLink {
+  id: string;
+  territory_id: string;
+  from_type: GraphEntityType;
+  from_id: string;
+  to_type: GraphEntityType;
+  to_id: string;
+  relation: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface EntityEvent {
+  id: string;
+  territory_id: string;
+  entity_type: GraphEntityType;
+  entity_id: string;
+  verb: string;
+  actor_id: string | null;
+  payload: Record<string, unknown>;
+  occurred_at: string;
+}
+
 export interface WikiPage {
   id: string;
   territory_id: string;
@@ -659,6 +719,28 @@ export interface TaskPhoto {
   created_at: string;
 }
 
+/** A photo attached to a territory note — a tray, a label, a shelf, whatever the note is about. */
+export interface NotePhoto {
+  id: string;
+  territory_id: string;
+  note_id: string;
+  url: string;
+  caption: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
+/** A photo attached to a Knowledge page. */
+export interface PagePhoto {
+  id: string;
+  territory_id: string;
+  page_id: string;
+  url: string;
+  caption: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
 /**
  * What a photo of a tray is showing.
  *
@@ -677,6 +759,8 @@ export interface AssetPhoto {
   territory_id: string;
   inventory_item_id: string | null;
   tracked_asset_id: string | null;
+  /** A Set/Tote template's own reference photo — "what a correct one looks like", not tied to one physical unit. */
+  tote_template_id: string | null;
   kind: AssetPhotoKind;
   /** 1-based, top layer first. Null for a label photo. */
   layer_index: number | null;

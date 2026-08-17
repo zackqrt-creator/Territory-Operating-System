@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   listCasesInRange,
   listCaseTemplatesWithItems,
@@ -104,6 +104,17 @@ export default function StagingReport() {
     [date, cases, templates, inventory, facilities, dayReqs, dayMarks],
   );
 
+  // Already have a 13-day window loaded for loaner-deadline lookback/lookahead
+  // — reuse it so an empty day still points at whenever the next one is,
+  // instead of just reporting nothing scheduled and stopping there.
+  const nextDays = useMemo(() => {
+    const byDate = new Map<string, number>();
+    for (const c of cases) {
+      if (c.surgery_date > date) byDate.set(c.surgery_date, (byDate.get(c.surgery_date) ?? 0) + 1);
+    }
+    return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(0, 5);
+  }, [cases, date]);
+
   async function toggleDayMark(key: string, currentlyMarked: boolean) {
     if (!profile) return;
     setBusyKey(key);
@@ -176,7 +187,31 @@ export default function StagingReport() {
               Haul list {report.cases.length > 0 && `· ${report.cases.length} case${report.cases.length === 1 ? "" : "s"}`}
             </h2>
             {report.cases.length === 0 ? (
-              <p className="text-sm text-slate-500">No cases scheduled this day.</p>
+              <div>
+                <p className="text-sm text-slate-500">No cases scheduled this day.</p>
+                {nextDays.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {nextDays.map(([d, count]) => (
+                      <button
+                        key={d}
+                        onClick={() => setDate(d)}
+                        className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2.5 text-left active:bg-slate-800"
+                      >
+                        <span className="text-sm font-medium text-slate-200">{formatDateShort(d)}</span>
+                        <span className="text-xs text-slate-500">
+                          {count} case{count === 1 ? "" : "s"} →
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <Link
+                  to="/cases/new"
+                  className="mt-2 inline-block rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white"
+                >
+                  + Add a case
+                </Link>
+              </div>
             ) : report.routes.length === 0 ? (
               <p className="rounded-lg border border-emerald-800 bg-emerald-950/30 p-3 text-sm text-emerald-300">
                 Everything needed is already at the right facility. ✅

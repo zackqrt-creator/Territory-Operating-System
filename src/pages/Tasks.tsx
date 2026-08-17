@@ -4,6 +4,8 @@ import { createTask, deleteTask, listMyTasks, listProfiles, updateTask } from ".
 import type { PersonalTask, Profile, TaskStatus } from "../lib/types";
 import TaskPhotos from "../components/TaskPhotos";
 import { daysUntil, formatDateShort, tomorrow } from "../utils/dates";
+import { appendChecklistItem, toggleChecklistLine } from "../lib/wikilinks";
+import ChecklistBody from "../components/ChecklistBody";
 
 const COLUMNS: { value: TaskStatus; label: string }[] = [
   { value: "todo", label: "To do" },
@@ -125,9 +127,15 @@ export default function Tasks() {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
-            placeholder="Notes (optional)..."
+            placeholder={'Notes (optional)... type "- [ ] " for a checkbox'}
             className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
+          <button
+            onClick={() => setNotes((prev) => appendChecklistItem(prev))}
+            className="mt-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300"
+          >
+            + ☑ Checkbox
+          </button>
           <div className="mt-2 flex items-center gap-2">
             <label className="text-xs text-slate-400">Due</label>
             <input
@@ -326,10 +334,11 @@ function TaskCard({
   async function move(next: TaskStatus) {
     setBusy(true);
     try {
-      await updateTask(task.id, {
-        status: next,
-        done_at: next === "done" ? new Date().toISOString() : null,
-      });
+      await updateTask(
+        task.id,
+        { status: next, done_at: next === "done" ? new Date().toISOString() : null },
+        { id: meId, territoryId },
+      );
       onChanged();
     } finally {
       setBusy(false);
@@ -359,6 +368,17 @@ function TaskCard({
     try {
       await updateTask(task.id, { title: eTitle.trim() || task.title, notes: eNotes.trim() || null });
       setEditing(false);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onToggleChecklist(lineIndex: number) {
+    if (!task.notes) return;
+    setBusy(true);
+    try {
+      await updateTask(task.id, { notes: toggleChecklistLine(task.notes, lineIndex) });
       onChanged();
     } finally {
       setBusy(false);
@@ -399,6 +419,12 @@ function TaskCard({
             placeholder="Notes..."
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
           />
+          <button
+            onClick={() => setENotes((prev) => appendChecklistItem(prev))}
+            className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300"
+          >
+            + ☑ Checkbox
+          </button>
           <div className="flex gap-2">
             <button onClick={() => setEditing(false)} className="flex-1 rounded-lg bg-slate-800 py-2 text-sm text-slate-100">
               Cancel
@@ -413,7 +439,9 @@ function TaskCard({
           <p className={`text-sm font-medium ${task.status === "done" ? "text-slate-400 line-through" : "text-slate-100"}`}>
             {task.title}
           </p>
-          {task.notes && <p className="mt-0.5 text-sm text-slate-400">{task.notes}</p>}
+          {task.notes && (
+            <ChecklistBody body={task.notes} onToggle={onToggleChecklist} className="mt-0.5 text-sm text-slate-400" />
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
             {task.status === "done" && task.done_at ? (
               <span className="font-medium text-emerald-400">

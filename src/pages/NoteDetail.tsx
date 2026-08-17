@@ -1,20 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Lock, Users, Pin } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
+  addNotePhoto,
+  assignNoteTag,
+  createNoteTag,
   deleteNote,
+  deleteNotePhoto,
   getNote,
   linkNoteToEntity,
   listCatalogItems,
   listCaseTemplatesWithItems,
   listFacilities,
+  listNotePhotos,
+  listNoteTags,
   listSurgeons,
+  listTagsForNote,
   listToteTemplatesWithItems,
   listNoteLinks,
   listTasksForNote,
   listUpcomingCases,
   spawnTaskFromNote,
+  unassignNoteTag,
   unlinkNote,
   updateNote,
   updateTask,
@@ -24,16 +32,34 @@ import type {
   CaseTemplateWithItems,
   CatalogItem,
   Facility,
+  NotePhoto,
   PersonalTask,
   Surgeon,
   TerritoryNote,
   TerritoryNoteEntityType,
   TerritoryNoteLink,
+  TerritoryNoteTag,
   TerritoryNoteVisibility,
   ToteTemplateWithItems,
 } from "../lib/types";
 import { formatDateShort, formatRelativeDay } from "../utils/dates";
 import { NOTE_KINDS } from "../lib/noteKinds";
+import { appendChecklistItem, toggleChecklistLine } from "../lib/wikilinks";
+import ChecklistBody from "../components/ChecklistBody";
+import FormatToolbar from "../components/FormatToolbar";
+
+/** Image files out of a drop or paste event — used by both drag-and-drop and clipboard-paste. */
+function imageFilesFrom(items: DataTransferItemList | null): File[] {
+  if (!items) return [];
+  const files: File[] = [];
+  for (const item of items) {
+    if (item.kind === "file" && item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) files.push(file);
+    }
+  }
+  return files;
+}
 
 /*
  * This screen used to keep its own hardcoded list of note types, which had
@@ -66,6 +92,12 @@ export default function NoteDetail() {
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const dirtyRef = useRef(false);
+  const titleRef = useRef(title);
+  const bodyRef = useRef(body);
+  titleRef.current = title;
+  bodyRef.current = body;
 
   const [entityType, setEntityType] = useState<TerritoryNoteEntityType>("case");
   const [entityId, setEntityId] = useState("");
@@ -79,17 +111,34 @@ export default function NoteDetail() {
 
   const [taskTitle, setTaskTitle] = useState("");
 
+  const [photos, setPhotos] = useState<NotePhoto[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const [myTags, setMyTags] = useState<TerritoryNoteTag[]>([]);
+  const [allTags, setAllTags] = useState<TerritoryNoteTag[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+
   function refresh() {
     if (!id) return Promise.resolve();
-    return Promise.all([getNote(id), listNoteLinks(id), listTasksForNote(id)]).then(
-      ([n, l, t]) => {
-        setNote(n);
-        setTitle(n?.title ?? "");
-        setBody(n?.body ?? "");
-        setLinks(l);
-        setTasks(t);
-      },
-    );
+    return Promise.all([
+      getNote(id),
+      listNoteLinks(id),
+      listTasksForNote(id),
+      listNotePhotos(id),
+      listTagsForNote(id),
+    ]).then(([n, l, t, ph, tg]) => {
+      setNote(n);
+      setTitle(n?.title ?? "");
+      setBody(n?.body ?? "");
+      setLinks(l);
+      setTasks(t);
+      setPhotos(ph);
+      setMyTags(tg);
+    });
   }
 
   useEffect(() => {
@@ -98,14 +147,119 @@ export default function NoteDetail() {
   }, [id]);
 
   async function saveText() {
-    if (!id) return;
-    await updateNote(id, { title: title.trim() || "Untitled note", body });
+    if (!id || !dirtyRef.current) return;
+    setSaveStatus("saving");
+    dirtyRef.current = false;
+    await updateNote(id, { title: titleRef.current.trim() || "Untitled note", body: bodyRef.current });
+    setSaveStatus("saved");
   }
+
+  /** The explicit Save button — always writes, even if the debounce already caught it, so tapping it is never a silent no-op. */
+  async function saveNow() {
+    if (!id) return;
+    setSaveStatus("saving");
+    dirtyRef.current = false;
+    await updateNote(id, { title: titleRef.current.trim() || "Untitled note", body: bodyRef.current });
+    setSaveStatus("saved");
+  }
+
+  function onEditTitle(next: string) {
+    setTitle(next);
+    dirtyRef.current = true;
+    setSaveStatus("idle");
+  }
+
+  function onEditBody(next: string) {
+    setBody(next);
+    dirtyRef.current = true;
+    setSaveStatus("idle");
+  }
+
+  // Autosave shortly after typing stops — a rep swiping back or switching apps
+  // mid-edit shouldn't have to guess whether the blur handler caught it.
+  useEffect(() => {
+    if (!dirtyRef.current) return;
+    const timer = setTimeout(saveText, 1200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, body]);
+
+  // Safety net: flush any unsaved edit if the rep navigates away before the
+  // debounce timer or a blur fires.
+  useEffect(() => {
+    return () => {
+      if (dirtyRef.current && id) {
+        updateNote(id, { title: titleRef.current.trim() || "Untitled note", body: bodyRef.current });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   async function patch(fields: Partial<Pick<TerritoryNote, "note_type" | "visibility" | "pinned" | "archived">>) {
     if (!id) return;
     await updateNote(id, fields);
     refresh();
+  }
+
+  /** Toggles a checkbox line straight from the rendered preview — saves immediately, no need to hand-edit the raw text. */
+  async function onToggleChecklist(lineIndex: number) {
+    if (!id) return;
+    const nextBody = toggleChecklistLine(body, lineIndex);
+    setBody(nextBody);
+    await updateNote(id, { body: nextBody });
+  }
+
+  function onInsertChecklistItem() {
+    onEditBody(appendChecklistItem(body));
+  }
+
+  async function onPickPhotos(files: File[]) {
+    if (files.length === 0 || !id || !profile) return;
+    setUploadingPhoto(true);
+    try {
+      for (const file of files) {
+        await addNotePhoto({ file, territory_id: profile.territory_id, note_id: id, uploaded_by: profile.id });
+      }
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function onDeletePhoto(photoId: string) {
+    await deleteNotePhoto(photoId);
+    await refresh();
+  }
+
+  function openTagPicker() {
+    setShowTagPicker(true);
+    if (profile && allTags.length === 0) listNoteTags(profile.territory_id).then(setAllTags);
+  }
+
+  async function onAssignTag(tagId: string) {
+    if (!id) return;
+    await assignNoteTag(id, tagId);
+    setShowTagPicker(false);
+    await refresh();
+  }
+
+  async function onRemoveTag(tagId: string) {
+    if (!id) return;
+    await unassignNoteTag(id, tagId);
+    await refresh();
+  }
+
+  async function onCreateTag() {
+    if (!id || !profile || !newTagName.trim()) return;
+    const created = await createNoteTag({
+      name: newTagName.trim(),
+      territory_id: profile.territory_id,
+      created_by: profile.id,
+    });
+    setAllTags((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    setNewTagName("");
+    await onAssignTag(created.id);
   }
 
   function openLinkPicker() {
@@ -153,7 +307,12 @@ export default function NoteDetail() {
   }
 
   async function toggleTaskDone(t: PersonalTask) {
-    await updateTask(t.id, { status: t.status === "done" ? "todo" : "done", done_at: t.status === "done" ? null : new Date().toISOString() });
+    const done = t.status === "done";
+    await updateTask(
+      t.id,
+      { status: done ? "todo" : "done", done_at: done ? null : new Date().toISOString() },
+      profile ? { id: profile.id, territoryId: profile.territory_id } : undefined,
+    );
     refresh();
   }
 
@@ -168,26 +327,169 @@ export default function NoteDetail() {
   if (!note) return <div className="min-h-screen px-4 pt-6 text-slate-400">Note not found.</div>;
 
   return (
-    <div className="min-h-screen px-4 pb-28 pt-6">
+    <div className="min-h-screen px-4 pb-40 pt-6">
       <input
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => onEditTitle(e.target.value)}
         onBlur={saveText}
         className="w-full bg-transparent text-2xl font-bold text-slate-100 outline-none"
         placeholder="Untitled note"
       />
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
         Updated {formatRelativeDay(note.updated_at)} · created {formatRelativeDay(note.created_at)}
+        {saveStatus === "saving" && <span className="text-amber-400">· Saving…</span>}
+        {saveStatus === "saved" && <span className="text-emerald-400">· Saved ✓</span>}
       </p>
 
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onBlur={saveText}
-        rows={6}
-        placeholder="Write here..."
-        className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
-      />
+      <div className="mt-3">
+        <FormatToolbar textareaRef={bodyTextareaRef} value={body} onChange={onEditBody} />
+      </div>
+      <div
+        className={`mt-1.5 rounded-lg ${dragOver ? "ring-2 ring-sky-500" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          onPickPhotos(imageFilesFrom(e.dataTransfer.items));
+        }}
+      >
+        <textarea
+          ref={bodyTextareaRef}
+          value={body}
+          onChange={(e) => onEditBody(e.target.value)}
+          onBlur={saveText}
+          onPaste={(e) => {
+            const files = imageFilesFrom(e.clipboardData.items);
+            if (files.length > 0) onPickPhotos(files);
+          }}
+          rows={6}
+          placeholder={'Write here... **bold**, *italic*, ++underline++, ~~strike~~, # heading, "- [ ] " checkbox. Drag or paste a photo in anywhere.'}
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
+        />
+      </div>
+      <button
+        onClick={onInsertChecklistItem}
+        className="mt-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300"
+      >
+        + ☑ Checkbox
+      </button>
+
+      {/* Live checklist preview — tap a box to toggle without hand-editing the raw text above. */}
+      {body.includes("- [") && (
+        <div className="mt-2 rounded-lg border border-slate-700 bg-slate-800/40 px-3 py-2">
+          <ChecklistBody body={body} onToggle={onToggleChecklist} className="text-sm text-slate-200" />
+        </div>
+      )}
+
+      <div className="mt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-100">Photos</h2>
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploadingPhoto} className="text-sm font-medium text-sky-400 disabled:opacity-50">
+            {uploadingPhoto ? "Uploading…" : "+ Photo"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) onPickPhotos(Array.from(e.target.files));
+            }}
+          />
+        </div>
+        {photos.length === 0 && (
+          <p className="mt-1 text-xs text-slate-600">Drag, paste, or tap + Photo to attach one.</p>
+        )}
+        {photos.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {photos.map((p) => (
+              <div key={p.id} className="relative">
+                <a href={p.url} target="_blank" rel="noreferrer">
+                  <img src={p.url} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                </a>
+                <button
+                  onClick={() => onDeletePhoto(p.id)}
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 min-h-0 items-center justify-center rounded-full bg-slate-900 text-xs text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-100">Notebook / tags</h2>
+          {!showTagPicker && (
+            <button onClick={openTagPicker} className="text-sm font-medium text-sky-400">
+              + Notebook
+            </button>
+          )}
+        </div>
+        {myTags.length === 0 && !showTagPicker && (
+          <p className="mt-1 text-sm text-slate-500">Not filed in a notebook yet.</p>
+        )}
+        {myTags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {myTags.map((t) => (
+              <span
+                key={t.id}
+                className="flex items-center gap-1.5 rounded-full bg-sky-950/50 px-3 py-1 text-sm text-sky-300"
+              >
+                {t.name}
+                <button onClick={() => onRemoveTag(t.id)} className="text-sky-500">
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {showTagPicker && (
+          <div className="mt-2 rounded-lg border border-slate-700 bg-slate-800/40 p-3">
+            {allTags.filter((t) => !myTags.some((m) => m.id === t.id)).length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {allTags
+                  .filter((t) => !myTags.some((m) => m.id === t.id))
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => onAssignTag(t.id)}
+                      className="rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300"
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="New notebook name…"
+                className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+              />
+              <button
+                onClick={onCreateTag}
+                disabled={!newTagName.trim()}
+                className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Create
+              </button>
+            </div>
+            <button onClick={() => setShowTagPicker(false)} className="mt-2 text-xs text-slate-500 underline">
+              Close
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {NOTE_KINDS.map((k) => (
@@ -383,6 +685,22 @@ export default function NoteDetail() {
       <button onClick={removeNote} className="mt-8 text-sm text-red-400 underline underline-offset-2">
         Delete note
       </button>
+
+      {/* Fixed above the bottom nav, not just near the body text — this page
+          scrolls long (photos, notebook, links, tasks), and a Save button
+          only reachable by scrolling back up isn't "always there". */}
+      <div
+        className="fixed left-0 right-0 z-30 border-t border-slate-800 bg-slate-950/95 px-4 py-2.5 backdrop-blur-xl"
+        style={{ bottom: "calc(64px + var(--safe-bottom))" }}
+      >
+        <button
+          onClick={saveNow}
+          disabled={saveStatus === "saving"}
+          className="w-full rounded-lg bg-sky-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }

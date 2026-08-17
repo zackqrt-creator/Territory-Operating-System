@@ -21,10 +21,12 @@ import {
 } from "../lib/api";
 import { scoreCase, type CheckStatus } from "../lib/crm";
 import CaseCoverage from "./CaseCoverage";
+import EntityTags from "./EntityTags";
+import EntityTimeline from "./EntityTimeline";
 import MoveItemSheet from "./MoveItemSheet";
 import NotesSection from "./NotesSection";
 import QuickLogSheet from "./QuickLogSheet";
-import { StickerSheetCapture } from "./scanners";
+import { DigitalTicketImport, StickerSheetCapture } from "./scanners";
 import { formatDateShort } from "../utils/dates";
 
 const CHECK_STYLE: Record<CheckStatus, { icon: string; text: string }> = {
@@ -65,6 +67,7 @@ export default function ReadinessSheet({
   const [moving, setMoving] = useState<{ item: InventoryItem; target: Facility } | null>(null);
   const [logging, setLogging] = useState(false);
   const [scanningStickers, setScanningStickers] = useState(false);
+  const [importingTicket, setImportingTicket] = useState(false);
   const [plans, setPlans] = useState<CaseItemPlan[]>([]);
   const [qa, setQa] = useState<{ q: QaQuestion; answers: QaAnswer[] }[]>([]);
   const [marks, setMarks] = useState<CaseChecklistMark[]>([]);
@@ -143,6 +146,8 @@ export default function ReadinessSheet({
         {caseRow.surgeon && <p className="text-sm text-slate-500">{caseRow.surgeon}</p>}
         {caseRow.case_id && <p className="text-xs text-slate-600">Case #{caseRow.case_id}</p>}
 
+        <EntityTags entityType="case" entityId={caseRow.id} />
+
         <div
           className={`mt-3 rounded-xl border p-3 ${
             score.color === "red"
@@ -185,6 +190,8 @@ export default function ReadinessSheet({
 
         <NotesSection entityType="case" entityId={caseRow.id} />
 
+        <EntityTimeline entityType="case" entityId={caseRow.id} />
+
         {caseRow.facility_id && (
           <NotesSection
             entityType="facility"
@@ -226,6 +233,12 @@ export default function ReadinessSheet({
             Log case
           </button>
         )}
+        <button
+          onClick={() => setImportingTicket(true)}
+          className="mt-2 w-full rounded-lg border border-emerald-800 bg-emerald-950/30 px-4 py-3 font-medium text-emerald-300 active:bg-emerald-950/60"
+        >
+          🎫 Import digital ticket
+        </button>
         <button
           onClick={() => setScanningStickers(true)}
           className="mt-2 w-full rounded-lg border border-sky-800 bg-sky-950/30 px-4 py-3 font-medium text-sky-300 active:bg-sky-950/60"
@@ -340,6 +353,16 @@ export default function ReadinessSheet({
           inventory={inventory}
           facilities={facilities}
           onClose={() => setScanningStickers(false)}
+          onDone={onRefresh}
+        />
+      )}
+
+      {importingTicket && (
+        <DigitalTicketImport
+          caseRow={caseRow}
+          inventory={inventory}
+          facilities={facilities}
+          onClose={() => setImportingTicket(false)}
           onDone={onRefresh}
         />
       )}

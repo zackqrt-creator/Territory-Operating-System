@@ -22,6 +22,9 @@ import { orderCasesForDay, dayLoadWarnings, repInitials, caseRepId } from "../li
 import ReadinessSheet from "../components/ReadinessSheet";
 import { addDays, formatDateShort, formatTime, isToday, toISODate } from "../utils/dates";
 
+/** Wide enough that "nothing today" almost never also means "nothing to show at all". */
+const LOOKAHEAD_DAYS = 45;
+
 const SCORE_STYLE: Record<ScoreColor, string> = {
   green: "bg-emerald-500/15 text-emerald-300",
   yellow: "bg-amber-500/15 text-amber-300",
@@ -32,6 +35,7 @@ export default function RunSheet() {
   const [params, setParams] = useSearchParams();
   const date = params.get("date") ?? toISODate(new Date());
   const [cases, setCases] = useState<CaseRow[]>([]);
+  const [upcoming, setUpcoming] = useState<CaseRow[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [templates, setTemplates] = useState<CaseTemplateWithItems[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -44,14 +48,18 @@ export default function RunSheet() {
     setLoading(true);
     return Promise.all([
       listCasesInRange(date, date),
+      // A day with nothing shouldn't be a dead end — pull far enough ahead to
+      // point at whenever the next real case actually is.
+      listCasesInRange(date, addDays(date, LOOKAHEAD_DAYS)),
       listFacilities(),
       listCaseTemplatesWithItems(),
       listInventory(),
       listProfiles(),
       listTimeOff(),
     ])
-      .then(([c, f, t, i, p, to]) => {
+      .then(([c, upc, f, t, i, p, to]) => {
         setCases(c);
+        setUpcoming(upc.filter((x) => x.surgery_date > date));
         setFacilities(f);
         setTemplates(t);
         setInventory(i);
@@ -68,6 +76,14 @@ export default function RunSheet() {
 
   const ordered = useMemo(() => orderCasesForDay(cases), [cases]);
   const warnings = useMemo(() => dayLoadWarnings(cases, facilities), [cases, facilities]);
+
+  // The next few distinct case dates ahead, each with a count — what an empty
+  // day should point you toward instead of just sitting there blank.
+  const nextDays = useMemo(() => {
+    const byDate = new Map<string, number>();
+    for (const c of upcoming) byDate.set(c.surgery_date, (byDate.get(c.surgery_date) ?? 0) + 1);
+    return [...byDate.entries()].slice(0, 5);
+  }, [upcoming]);
 
   const facilityName = (id: string | null) => facilities.find((f) => f.id === id)?.name ?? "—";
   const profileById = (id: string | null) => profiles.find((p) => p.id === id);
@@ -127,7 +143,40 @@ export default function RunSheet() {
       {loading ? (
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : ordered.length === 0 ? (
-        <p className="mt-8 text-slate-400">No cases on this day.</p>
+        <div className="mt-8">
+          <p className="text-slate-400">No cases on this day.</p>
+          {nextDays.length > 0 ? (
+            <>
+              <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">
+                Next scheduled
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {nextDays.map(([d, count]) => (
+                  <button
+                    key={d}
+                    onClick={() => setParams({ date: d })}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2.5 text-left active:bg-slate-800"
+                  >
+                    <span className="text-sm font-medium text-slate-200">{formatDateShort(d)}</span>
+                    <span className="text-xs text-slate-500">
+                      {count} case{count === 1 ? "" : "s"} →
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">
+              Nothing in the next {LOOKAHEAD_DAYS} days either — the calendar's probably behind.
+            </p>
+          )}
+          <Link
+            to="/cases/new"
+            className="mt-4 inline-block rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white"
+          >
+            + Add a case
+          </Link>
+        </div>
       ) : (
         <div className="mt-5 space-y-2">
           {ordered.map((c) => {

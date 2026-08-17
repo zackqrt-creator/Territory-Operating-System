@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Check, Minus, Plus, Search, Trash2, X } from "lucide-react";
 import {
   addToteTemplateItem,
+  createCatalogItem,
   createToteTemplate,
   deleteToteTemplate,
   deleteToteTemplateItem,
@@ -9,6 +10,7 @@ import {
   updateToteTemplateItem,
 } from "../lib/api";
 import NotesSection from "./NotesSection";
+import TrayPhotos from "./TrayPhotos";
 import type { CatalogItem, ToteTemplateWithItems } from "../lib/types";
 
 function itemLabel(c: CatalogItem): string {
@@ -37,16 +39,22 @@ export default function SetEditor({
   set,
   catalog,
   territoryId,
+  uploadedBy,
   onClose,
   onChanged,
+  onCatalogChanged,
 }: {
   /** null = creating a new Set. */
   set: ToteTemplateWithItems | null;
   catalog: CatalogItem[];
   /** Null while the signed-in profile is still loading, or missing. */
   territoryId: string | null;
+  /** Signed-in profile id — tags who uploaded a reference photo. */
+  uploadedBy?: string | null;
   onClose: () => void;
   onChanged: () => void;
+  /** Called after creating a catalog item inline, so the caller's catalog list stays current. */
+  onCatalogChanged?: (item: CatalogItem) => void;
 }) {
   const [name, setName] = useState(set?.name ?? "");
   const [code, setCode] = useState(set?.code ?? "");
@@ -129,6 +137,28 @@ export default function SetEditor({
       setLines((prev) => [...prev, { ...row, catalog_item: c }]);
       setSearch("");
       onChanged();
+    });
+  }
+
+  /**
+   * Nothing in the catalog matched, so create it on the spot and add it in
+   * the same tap — instead of a dead end pointing at a separate tab. Category
+   * defaults to whatever this tray already is (a reasonable guess, since the
+   * new item is going straight into it); joint/side/size are left unset for
+   * the Catalog tab to fill in later, same as any quick-add.
+   */
+  async function addNewToCatalog() {
+    const trimmed = search.trim();
+    if (!trimmed || !territoryId) return;
+    await guard(async () => {
+      const created = await createCatalogItem({
+        name: trimmed,
+        category: reusable ? "instrument_tray" : "implant",
+        joint: "NA",
+        territory_id: territoryId,
+      });
+      onCatalogChanged?.(created);
+      await addItem(created);
     });
   }
 
@@ -287,9 +317,16 @@ export default function SetEditor({
               {search.trim() && (
                 <div className="mt-1.5 max-h-56 space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/60 p-1">
                   {results.length === 0 ? (
-                    <p className="px-2 py-2 text-xs text-slate-500">
-                      Nothing in the catalog matches — add it under the Catalog tab first.
-                    </p>
+                    <button
+                      onClick={addNewToCatalog}
+                      disabled={busy}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left active:bg-slate-800 disabled:opacity-50"
+                    >
+                      <Plus size={13} className="shrink-0 text-emerald-400" />
+                      <span className="text-sm text-slate-200">
+                        Nothing matches — create "{search.trim()}" in the catalog and add it here
+                      </span>
+                    </button>
                   ) : (
                     results.map((c) => (
                       <button
@@ -377,6 +414,21 @@ export default function SetEditor({
                     </div>
                   ))}
               </div>
+            )}
+
+            {/*
+              Reference photos for the Set itself — what a correct one looks
+              like — separate from TrayPhotos on a physical unit, which is
+              about restoring that one specific tray's own layout.
+            */}
+            {territoryId && (
+              <TrayPhotos
+                toteTemplateId={setId}
+                territoryId={territoryId}
+                uploadedBy={uploadedBy}
+                title="What a complete tote looks like"
+                hint="Reference photos so anyone building or checking one knows what right looks like."
+              />
             )}
 
             {/*
