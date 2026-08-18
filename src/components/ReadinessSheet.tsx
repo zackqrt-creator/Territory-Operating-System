@@ -73,6 +73,7 @@ export default function ReadinessSheet({
   const [qa, setQa] = useState<{ q: QaQuestion; answers: QaAnswer[] }[]>([]);
   const [marks, setMarks] = useState<CaseChecklistMark[]>([]);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const { profile } = useAuth();
 
   // Silent on failure: without migration 050 there are simply no marks, which
@@ -147,17 +148,11 @@ export default function ReadinessSheet({
         {caseRow.surgeon && <p className="text-sm text-slate-500">{caseRow.surgeon}</p>}
         {caseRow.case_id && <p className="text-xs text-slate-600">Case #{caseRow.case_id}</p>}
 
-        <EntityTags entityType="case" entityId={caseRow.id} />
-
-        <EntityLinkPicker
-          entityType="case"
-          entityId={caseRow.id}
-          candidates={{
-            facility: facilities.map((f) => ({ id: f.id, label: f.name })),
-            case_template: templates.map((t) => ({ id: t.id, label: t.name })),
-          }}
-        />
-
+        {/*
+          Verdict first: this is the answer the sheet exists to give, so it
+          leads -- immediately under who/what/when, before anything else
+          competes for the top of the scroll.
+        */}
         <div
           className={`mt-3 rounded-xl border p-3 ${
             score.color === "red"
@@ -179,82 +174,6 @@ export default function ReadinessSheet({
             ))}
           </div>
         </div>
-
-        {plans.length > 0 && (
-          <div className="mt-3 rounded-xl border border-slate-700 bg-slate-800/40 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Planned items (preference card)
-            </p>
-            <div className="mt-1.5 space-y-1">
-              {plans.map((p) => (
-                <p key={p.id} className="text-sm text-slate-300">
-                  {p.name} ×{p.quantity}
-                  {p.source === "manual" && <span className="text-slate-500"> · added by rep</span>}
-                </p>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <CaseCoverage caseId={caseRow.id} territoryId={caseRow.territory_id ?? null} />
-
-        <NotesSection entityType="case" entityId={caseRow.id} />
-
-        <EntityTimeline entityType="case" entityId={caseRow.id} />
-
-        {caseRow.facility_id && (
-          <NotesSection
-            entityType="facility"
-            entityId={caseRow.facility_id}
-            title={`${caseFacility?.name ?? "Facility"} playbook`}
-            placeholder="Dock hours, parking, door codes, who to find in SPD…"
-          />
-        )}
-
-        {qa.length > 0 && (
-          <div className="mt-3 rounded-xl border border-sky-900 bg-sky-950/20 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-sky-300">
-              Team Q&A for this case
-            </p>
-            <div className="mt-1.5 space-y-2">
-              {qa.slice(0, 3).map(({ q, answers }) => (
-                <div key={q.id}>
-                  <p className="text-sm font-medium text-slate-200">Q: {q.body}</p>
-                  {answers.length > 0 && (
-                    <p className="text-sm text-slate-400">
-                      A: {(answers.find((a) => a.accepted) ?? answers[0]).body}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {caseRow.status === "completed" ? (
-          <span className="mt-3 inline-block rounded bg-emerald-900 px-2 py-1 text-xs font-medium text-emerald-300">
-            ✓ Logged complete
-          </span>
-        ) : (
-          <button
-            onClick={() => setLogging(true)}
-            className="mt-3 w-full rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white active:bg-emerald-800"
-          >
-            Log case
-          </button>
-        )}
-        <button
-          onClick={() => setImportingTicket(true)}
-          className="mt-2 w-full rounded-lg border border-emerald-800 bg-emerald-950/30 px-4 py-3 font-medium text-emerald-300 active:bg-emerald-950/60"
-        >
-          🎫 Import digital ticket
-        </button>
-        <button
-          onClick={() => setScanningStickers(true)}
-          className="mt-2 w-full rounded-lg border border-sky-800 bg-sky-950/30 px-4 py-3 font-medium text-sky-300 active:bg-sky-950/60"
-        >
-          📸 Scan sticker sheet
-        </button>
 
         <div className="mt-5">
           {!readiness.applicable ? (
@@ -337,6 +256,117 @@ export default function ReadinessSheet({
             </>
           )}
         </div>
+
+        {/*
+          One clear primary action right where the checklist just told you
+          what's missing. The two capture paths are real but secondary --
+          equal-weight buttons here used to make "Log case" compete with two
+          things a rep reaches for far less often.
+        */}
+        {caseRow.status === "completed" ? (
+          <span className="mt-5 inline-block rounded bg-emerald-900 px-2 py-1 text-xs font-medium text-emerald-300">
+            ✓ Logged complete
+          </span>
+        ) : (
+          <button
+            onClick={() => setLogging(true)}
+            className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white active:bg-emerald-800"
+          >
+            Log case
+          </button>
+        )}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setImportingTicket(true)}
+            className="rounded-lg border border-emerald-800 bg-emerald-950/30 px-3 py-2.5 text-sm font-medium text-emerald-300 active:bg-emerald-950/60"
+          >
+            🎫 Digital ticket
+          </button>
+          <button
+            onClick={() => setScanningStickers(true)}
+            className="rounded-lg border border-sky-800 bg-sky-950/30 px-3 py-2.5 text-sm font-medium text-sky-300 active:bg-sky-950/60"
+          >
+            📸 Sticker sheet
+          </button>
+        </div>
+
+        {plans.length > 0 && (
+          <div className="mt-5 rounded-xl border border-slate-700 bg-slate-800/40 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Planned items (preference card)
+            </p>
+            <div className="mt-1.5 space-y-1">
+              {plans.map((p) => (
+                <p key={p.id} className="text-sm text-slate-300">
+                  {p.name} ×{p.quantity}
+                  {p.source === "manual" && <span className="text-slate-500"> · added by rep</span>}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <CaseCoverage caseId={caseRow.id} territoryId={caseRow.territory_id ?? null} />
+
+        <NotesSection entityType="case" entityId={caseRow.id} />
+
+        {caseRow.facility_id && (
+          <NotesSection
+            entityType="facility"
+            entityId={caseRow.facility_id}
+            title={`${caseFacility?.name ?? "Facility"} playbook`}
+            placeholder="Dock hours, parking, door codes, who to find in SPD…"
+          />
+        )}
+
+        {qa.length > 0 && (
+          <div className="mt-3 rounded-xl border border-sky-900 bg-sky-950/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-sky-300">
+              Team Q&A for this case
+            </p>
+            <div className="mt-1.5 space-y-2">
+              {qa.slice(0, 3).map(({ q, answers }) => (
+                <div key={q.id}>
+                  <p className="text-sm font-medium text-slate-200">Q: {q.body}</p>
+                  {answers.length > 0 && (
+                    <p className="text-sm text-slate-400">
+                      A: {(answers.find((a) => a.accepted) ?? answers[0]).body}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/*
+          Tags/links/the activity log are real but secondary to "is this case
+          covered" -- collapsed by default so they no longer outrank the
+          verdict they used to sit above.
+        */}
+        <button
+          onClick={() => setShowDetails((s) => !s)}
+          className="mt-4 flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-800/40 px-3 py-2.5 text-sm text-slate-400"
+        >
+          <span>Tags, links &amp; history</span>
+          <span className="text-slate-600">{showDetails ? "▴ Hide" : "▾ Show"}</span>
+        </button>
+        {showDetails && (
+          <>
+            <EntityTags entityType="case" entityId={caseRow.id} />
+
+            <EntityLinkPicker
+              entityType="case"
+              entityId={caseRow.id}
+              candidates={{
+                facility: facilities.map((f) => ({ id: f.id, label: f.name })),
+                case_template: templates.map((t) => ({ id: t.id, label: t.name })),
+              }}
+            />
+
+            <EntityTimeline entityType="case" entityId={caseRow.id} />
+          </>
+        )}
 
         <button onClick={onClose} className="mt-5 w-full text-sm text-slate-500 underline">
           Close

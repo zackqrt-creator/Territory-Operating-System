@@ -18,11 +18,18 @@ export default function EditItemSheet({
   facilities,
   onClose,
   onSaved,
+  onMove,
 }: {
   item: InventoryItem;
   facilities: Facility[];
   onClose: () => void;
   onSaved: () => void;
+  /** Opens the audited Move flow instead. The Location field below just
+   * fixes a typo -- it writes no movement record. Relocating an item for
+   * real (and clearing a loaner's return clock on arrival at corporate)
+   * has to go through Move, so this is offered as its own action rather
+   * than folded into Save. */
+  onMove?: () => void;
 }) {
   const [name, setName] = useState(item.name);
   const [lot, setLot] = useState(item.lot_number ?? "");
@@ -174,6 +181,15 @@ export default function EditItemSheet({
               </select>
             </div>
           </div>
+
+          {onMove && (
+            <button
+              onClick={onMove}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm font-medium text-sky-400 active:bg-slate-800"
+            >
+              ↔ Move to another facility
+            </button>
+          )}
 
           {item.category === "implant" && (
             <div>

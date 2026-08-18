@@ -287,7 +287,7 @@ export default function Inventory() {
             items={onHand}
             facilityName={facilityName}
             onTote={(it) => setViewingTote(it)}
-            onMove={(it) => setMoving(it)}
+            onOpen={(it) => setEditing(it)}
           />
           {usedUp.length > 0 && (
             <div className="mt-6 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
@@ -374,6 +374,11 @@ export default function Inventory() {
             setEditing(null);
             refreshOnHand();
           }}
+          onMove={() => {
+            const it = editing;
+            setEditing(null);
+            setMoving(it);
+          }}
         />
       )}
       {viewingTote && (
@@ -428,12 +433,15 @@ function OnHandList({
   items,
   facilityName,
   onTote,
-  onMove,
+  onOpen,
 }: {
   items: InventoryItem[];
   facilityName: (id: string | null) => string;
   onTote: (i: InventoryItem) => void;
-  onMove: (i: InventoryItem) => void;
+  /** Opens the item's detail view -- counts, notes, tags, and history
+   * together. Move lives inside that view now, not at the front door;
+   * the record's knowledge shouldn't be two more taps behind its count. */
+  onOpen: (i: InventoryItem) => void;
 }) {
   if (items.length === 0) return <p className="mt-8 text-slate-400">No items match.</p>;
   return (
@@ -447,7 +455,7 @@ function OnHandList({
         return (
           <button
             key={item.id}
-            onClick={() => (isTote ? onTote(item) : onMove(item))}
+            onClick={() => (isTote ? onTote(item) : onOpen(item))}
             className={`w-full rounded-lg border p-3 text-left active:bg-slate-800 ${
               urgent || expired
                 ? "border-red-800 bg-red-950/30"
