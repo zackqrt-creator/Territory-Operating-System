@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
   createEntityNote,
@@ -6,10 +7,11 @@ import {
   deleteEntityNote,
   listEntityNotes,
   listProfiles,
+  promoteEntityNoteToPage,
   setNotePinned,
   updateEntityNote,
 } from "../lib/api";
-import type { EntityNote, NoteEntityType, Profile } from "../lib/types";
+import type { EntityNote, NoteEntityType, Profile, WikiPage } from "../lib/types";
 import EntityTasks from "./EntityTasks";
 import { formatRelativeDay, formatTimeOfDay, tomorrow } from "../utils/dates";
 
@@ -50,6 +52,9 @@ export default function NotesSection({
   const [followUpDate, setFollowUpDate] = useState(tomorrow());
   const [followUpDone, setFollowUpDone] = useState<Set<string>>(new Set());
   const [dictating, setDictating] = useState(false);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [promoteTitle, setPromoteTitle] = useState("");
+  const [promotedPages, setPromotedPages] = useState<Map<string, WikiPage>>(new Map());
 
   // Browser speech-to-text, where the platform offers it (iOS/Android/Chrome).
   // No API, no server — and the button simply doesn't render elsewhere.
@@ -164,6 +169,24 @@ export default function NotesSection({
       setFollowUpId(null);
       setFollowUpDate(tomorrow());
       setFollowUpDone((prev) => new Set(prev).add(note.id));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startPromote(note: EntityNote) {
+    const snippet = note.body.split("\n")[0].slice(0, 60);
+    setPromoteTitle(snippet || "Untitled");
+    setPromotingId(note.id);
+  }
+
+  async function onPromote(note: EntityNote) {
+    if (!profile || !promoteTitle.trim()) return;
+    setBusy(true);
+    try {
+      const page = await promoteEntityNoteToPage(note, profile.id, promoteTitle.trim());
+      setPromotingId(null);
+      setPromotedPages((prev) => new Map(prev).set(note.id, page));
     } finally {
       setBusy(false);
     }
@@ -318,6 +341,35 @@ export default function NotesSection({
                     className="min-h-0 text-sky-400 underline"
                   >
                     ⏰ follow up
+                  </button>
+                )}
+                {promotedPages.has(n.id) ? (
+                  <Link to={`/pages/${promotedPages.get(n.id)!.id}`} className="text-emerald-400 underline">
+                    ✓ promoted — open page
+                  </Link>
+                ) : promotingId === n.id ? (
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      autoFocus
+                      value={promoteTitle}
+                      onChange={(e) => setPromoteTitle(e.target.value)}
+                      placeholder="Page title"
+                      className="min-h-0 w-32 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100 placeholder:text-slate-500"
+                    />
+                    <button
+                      onClick={() => onPromote(n)}
+                      disabled={busy || !promoteTitle.trim()}
+                      className="min-h-0 rounded bg-sky-600 px-2 py-0.5 font-medium text-white disabled:opacity-50"
+                    >
+                      Create page
+                    </button>
+                    <button onClick={() => setPromotingId(null)} className="min-h-0 text-slate-500 underline">
+                      cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button onClick={() => startPromote(n)} className="min-h-0 text-sky-400 underline">
+                    📎 promote to page
                   </button>
                 )}
                 {n.author_id === profile?.id && (

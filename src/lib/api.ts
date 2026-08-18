@@ -1777,6 +1777,34 @@ export async function promoteNoteToPage(
   return page;
 }
 
+/** entity_type values createPage can attach a page to — a strict subset of NoteEntityType. */
+const PAGE_ENTITY_TYPES = new Set<string>(["surgeon", "facility", "tote_template", "catalog_item"]);
+
+/**
+ * The other promotion path: a note written directly on a record (a case, an
+ * item, whatever) into a durable Knowledge base page. Mirrors
+ * promoteNoteToPage's shape, but there's no second_brain_status to flip here
+ * -- entity_notes was never part of that review queue, so the only bookkeeping
+ * is the page itself. When the note's entity type is one pages can be
+ * canonically attached to (surgeon/facility/tote_template/catalog_item), the
+ * new page carries that link forward; otherwise it's created standalone.
+ */
+export async function promoteEntityNoteToPage(
+  note: EntityNote,
+  authorId: string,
+  title: string,
+): Promise<WikiPage> {
+  const attachable = PAGE_ENTITY_TYPES.has(note.entity_type);
+  return createPage({
+    territory_id: note.territory_id,
+    title,
+    body: note.body,
+    entity_type: attachable ? (note.entity_type as PageEntityType) : null,
+    entity_id: attachable ? note.entity_id : null,
+    created_by: authorId,
+  });
+}
+
 export async function listSecondBrainQueue(): Promise<TerritoryNote[]> {
   const { data, error } = await supabase
     .from("territory_second_brain_queue")
