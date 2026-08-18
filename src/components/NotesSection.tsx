@@ -55,6 +55,10 @@ export default function NotesSection({
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [promoteTitle, setPromoteTitle] = useState("");
   const [promotedPages, setPromotedPages] = useState<Map<string, WikiPage>>(new Map());
+  // A rejected write used to just vanish -- the draft cleared, the note never
+  // saved, nothing on screen said so. Every handler below now keeps whatever
+  // the rep was mid-typing and surfaces this instead of failing silently.
+  const [error, setError] = useState<string | null>(null);
 
   // Browser speech-to-text, where the platform offers it (iOS/Android/Chrome).
   // No API, no server — and the button simply doesn't render elsewhere.
@@ -105,6 +109,7 @@ export default function NotesSection({
   async function onAdd() {
     if (!draft.trim() || !profile) return;
     setBusy(true);
+    setError(null);
     try {
       await createEntityNote({
         entity_type: entityType,
@@ -116,6 +121,8 @@ export default function NotesSection({
       setDraft("");
       setAdding(false);
       await refresh();
+    } catch {
+      setError("Couldn't save that note. It's still here -- try again.");
     } finally {
       setBusy(false);
     }
@@ -124,10 +131,13 @@ export default function NotesSection({
   async function onSaveEdit(id: string) {
     if (!editDraft.trim()) return;
     setBusy(true);
+    setError(null);
     try {
       await updateEntityNote(id, editDraft.trim());
       setEditingId(null);
       await refresh();
+    } catch {
+      setError("Couldn't save that edit -- try again.");
     } finally {
       setBusy(false);
     }
@@ -135,9 +145,12 @@ export default function NotesSection({
 
   async function onDelete(id: string) {
     setBusy(true);
+    setError(null);
     try {
       await deleteEntityNote(id);
       await refresh();
+    } catch {
+      setError("Couldn't delete that note -- try again.");
     } finally {
       setBusy(false);
     }
@@ -145,9 +158,12 @@ export default function NotesSection({
 
   async function onTogglePin(note: EntityNote) {
     setBusy(true);
+    setError(null);
     try {
       await setNotePinned(note.id, !note.pinned);
       await refresh();
+    } catch {
+      setError("Couldn't update that -- try again.");
     } finally {
       setBusy(false);
     }
@@ -156,6 +172,7 @@ export default function NotesSection({
   async function onCreateFollowUp(note: EntityNote) {
     if (!profile) return;
     setBusy(true);
+    setError(null);
     try {
       const snippet = note.body.length > 60 ? `${note.body.slice(0, 60)}…` : note.body;
       await createTask({
@@ -169,6 +186,8 @@ export default function NotesSection({
       setFollowUpId(null);
       setFollowUpDate(tomorrow());
       setFollowUpDone((prev) => new Set(prev).add(note.id));
+    } catch {
+      setError("Couldn't create that task -- try again.");
     } finally {
       setBusy(false);
     }
@@ -183,10 +202,13 @@ export default function NotesSection({
   async function onPromote(note: EntityNote) {
     if (!profile || !promoteTitle.trim()) return;
     setBusy(true);
+    setError(null);
     try {
       const page = await promoteEntityNoteToPage(note, profile.id, promoteTitle.trim());
       setPromotingId(null);
       setPromotedPages((prev) => new Map(prev).set(note.id, page));
+    } catch {
+      setError("Couldn't create that page -- try again.");
     } finally {
       setBusy(false);
     }
@@ -230,6 +252,8 @@ export default function NotesSection({
           )
         )}
       </div>
+
+      {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
 
       {adding && (
         <div className="mt-2">

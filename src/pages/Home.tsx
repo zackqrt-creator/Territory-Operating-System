@@ -12,6 +12,7 @@ import {
   CalendarDays,
   ArrowRight,
   ChevronRight,
+  WifiOff,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 import { useAuth } from "../hooks/useAuth";
@@ -63,6 +64,12 @@ export default function Home() {
   const [activityCases, setActivityCases] = useState<CaseRow[]>([]);
   const [myTasks, setMyTasks] = useState<PersonalTask[]>([]);
   const [loading, setLoading] = useState(true);
+  // Home's one job is telling you whether anything's wrong -- so a failed
+  // fetch can never quietly resolve into "nothing's wrong". loadError gates
+  // the all-clear message; lastSynced tells you how stale what's on screen
+  // might be even after a successful load.
+  const [loadError, setLoadError] = useState(false);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
   function refresh() {
     return Promise.all([
@@ -73,17 +80,23 @@ export default function Home() {
       listRecentMovements(50),
       listProfiles(),
       listMyTasks(),
-    ]).then(async ([c, i, f, t, m, p, mt]) => {
-      setCases(c);
-      setItems(i);
-      setFacilities(f);
-      setTemplates(t);
-      setMovements(m);
-      setProfiles(p);
-      setMyTasks(mt);
-      const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
-      setActivityCases(await listCasesByIds(caseIds));
-    });
+    ])
+      .then(async ([c, i, f, t, m, p, mt]) => {
+        setCases(c);
+        setItems(i);
+        setFacilities(f);
+        setTemplates(t);
+        setMovements(m);
+        setProfiles(p);
+        setMyTasks(mt);
+        const caseIds = [...new Set(m.map((row) => row.related_case_id).filter((id): id is string => !!id))];
+        setActivityCases(await listCasesByIds(caseIds));
+        setLoadError(false);
+        setLastSynced(new Date());
+      })
+      .catch(() => {
+        setLoadError(true);
+      });
   }
 
   useEffect(() => {
@@ -313,6 +326,23 @@ export default function Home() {
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : (
         <div className="mt-6 space-y-6">
+          {loadError && (
+            <div className="rounded-2xl border border-red-800 bg-red-950 p-3.5">
+              <p className="flex items-center gap-2 text-sm font-medium text-red-200">
+                <WifiOff className="h-4 w-4 shrink-0" />
+                Couldn't reach the server
+              </p>
+              <p className="mt-1 text-[13px] leading-relaxed text-red-300">
+                {lastSynced
+                  ? `Showing what loaded as of ${lastSynced.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} -- may be stale.`
+                  : "Nothing has loaded yet this session."}{" "}
+                <button onClick={() => refresh()} className="underline">
+                  Retry
+                </button>
+              </p>
+            </div>
+          )}
+
           {/*
            * The database holds 931 catalogued products but only a handful of
            * rows saying anything is actually on a shelf. Everything that asks
@@ -352,6 +382,17 @@ export default function Home() {
                 ))}
               </div>
             </section>
+          ) : loadError ? (
+            /*
+             * Silence only means good news when the app actually heard back.
+             * On a failed fetch, silence means "didn't check" -- and saying so
+             * is what makes the green check below mean something the rest of
+             * the time.
+             */
+            <p className="flex items-center gap-2 text-sm text-slate-400">
+              <WifiOff className="h-4 w-4 shrink-0 text-red-400" />
+              Can't confirm anything's clear until this reconnects.
+            </p>
           ) : (
             /*
              * Silence has to mean good news, or the red above stops meaning
