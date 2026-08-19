@@ -9,6 +9,7 @@ import {
   updateToteTemplate,
   updateToteTemplateItem,
 } from "../lib/api";
+import { useFrequentCatalog } from "../hooks/useFrequentCatalog";
 import NotesSection from "./NotesSection";
 import TrayPhotos from "./TrayPhotos";
 import type { CatalogItem, ToteTemplateWithItems } from "../lib/types";
@@ -72,21 +73,30 @@ export default function SetEditor({
   const setId = set?.id ?? null;
 
   const inSet = useMemo(() => new Set(lines.map((l) => l.catalog_item_id)), [lines]);
+  const frequent = useFrequentCatalog();
 
+  // Most territories touch ~60 of the 931 catalogued products. Ranking
+  // matches by actual stocking history (not just alphabetically) means the
+  // REF you've handled a dozen times shows up before ones you've never
+  // stocked, instead of both being interchangeable rows in a long list.
   const results = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
-    return catalog
-      .filter(
-        (c) =>
-          !inSet.has(c.id) &&
-          (c.name.toLowerCase().includes(q) ||
-            (c.item_number ?? "").toLowerCase().includes(q) ||
-            (c.product_line ?? "").toLowerCase().includes(q) ||
-            (c.device_type ?? "").toLowerCase().includes(q)),
-      )
-      .slice(0, 40);
-  }, [catalog, search, inSet]);
+    const matches = catalog.filter(
+      (c) =>
+        !inSet.has(c.id) &&
+        (c.name.toLowerCase().includes(q) ||
+          (c.item_number ?? "").toLowerCase().includes(q) ||
+          (c.product_line ?? "").toLowerCase().includes(q) ||
+          (c.device_type ?? "").toLowerCase().includes(q)),
+    );
+    return frequent.sort(matches).slice(0, 40);
+  }, [catalog, search, inSet, frequent]);
+
+  const topPicks = useMemo(
+    () => (search.trim() ? [] : frequent.top(catalog.filter((c) => !inSet.has(c.id)))),
+    [catalog, search, inSet, frequent],
+  );
 
   async function guard(work: () => Promise<void>) {
     setBusy(true);
@@ -314,6 +324,20 @@ export default function SetEditor({
                 placeholder="Search the catalog by name, REF or size"
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500"
               />
+              {topPicks.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {topPicks.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => addItem(c)}
+                      disabled={busy}
+                      className="rounded-full border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs text-slate-300 disabled:opacity-50"
+                    >
+                      + {itemLabel(c)}
+                    </button>
+                  ))}
+                </div>
+              )}
               {search.trim() && (
                 <div className="mt-1.5 max-h-56 space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/60 p-1">
                   {/*
