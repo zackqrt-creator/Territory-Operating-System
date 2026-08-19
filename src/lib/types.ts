@@ -191,6 +191,10 @@ export interface CaseTemplate {
   id: string;
   territory_id: string;
   name: string;
+  /** Alternate/short name some screens display instead of the full name. */
+  alt_name: string | null;
+  /** myOPS procedure code, when known. */
+  code: string | null;
   surgery_type: "KNEE" | "HIP";
   variant: CaseVariant;
 }

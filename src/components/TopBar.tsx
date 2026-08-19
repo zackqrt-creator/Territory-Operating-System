@@ -30,6 +30,7 @@ const ROUTE_TITLES: { test: (path: string) => boolean; title: string }[] = [
   { test: (p) => p.startsWith("/pages/"), title: "Page" },
   { test: (p) => p === "/runsheet", title: "Run sheet" },
   { test: (p) => p === "/sets", title: "Sets & totes" },
+  { test: (p) => p === "/procedures", title: "Procedures" },
 ];
 
 function titleFor(pathname: string): string | null {

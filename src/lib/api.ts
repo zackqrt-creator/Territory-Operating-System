@@ -34,7 +34,10 @@ import type {
   GraphEntityType,
   CaseItemPlan,
   CaseRow,
+  CaseTemplate,
+  CaseTemplateItem,
   CaseTemplateWithItems,
+  CaseVariant,
   CatalogItem,
   AcquisitionType,
   CatalogJoint,
@@ -57,6 +60,7 @@ import type {
   QaQuestion,
   RepCertification,
   SecondBrainStatus,
+  Side,
   Surgeon,
   SurgeonPreference,
   TaskPhoto,
@@ -115,6 +119,75 @@ export async function listCaseTemplatesWithItems(): Promise<CaseTemplateWithItem
   const { data, error } = await supabase.from("case_templates").select("*, case_template_items(*)");
   if (error) throw error;
   return data as CaseTemplateWithItems[];
+}
+
+// ---- Case templates: what a case type actually needs ----------------------
+//
+// Every previous change to this list was a hand-written migration -- the
+// procedure name is right there in the filename (038_case_template_alt_name,
+// 039_gmk_revision_..., 041_gmk_sphere_300_left_case). That worked for one
+// developer seeding a territory once; it does not work for a rep adding a
+// procedure variant on their own. This is the same fix day_requirements
+// already got: real CRUD, no migration required to add or change one.
+
+export async function createCaseTemplate(input: {
+  territory_id: string;
+  name: string;
+  alt_name?: string | null;
+  code?: string | null;
+  surgery_type: "KNEE" | "HIP";
+  variant?: CaseVariant;
+}): Promise<CaseTemplate> {
+  const { data, error } = await supabase
+    .from("case_templates")
+    .insert({ variant: "total", ...input })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as CaseTemplate;
+}
+
+export async function updateCaseTemplate(
+  id: string,
+  patch: Partial<Pick<CaseTemplate, "name" | "alt_name" | "code" | "surgery_type" | "variant">>,
+): Promise<void> {
+  const { error } = await supabase.from("case_templates").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+/** Deletes the template and, via on-delete-cascade, every one of its items. */
+export async function deleteCaseTemplate(id: string): Promise<void> {
+  const { error } = await supabase.from("case_templates").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function createCaseTemplateItem(input: {
+  template_id: string;
+  category: ItemCategory;
+  name: string;
+  quantity?: number;
+  applies_to_side?: Side | "ANY";
+}): Promise<CaseTemplateItem> {
+  const { data, error } = await supabase
+    .from("case_template_items")
+    .insert({ quantity: 1, applies_to_side: "ANY", ...input })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as CaseTemplateItem;
+}
+
+export async function updateCaseTemplateItem(
+  id: string,
+  patch: Partial<Pick<CaseTemplateItem, "category" | "name" | "quantity" | "applies_to_side">>,
+): Promise<void> {
+  const { error } = await supabase.from("case_template_items").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCaseTemplateItem(id: string): Promise<void> {
+  const { error } = await supabase.from("case_template_items").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export interface NewCaseInput {

@@ -54,6 +54,7 @@ const Trends = lazy(() => import("./pages/Trends"));
 const Assistant = lazy(() => import("./pages/Assistant"));
 const EntityPage = lazy(() => import("./pages/EntityPage"));
 const TagPage = lazy(() => import("./pages/TagPage"));
+const Procedures = lazy(() => import("./pages/Procedures"));
 
 /** Legacy /wiki/:id bookmarks now live under /pages/:id. */
 function WikiRedirect() {
@@ -127,6 +128,7 @@ function App() {
           <Route path="/assistant" element={<Assistant />} />
           <Route path="/entity/:type/:id" element={<EntityPage />} />
           <Route path="/tag/:tagId" element={<TagPage />} />
+          <Route path="/procedures" element={<Procedures />} />
           <Route path="/wiki" element={<Navigate to="/pages" replace />} />
           <Route path="/wiki/:id" element={<WikiRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />

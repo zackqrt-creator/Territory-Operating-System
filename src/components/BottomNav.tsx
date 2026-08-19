@@ -24,6 +24,7 @@ import {
   Plug,
   BarChart3,
   Bot,
+  ListTree,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -44,6 +45,7 @@ const MORE: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/staging", label: "Staging", icon: Truck },
   { to: "/pack-list", label: "Pack list", icon: Boxes },
   { to: "/sets", label: "Sets & totes", icon: Boxes },
+  { to: "/procedures", label: "Procedures", icon: ListTree },
   { to: "/loaners", label: "Loaner returns", icon: RotateCcw },
   { to: "/readiness", label: "Readiness", icon: ClipboardCheck },
   { to: "/activity", label: "Activity", icon: Activity },
