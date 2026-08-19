@@ -316,39 +316,44 @@ export default function SetEditor({
               />
               {search.trim() && (
                 <div className="mt-1.5 max-h-56 space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/60 p-1">
-                  {results.length === 0 ? (
+                  {/*
+                    Always offered, not just when nothing matches -- a generic
+                    word like "tray" or "insert" can match an unrelated
+                    catalog product and used to hide this option entirely,
+                    leaving no way to add something genuinely new.
+                  */}
+                  <button
+                    onClick={addNewToCatalog}
+                    disabled={busy}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left active:bg-slate-800 disabled:opacity-50"
+                  >
+                    <Plus size={13} className="shrink-0 text-emerald-400" />
+                    <span className="text-sm text-slate-200">
+                      {results.length === 0
+                        ? `Nothing matches — add "${search.trim()}" as a new item`
+                        : `Add "${search.trim()}" as a new item`}
+                    </span>
+                  </button>
+                  {results.map((c) => (
                     <button
-                      onClick={addNewToCatalog}
+                      key={c.id}
+                      onClick={() => addItem(c)}
                       disabled={busy}
-                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left active:bg-slate-800 disabled:opacity-50"
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left active:bg-slate-800 disabled:opacity-50"
                     >
-                      <Plus size={13} className="shrink-0 text-emerald-400" />
-                      <span className="text-sm text-slate-200">
-                        Nothing matches — create "{search.trim()}" in the catalog and add it here
+                      <Plus size={13} className="shrink-0 text-sky-400" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-slate-200">
+                          {itemLabel(c)}
+                        </span>
+                        {c.item_number && (
+                          <span className="font-mono text-[10px] text-slate-500">
+                            {c.item_number}
+                          </span>
+                        )}
                       </span>
                     </button>
-                  ) : (
-                    results.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => addItem(c)}
-                        disabled={busy}
-                        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left active:bg-slate-800 disabled:opacity-50"
-                      >
-                        <Plus size={13} className="shrink-0 text-sky-400" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm text-slate-200">
-                            {itemLabel(c)}
-                          </span>
-                          {c.item_number && (
-                            <span className="font-mono text-[10px] text-slate-500">
-                              {c.item_number}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    ))
-                  )}
+                  ))}
                 </div>
               )}
             </div>
