@@ -1,18 +1,44 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
+  createDayRequirement,
+  deleteDayRequirement,
+  listDayRequirements,
   listFacilities,
   listToteTemplatesWithItems,
   listTrackedAssets,
   moveAsset,
+  updateDayRequirement,
   updateToteTemplateName,
   updateTrackedAsset,
 } from "../lib/api";
-import type { AssetStatus, Facility, ToteTemplateWithItems, TrackedAsset } from "../lib/types";
+import type {
+  AssetStatus,
+  DayRequirement,
+  DayRequirementScaling,
+  Facility,
+  ItemCategory,
+  ToteTemplateWithItems,
+  TrackedAsset,
+} from "../lib/types";
 import TrayPhotos from "../components/TrayPhotos";
 import { formatDateShort } from "../utils/dates";
 import RenameField from "../components/RenameField";
 import WikiLinkButton from "../components/WikiLinkButton";
+
+const CATEGORY_LABEL: Record<ItemCategory, string> = {
+  loaner_kit: "Loaner kit",
+  instrument_tray: "Instrument tray",
+  implant: "Implant",
+  consumable: "Efficiency",
+};
+
+const SURGERY_TYPE_LABEL: Record<DayRequirement["surgery_type"], string> = {
+  KNEE: "Knee day",
+  HIP: "Hip day",
+  INSTRUMENT: "Instrument day",
+  ANY: "Any surgery day",
+};
 
 const STATUS_META: Record<AssetStatus, { label: string; cls: string; dot: string }> = {
   available: { label: "Available", cls: "bg-emerald-500/15 text-emerald-300", dot: "bg-emerald-400" },
@@ -130,6 +156,8 @@ export default function Sets() {
         </div>
       )}
 
+      {profile && <DayRulesPanel territoryId={profile.territory_id} />}
+
       {loading ? (
         <p className="mt-8 text-slate-400">Loading...</p>
       ) : (
@@ -164,6 +192,295 @@ export default function Sets() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * What goes in the car on any surgery day, independent of case count -- the
+ * revision totes, and anything that scales with the day's side split rather
+ * than being counted per case. Feeds Staging's day-line list directly; a
+ * rule added here shows up there the next time that day is loaded.
+ */
+function DayRulesPanel({ territoryId }: { territoryId: string }) {
+  const { profile } = useAuth();
+  const [rules, setRules] = useState<DayRequirement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState({
+    surgery_type: "KNEE" as DayRequirement["surgery_type"],
+    category: "loaner_kit" as ItemCategory,
+    name: "",
+    scaling: "flat" as DayRequirementScaling,
+    quantity: 1,
+    note: "",
+  });
+
+  function refresh() {
+    setLoading(true);
+    return listDayRequirements()
+      .then(setRules)
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function resetDraft() {
+    setDraft({ surgery_type: "KNEE", category: "loaner_kit", name: "", scaling: "flat", quantity: 1, note: "" });
+  }
+
+  async function onAdd() {
+    if (!draft.name.trim() || !profile) return;
+    setBusy(true);
+    try {
+      await createDayRequirement({
+        territory_id: territoryId,
+        surgery_type: draft.surgery_type,
+        category: draft.category,
+        name: draft.name.trim(),
+        scaling: draft.scaling,
+        quantity: draft.quantity,
+        note: draft.note.trim() || null,
+      });
+      setAdding(false);
+      resetDraft();
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSaveEdit(r: DayRequirement) {
+    setBusy(true);
+    try {
+      await updateDayRequirement(r.id, {
+        surgery_type: draft.surgery_type,
+        category: draft.category,
+        name: draft.name.trim() || r.name,
+        scaling: draft.scaling,
+        quantity: draft.quantity,
+        note: draft.note.trim() || null,
+      });
+      setEditingId(null);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete(id: string) {
+    setBusy(true);
+    try {
+      await deleteDayRequirement(id);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startEdit(r: DayRequirement) {
+    setDraft({
+      surgery_type: r.surgery_type,
+      category: r.category,
+      name: r.name,
+      scaling: r.scaling,
+      quantity: r.quantity,
+      note: r.note ?? "",
+    });
+    setEditingId(r.id);
+  }
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Day rules</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            What goes in the car once for the whole day, however many cases are on it.
+          </p>
+        </div>
+        {!adding && (
+          <button
+            onClick={() => {
+              resetDraft();
+              setAdding(true);
+            }}
+            className="min-h-0 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-medium text-white"
+          >
+            + Add rule
+          </button>
+        )}
+      </div>
+
+      {!loading && rules.length === 0 && !adding && (
+        <p className="mt-2 text-xs text-slate-600">No day rules yet.</p>
+      )}
+
+      <div className="mt-2 space-y-2">
+        {rules.map((r) =>
+          editingId === r.id ? (
+            <DayRuleForm
+              key={r.id}
+              draft={draft}
+              setDraft={setDraft}
+              busy={busy}
+              onCancel={() => setEditingId(null)}
+              onSave={() => onSaveEdit(r)}
+              saveLabel="Save"
+            />
+          ) : (
+            <div
+              key={r.id}
+              className="rounded-xl border border-slate-700 bg-slate-800/50 p-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-100">{r.name}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {SURGERY_TYPE_LABEL[r.surgery_type]} · {CATEGORY_LABEL[r.category]} ·{" "}
+                    {r.scaling === "per_side_plus_one"
+                      ? `case count per side + ${r.quantity}`
+                      : `×${r.quantity} flat`}
+                  </p>
+                  {r.note && <p className="mt-0.5 text-xs text-slate-600">{r.note}</p>}
+                </div>
+                <span className="flex shrink-0 gap-2 text-xs">
+                  <button onClick={() => startEdit(r)} className="text-sky-400 underline">
+                    edit
+                  </button>
+                  <button onClick={() => onDelete(r.id)} disabled={busy} className="text-slate-600">
+                    ✕
+                  </button>
+                </span>
+              </div>
+            </div>
+          ),
+        )}
+      </div>
+
+      {adding && (
+        <div className="mt-2">
+          <DayRuleForm
+            draft={draft}
+            setDraft={setDraft}
+            busy={busy}
+            onCancel={() => setAdding(false)}
+            onSave={onAdd}
+            saveLabel="Add"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface DayRuleDraft {
+  surgery_type: DayRequirement["surgery_type"];
+  category: ItemCategory;
+  name: string;
+  scaling: DayRequirementScaling;
+  quantity: number;
+  note: string;
+}
+
+function DayRuleForm({
+  draft,
+  setDraft,
+  busy,
+  onCancel,
+  onSave,
+  saveLabel,
+}: {
+  draft: DayRuleDraft;
+  setDraft: (d: DayRuleDraft) => void;
+  busy: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+  saveLabel: string;
+}) {
+  return (
+    <div className="rounded-xl border border-sky-800 bg-sky-950/20 p-3">
+      <input
+        autoFocus
+        value={draft.name}
+        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+        placeholder="e.g. Efficiency Tote or Revision Tote"
+        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+      />
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <select
+          value={draft.surgery_type}
+          onChange={(e) => setDraft({ ...draft, surgery_type: e.target.value as DayRequirement["surgery_type"] })}
+          className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+        >
+          {(["KNEE", "HIP", "INSTRUMENT", "ANY"] as const).map((t) => (
+            <option key={t} value={t}>
+              {SURGERY_TYPE_LABEL[t]}
+            </option>
+          ))}
+        </select>
+        <select
+          value={draft.category}
+          onChange={(e) => setDraft({ ...draft, category: e.target.value as ItemCategory })}
+          className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+        >
+          {(Object.keys(CATEGORY_LABEL) as ItemCategory[]).map((c) => (
+            <option key={c} value={c}>
+              {CATEGORY_LABEL[c]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <select
+          value={draft.scaling}
+          onChange={(e) => setDraft({ ...draft, scaling: e.target.value as DayRequirementScaling })}
+          className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+        >
+          <option value="flat">Flat quantity for the day</option>
+          <option value="per_side_plus_one">Per-side case count + buffer</option>
+        </select>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            value={draft.quantity}
+            onChange={(e) => setDraft({ ...draft, quantity: Math.max(1, Number(e.target.value) || 1) })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+          />
+          <span className="shrink-0 text-xs text-slate-500">
+            {draft.scaling === "per_side_plus_one" ? "extra per side" : "quantity"}
+          </span>
+        </div>
+      </div>
+      {draft.scaling === "per_side_plus_one" && (
+        <p className="mt-1.5 text-xs text-slate-500">
+          Produces one line per side (Left/Right), counted from that day's cases, plus this many extra.
+          E.g. 3 right + 2 left knees with a buffer of 1 → 4 Right, 3 Left.
+        </p>
+      )}
+      <input
+        value={draft.note}
+        onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+        placeholder="Note shown under the line (optional)"
+        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+      />
+      <div className="mt-2 flex gap-2">
+        <button onClick={onCancel} className="flex-1 rounded-lg bg-slate-800 py-2 text-sm text-slate-300">
+          Cancel
+        </button>
+        <button
+          onClick={onSave}
+          disabled={busy || !draft.name.trim()}
+          className="flex-1 rounded-lg bg-sky-600 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {saveLabel}
+        </button>
+      </div>
     </div>
   );
 }

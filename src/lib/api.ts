@@ -27,6 +27,7 @@ import type {
   CaseChecklistMark,
   DayChecklistMark,
   DayRequirement,
+  DayRequirementScaling,
   EntityEvent,
   EntityLink,
   EntityTagAssignment,
@@ -1295,7 +1296,7 @@ export async function unmarkChecklistItem(caseId: string, itemKey: string): Prom
 // ---- Day-level requirements ------------------------------------------------
 //
 // The short list that goes in the car on any surgery day, independent of how
-// many cases are on it. Read-only here; editing is a Sets-page job.
+// many cases are on it -- managed from the Sets & totes page.
 
 export async function listDayRequirements(): Promise<DayRequirement[]> {
   const { data, error } = await supabase
@@ -1304,6 +1305,40 @@ export async function listDayRequirements(): Promise<DayRequirement[]> {
     .order("sort_order");
   if (error) throw error;
   return data as DayRequirement[];
+}
+
+export async function createDayRequirement(input: {
+  territory_id: string;
+  surgery_type: DayRequirement["surgery_type"];
+  category: ItemCategory;
+  name: string;
+  scaling?: DayRequirementScaling;
+  quantity: number;
+  note?: string | null;
+  sort_order?: number;
+}): Promise<DayRequirement> {
+  const { data, error } = await supabase
+    .from("day_requirements")
+    .insert({ scaling: "flat", sort_order: 0, ...input })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DayRequirement;
+}
+
+export async function updateDayRequirement(
+  id: string,
+  patch: Partial<
+    Pick<DayRequirement, "surgery_type" | "category" | "name" | "scaling" | "quantity" | "note" | "sort_order">
+  >,
+): Promise<void> {
+  const { error } = await supabase.from("day_requirements").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteDayRequirement(id: string): Promise<void> {
+  const { error } = await supabase.from("day_requirements").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function listDayChecklistMarks(onDate: string): Promise<DayChecklistMark[]> {

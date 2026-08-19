@@ -236,6 +236,8 @@ export interface CaseTemplateWithItems extends CaseTemplate {
  * it -- the revision totes, spare efficiency kits. Counted once per day, not
  * once per case, which is the whole reason it is not a `CaseTemplateItem`.
  */
+export type DayRequirementScaling = "flat" | "per_side_plus_one";
+
 export interface DayRequirement {
   id: string;
   territory_id: string;
@@ -243,6 +245,10 @@ export interface DayRequirement {
   surgery_type: "KNEE" | "HIP" | "INSTRUMENT" | "ANY";
   category: ItemCategory;
   name: string;
+  /** 'flat': this quantity, once, for the day. 'per_side_plus_one': a buffer
+   * added on top of however many cases that day have a given side -- see
+   * `quantity`'s role change accordingly. */
+  scaling: DayRequirementScaling;
   quantity: number;
   note: string | null;
   sort_order: number;

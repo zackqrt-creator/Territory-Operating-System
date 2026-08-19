@@ -167,36 +167,78 @@ export function buildStagingReport(
   // its kind, or if it is marked 'ANY', in which case any scheduled case
   // triggers it. No cases, no day list: there is nothing to bring.
   const kindsToday = new Set(cases.map((c) => c.surgery_type));
+
+  // Per-side case counts, for 'per_side_plus_one' requirements -- "how many
+  // rights today" is a different question from "is there a knee day", and
+  // needs its own tally rather than the flat kindsToday set.
+  const sideCounts = new Map<string, number>();
+  for (const c of cases) {
+    if (!c.side) continue;
+    const key = `${c.surgery_type}|${c.side}`;
+    sideCounts.set(key, (sideCounts.get(key) ?? 0) + 1);
+  }
+  const ALL_SURGERY_TYPES = ["KNEE", "HIP", "INSTRUMENT"] as const;
+
+  function locationsFor(category: ItemCategory, name: string) {
+    const byFacility = new Map<string, number>();
+    for (const i of inventory) {
+      if (i.category !== category || i.name !== name) continue;
+      byFacility.set(i.location_id, (byFacility.get(i.location_id) ?? 0) + i.quantity);
+    }
+    return [...byFacility.entries()]
+      .map(([facilityId, count]) => ({
+        facility: facilities.find((f) => f.id === facilityId)!,
+        count,
+      }))
+      .filter((l) => l.facility)
+      .sort((a, b) => b.count - a.count);
+  }
+
   const dayItems: DayHaulItem[] =
     cases.length === 0
       ? []
       : dayRequirements
           .filter((r) => r.surgery_type === "ANY" || kindsToday.has(r.surgery_type))
           .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
-          .map((r) => {
-            const byFacility = new Map<string, number>();
-            for (const i of inventory) {
-              if (i.category !== r.category || i.name !== r.name) continue;
-              byFacility.set(i.location_id, (byFacility.get(i.location_id) ?? 0) + i.quantity);
+          .flatMap((r): DayHaulItem[] => {
+            if (r.scaling === "per_side_plus_one") {
+              const matchTypes: readonly (typeof ALL_SURGERY_TYPES)[number][] =
+                r.surgery_type === "ANY" ? ALL_SURGERY_TYPES : [r.surgery_type];
+              return (["RIGHT", "LEFT"] as const)
+                .map((side) => {
+                  const count = matchTypes.reduce(
+                    (sum, t) => sum + (sideCounts.get(`${t}|${side}`) ?? 0),
+                    0,
+                  );
+                  // No cases on that side today: nothing to buffer for, so no line.
+                  if (count === 0) return null;
+                  const name = `${r.name} (${side === "RIGHT" ? "Right" : "Left"})`;
+                  const key = checklistItemKey(r.category, name);
+                  return {
+                    key,
+                    category: r.category,
+                    name,
+                    quantity: count + r.quantity,
+                    note: r.note,
+                    locations: locationsFor(r.category, name),
+                    manuallyConfirmed: dayMarkedKeys.has(key),
+                  };
+                })
+                .filter((item): item is DayHaulItem => item !== null);
             }
-            const locations = [...byFacility.entries()]
-              .map(([facilityId, count]) => ({
-                facility: facilities.find((f) => f.id === facilityId)!,
-                count,
-              }))
-              .filter((l) => l.facility)
-              .sort((a, b) => b.count - a.count);
 
             const key = checklistItemKey(r.category, r.name);
-            return {
-              key,
-              category: r.category,
-              name: r.name,
-              quantity: r.quantity,
-              note: r.note,
-              locations,
-              manuallyConfirmed: dayMarkedKeys.has(key),
-            };
+            return [
+              {
+                key,
+                category: r.category,
+                name: r.name,
+                quantity: r.quantity,
+                note: r.note,
+                locations: locationsFor(r.category, r.name),
+                manuallyConfirmed: dayMarkedKeys.has(key),
+              },
+            ];
           });
 
   return {
