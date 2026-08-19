@@ -11,6 +11,8 @@ const VERB_LABEL: Record<string, string> = {
   items_consumed: "Items used",
   moved: "Moved",
   credential_added: "Credential added",
+  page_updated: "Knowledge page updated",
+  assigned: "Reassigned",
 };
 
 function describe(e: EntityEvent): string {

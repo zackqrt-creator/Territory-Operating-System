@@ -29,6 +29,7 @@ import type {
   DayRequirement,
   EntityEvent,
   EntityLink,
+  EntityTagAssignment,
   GraphEntityType,
   CaseItemPlan,
   CaseRow,
@@ -1604,6 +1605,16 @@ export async function updateTask(
       territory_id: actor.territoryId,
     }).catch(() => {});
   }
+  if (patch.assigned_to !== undefined && actor) {
+    logEvent({
+      entity_type: "task",
+      entity_id: id,
+      verb: "assigned",
+      actor_id: actor.id,
+      payload: { assigned_to: patch.assigned_to },
+      territory_id: actor.territoryId,
+    }).catch(() => {});
+  }
 }
 
 /** Tasks spawned from a specific territory note (entity_type="note"). */
@@ -1885,6 +1896,12 @@ export async function listNoteTags(territoryId: string): Promise<TerritoryNoteTa
   return data as TerritoryNoteTag[];
 }
 
+export async function getNoteTag(id: string): Promise<TerritoryNoteTag | null> {
+  const { data, error } = await supabase.from("territory_note_tags").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as TerritoryNoteTag | null;
+}
+
 export async function createNoteTag(input: {
   name: string;
   color?: string | null;
@@ -1948,6 +1965,17 @@ export async function listEntityTags(
     .eq("entity_id", entityId);
   if (error) throw error;
   return (data ?? []).map((r) => (r as unknown as { territory_note_tags: TerritoryNoteTag }).territory_note_tags);
+}
+
+/** The other direction: every record carrying this tag, across every entity type. */
+export async function listEntitiesByTag(tagId: string): Promise<EntityTagAssignment[]> {
+  const { data, error } = await supabase
+    .from("entity_tag_assignments")
+    .select("*")
+    .eq("tag_id", tagId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as EntityTagAssignment[];
 }
 
 export async function tagEntity(input: {
@@ -2370,6 +2398,19 @@ export async function updatePage(
   if (error) throw error;
   const page = data as WikiPage;
   if (patch.body !== undefined) await relinkPage(page.territory_id, page.id, page.body);
+  // Only when there's a canonical record and real content -- an empty page
+  // auto-scaffolded by ensureCanonicalPage's first visit isn't a rep doing
+  // anything, and logging that would just be noise in the activity log.
+  if (page.entity_type && page.entity_id && page.body.trim()) {
+    logEvent({
+      entity_type: page.entity_type,
+      entity_id: page.entity_id,
+      verb: "page_updated",
+      actor_id: editorId,
+      payload: { title: page.title },
+      territory_id: page.territory_id,
+    }).catch(() => {});
+  }
   return page;
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Tag, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { createNoteTag, listNoteTags, tagEntity, listEntityTags, untagEntity } from "../lib/api";
@@ -91,7 +92,9 @@ export default function EntityTags({
           key={t.id}
           className="flex items-center gap-1 rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-300"
         >
-          {t.name}
+          <Link to={`/tag/${t.id}`} className="underline decoration-slate-700">
+            {t.name}
+          </Link>
           <button onClick={() => remove(t.id)} disabled={busy} aria-label={`Remove ${t.name}`}>
             <X className="h-3 w-3 text-slate-500" />
           </button>
