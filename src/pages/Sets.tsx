@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { Plus } from "lucide-react";
 import {
   createDayRequirement,
   deleteDayRequirement,
+  listCatalogItems,
   listDayRequirements,
   listFacilities,
   listToteTemplatesWithItems,
@@ -14,6 +16,7 @@ import {
 } from "../lib/api";
 import type {
   AssetStatus,
+  CatalogItem,
   DayRequirement,
   DayRequirementScaling,
   Facility,
@@ -21,6 +24,7 @@ import type {
   ToteTemplateWithItems,
   TrackedAsset,
 } from "../lib/types";
+import SetEditor from "../components/SetEditor";
 import TrayPhotos from "../components/TrayPhotos";
 import { formatDateShort } from "../utils/dates";
 import RenameField from "../components/RenameField";
@@ -69,16 +73,24 @@ export default function Sets() {
   const [assets, setAssets] = useState<TrackedAsset[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [templates, setTemplates] = useState<ToteTemplateWithItems[]>([]);
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<TrackedAsset | null>(null);
+  const [editingSet, setEditingSet] = useState<{ set: ToteTemplateWithItems | null } | null>(null);
 
   function refresh() {
     setLoading(true);
-    return Promise.all([listTrackedAssets(), listFacilities(), listToteTemplatesWithItems()])
-      .then(([a, f, t]) => {
+    return Promise.all([
+      listTrackedAssets(),
+      listFacilities(),
+      listToteTemplatesWithItems(),
+      listCatalogItems(),
+    ])
+      .then(([a, f, t, c]) => {
         setAssets(a);
         setFacilities(f);
         setTemplates(t);
+        setCatalog(c);
       })
       .finally(() => setLoading(false));
   }
@@ -115,14 +127,28 @@ export default function Sets() {
         </p>
       </div>
 
-      {!loading && templates.length > 0 && (
+      {!loading && (
         <div className="mt-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-            Set definitions
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            What's in each set, and who it goes to — rename here, edit the rules on its page.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+                Set definitions
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                What's in each set, and who it goes to — rename here, edit contents in the full editor.
+              </p>
+            </div>
+            <button
+              onClick={() => setEditingSet({ set: null })}
+              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white"
+            >
+              <Plus className="h-4 w-4" />
+              New set
+            </button>
+          </div>
+          {templates.length === 0 && (
+            <p className="mt-3 text-xs text-slate-600">No sets defined yet.</p>
+          )}
           <div className="mt-2 space-y-2">
             {templates.map((t) => (
               <div
@@ -143,13 +169,17 @@ export default function Sets() {
                     {t.reusable ? " · reusable instrument set" : ""}
                   </p>
                 </div>
-                <WikiLinkButton
-                  entityType="tote_template"
-                  entityId={t.id}
-                  title={t.name}
-                  label="Page"
-                  className="shrink-0"
-                />
+                <span className="flex shrink-0 items-center gap-2">
+                  <button onClick={() => setEditingSet({ set: t })} className="text-sm text-sky-400 underline">
+                    Contents
+                  </button>
+                  <WikiLinkButton
+                    entityType="tote_template"
+                    entityId={t.id}
+                    title={t.name}
+                    label="Page"
+                  />
+                </span>
               </div>
             ))}
           </div>
@@ -190,6 +220,18 @@ export default function Sets() {
             setEditing(null);
             refresh();
           }}
+        />
+      )}
+
+      {editingSet && (
+        <SetEditor
+          set={editingSet.set}
+          catalog={catalog}
+          territoryId={profile?.territory_id ?? null}
+          uploadedBy={profile?.id ?? null}
+          onCatalogChanged={(item) => setCatalog((prev) => [...prev, item])}
+          onClose={() => setEditingSet(null)}
+          onChanged={refresh}
         />
       )}
     </div>
